@@ -1,0 +1,285 @@
+/* Invoice rendering (PDF) — synced to `izimoto-invoice.html` preview styles. */
+
+.inv-download {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #050505;
+  color: #fff;
+}
+
+.inv-download-card {
+  width: min(520px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(14px);
+}
+
+.inv-download-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.inv-download-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.inv-download-btn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 0;
+  background: #1f4fff;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Variables are scoped to `.preview` so they don't affect the rest of the app. */
+.preview {
+  --blue: #1f4fff;
+  --blue-light: #4a78ff;
+  --green: #27ae60;
+  --bg: #050505;
+  --surface: #0a0a0a;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-mid: rgba(255, 255, 255, 0.14);
+  --text: #fff;
+  --muted: rgba(255, 255, 255, 0.55);
+  --dim: rgba(255, 255, 255, 0.35);
+  --pink: #d6166b;
+  font-family: var(--font-sans);
+}
+
+/* ─── INVOICE PREVIEW ─── */
+.preview {
+  background: #050505;
+  padding: 32px 28px 48px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+
+/* MASTHEAD */
+.inv-masthead {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.inv-from { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; align-items: flex-start; }
+.inv-from-meta { display: flex; flex-direction: column; gap: 1px; }
+.inv-from-name {
+  font-family: 'Anton', Impact, sans-serif;
+  font-size: 13px; letter-spacing: .1em; line-height: 1.1; color: var(--text);
+}
+.inv-from-line { font-size: 10.5px; color: var(--muted); letter-spacing: .01em; line-height: 1.55; }
+.inv-stamp { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; flex: 0 0 auto; }
+.inv-stamp-tag {
+  font-family: 'Anton', Impact, sans-serif;
+  font-size: 24px; letter-spacing: .06em; line-height: .9; color: var(--blue); white-space: nowrap;
+}
+.inv-stamp-num {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .18em;
+  color: rgba(255,255,255,.65);
+}
+.inv-stamp-status {
+  margin-top: 4px; padding: 5px 9px; border-radius: 999px;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .18em; white-space: nowrap;
+}
+.status-due  { background: rgba(31,79,255,.14); color: #4A78FF; border: 1px solid rgba(31,79,255,.4); }
+.status-paid { background: rgba(39,174,96,.14); color: #27AE60; border: 1px solid rgba(39,174,96,.4); }
+
+/* META STRIP */
+.inv-meta {
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 1px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; overflow: hidden;
+}
+.inv-meta > div {
+  background: var(--surface); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.inv-meta span {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .16em;
+  color: rgba(255,255,255,.45); text-transform: uppercase;
+}
+.inv-meta b {
+  font-family: 'Archivo', sans-serif; font-weight: 600; font-size: 12px;
+  color: #fff; letter-spacing: .01em;
+}
+
+/* PARTIES */
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.inv-eyebrow {
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .22em;
+  color: rgba(255,255,255,.45); text-transform: uppercase; margin-bottom: 8px;
+}
+.inv-eyebrow--big { font-size: 10px; margin-top: 4px; }
+.inv-party-name {
+  font-family: 'Archivo', sans-serif; font-weight: 700; font-size: 15px;
+  color: #fff; line-height: 1.2; margin-bottom: 4px;
+}
+.inv-party-line { font-size: 11.5px; color: rgba(255,255,255,.65); line-height: 1.55; }
+
+/* TABLE */
+.inv-table { border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); }
+.inv-tr {
+  display: grid; grid-template-columns: 1fr 50px 110px;
+  gap: 10px; padding: 13px 4px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  align-items: start;
+}
+.inv-tr:last-child { border-bottom: 0; }
+.inv-th {
+  padding: 9px 4px; border-bottom: 1px solid rgba(255,255,255,.18);
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .18em;
+  color: rgba(255,255,255,.45); text-transform: uppercase;
+}
+.inv-tr.inv-th { align-items: center; }
+.inv-tr .r { text-align: right; }
+.inv-svc { font-family: 'Archivo', sans-serif; font-weight: 600; font-size: 13px; color: #fff; line-height: 1.2; }
+.inv-tr .tab {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  font-variant-numeric: tabular-nums; color: rgba(255,255,255,.85);
+}
+.inv-tr .tab.strong { color: #fff; font-weight: 500; }
+
+/* Rich service descriptions */
+.inv-svc-bullets {
+  margin-top: 5px;
+  display: grid;
+  gap: 2px;
+}
+.inv-svc-bullet {
+  font-family: var(--font-sans);
+  font-size: 10px; /* matches totals label scale like “Deposit due (60%)” */
+  color: rgba(255,255,255,.65);
+  letter-spacing: 0.01em;
+  line-height: 1.55;
+}
+
+/* VALIDITY BANNER */
+.inv-validity {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: 8px;
+  background: rgba(31,79,255,.07); border: 1px solid rgba(31,79,255,.2);
+}
+.inv-validity-icon { color: rgba(31,79,255,.8); flex-shrink: 0; }
+.inv-validity-text {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .12em;
+  color: rgba(255,255,255,.65); text-transform: uppercase;
+}
+.inv-validity-text b { color: #4A78FF; letter-spacing: .16em; }
+
+/* TOTALS */
+.inv-totals { display: grid; gap: 12px; margin-top: 4px; }
+.inv-totals-rows {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.inv-totals-rows .row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .04em;
+  color: rgba(255,255,255,.7); font-variant-numeric: tabular-nums;
+}
+.inv-totals-rows .row span:first-child {
+  font-size: 10px; letter-spacing: .14em; color: rgba(255,255,255,.5); text-transform: uppercase;
+}
+.inv-totals-rows .row.total {
+  margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.14);
+}
+.inv-totals-rows .row.total span:first-child {
+  font-family: 'Anton', Impact, sans-serif; font-size: 14px; letter-spacing: .06em; color: #fff;
+}
+.inv-totals-rows .row.total span:last-child {
+  font-family: 'Anton', Impact, sans-serif; font-size: 18px; letter-spacing: .02em; color: #fff;
+}
+.inv-balance {
+  padding: 18px; border-radius: 10px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  position: relative; overflow: hidden;
+}
+.inv-balance.due {
+  background: linear-gradient(140deg, rgba(31,79,255,.18), rgba(31,79,255,.04));
+  border: 1px solid rgba(31,79,255,.5);
+}
+.inv-balance.paid {
+  background: linear-gradient(140deg, rgba(39,174,96,.16), rgba(39,174,96,.04));
+  border: 1px solid rgba(39,174,96,.45);
+}
+.inv-balance-lbl {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .2em;
+  color: #fff; text-transform: uppercase; opacity: .85;
+}
+.inv-balance-val {
+  font-family: 'Anton', Impact, sans-serif; font-size: 44px; letter-spacing: -.01em; line-height: .95; color: #fff;
+}
+.inv-balance-when {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em;
+  color: rgba(255,255,255,.65); text-transform: uppercase; margin-top: 2px;
+}
+
+/* PAYMENT */
+.inv-payment { padding: 16px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.inv-pay-grid { display: flex; flex-direction: column; }
+.inv-pay-grid > div {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-bottom: 1px dashed rgba(255,255,255,.08);
+}
+.inv-pay-grid > div:last-child { border-bottom: 0; }
+.inv-pay-grid span {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .16em;
+  color: rgba(255,255,255,.45); text-transform: uppercase; flex: 0 0 auto;
+}
+.inv-pay-grid b {
+  font-family: 'Archivo', sans-serif; font-weight: 600; font-size: 12px;
+  color: #fff; text-align: right; letter-spacing: .01em;
+}
+
+/* WORKSHOP PARTNER */
+.inv-partner { padding: 16px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+.inv-partner-row { display: flex; align-items: center; gap: 14px; }
+.inv-izi-logo { height: 44px; width: auto; flex: 0 0 auto; }
+.inv-izi-fallback {
+  font-family: 'Anton', Impact, sans-serif;
+  font-size: 26px; letter-spacing: .02em; color: var(--pink);
+  flex: 0 0 auto; line-height: 1;
+}
+.inv-partner-meta { font-size: 10.5px; color: rgba(255,255,255,.65); line-height: 1.55; }
+.inv-partner-meta b { color: #fff; font-weight: 600; }
+
+/* NOTES */
+.inv-notes { padding: 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font-size: 11px; color: rgba(255,255,255,.6); line-height: 1.6; }
+.inv-notes .inv-eyebrow { margin-bottom: 6px; }
+
+/* FOOTER */
+.inv-footer-rule {
+  display: flex; justify-content: center; align-items: center; gap: 14px;
+  padding-top: 18px; margin-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  font-family: 'Anton', Impact, sans-serif; font-size: 11px; letter-spacing: .22em;
+  color: rgba(255,255,255,.45); text-transform: uppercase;
+}
+.inv-footer-rule .dot { width: 4px; height: 4px; border-radius: 999px; background: var(--blue); }
+
+/* ─── PRINT — dark, single page ─── */
+@media print {
+  @page { size: 210mm auto; margin: 0; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body   { width: 210mm !important; background: #050505 !important; margin: 0 !important; padding: 0 !important; }
+  .app-header  { display: none !important; }
+  .editor      { display: none !important; }
+  .layout      { display: block !important; width: 210mm !important; }
+  .preview     { background: #050505 !important; width: 210mm !important; padding: 10mm 12mm !important; box-sizing: border-box !important; }
+}

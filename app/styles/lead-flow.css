@@ -1,0 +1,814 @@
+/* Lead-capture flow styles — TikTok-native, full-bleed, dark, blue-accent */
+:root {
+  --mc-blue: #1F4FFF;
+}
+.lf-root {
+  position: absolute;
+  inset: 0;
+  background: #0A0A0A;
+  color: #fff;
+  font-family: var(--font-sans);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.lf-acc { color: var(--mc-blue); }
+.lf-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--mc-blue);
+  margin-right: 8px;
+  animation: lf-blink 1.4s infinite;
+  vertical-align: middle;
+}
+@keyframes lf-blink { 0%,60%{opacity:1} 70%,100%{opacity:.2} }
+
+.lf-page {
+  position: absolute; inset: 0;
+  animation: lf-in 360ms cubic-bezier(.2,.7,.2,1) both;
+  display: flex; flex-direction: column;
+}
+.lf-page--out { animation: lf-out 360ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes lf-in { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes lf-out { from { transform: translateY(-24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ───────── chrome ───────── */
+.lf-chrome {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px 14px;
+}
+.lf-back {
+  width: 36px; height: 36px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  color: #fff;
+  display: grid; place-items: center;
+  cursor: pointer;
+  flex: 0 0 36px;
+}
+.lf-back:disabled { opacity: .25; cursor: default; }
+.lf-progress {
+  flex: 1; height: 2px;
+  background: rgba(255,255,255,.1);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.lf-progress-bar {
+  height: 100%;
+  background: var(--mc-blue);
+  transition: width 320ms cubic-bezier(.2,.7,.2,1);
+}
+.lf-step-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .14em;
+}
+
+.lf-step { display: flex; flex-direction: column; height: 100%; }
+.lf-body {
+  flex: 1;
+  display: flex; flex-direction: column;
+  padding: 24px 24px 32px;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.lf-body::-webkit-scrollbar { width: 0; }
+
+/* ───────── question heads ───────── */
+.lf-q { display: flex; flex-direction: column; gap: 10px; }
+.lf-q-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--mc-blue);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.lf-q-title {
+  font-family: var(--font-display);
+  font-size: 56px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.lf-q-helper {
+  font-size: 14px;
+  color: rgba(255,255,255,.55);
+  line-height: 1.5;
+  max-width: 320px;
+}
+.lf-q-foot { margin-top: auto; }
+
+/* ───────── inputs ───────── */
+.lf-input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid rgba(255,255,255,.15);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 30px;
+  padding: 16px 0 12px;
+  outline: none;
+  transition: border-color 200ms;
+  letter-spacing: -.005em;
+}
+.lf-input:focus { border-bottom-color: var(--mc-blue); }
+.lf-input::placeholder { color: rgba(255,255,255,.25); font-weight: 700; }
+.lf-input--big { font-size: 32px; }
+
+.lf-suggest { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.lf-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  padding: 8px 12px;
+  background: rgba(255,255,255,.05);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms;
+}
+.lf-chip:hover { background: rgba(31,79,255,.16); border-color: var(--mc-blue); }
+
+/* ───────── big buttons ───────── */
+.lf-bigbtn {
+  width: 100%;
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 20px;
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  border: 0;
+  cursor: pointer;
+  transition: transform 120ms, background 160ms;
+}
+.lf-bigbtn:active { transform: translateY(1px) scale(.99); }
+.lf-bigbtn--primary {
+  background: var(--mc-blue);
+  color: #fff;
+}
+.lf-bigbtn--primary:hover { background: #4A78FF; }
+.lf-bigbtn--primary:disabled { background: rgba(255,255,255,.08); color: rgba(255,255,255,.3); cursor: default; }
+.lf-bigbtn--ghost {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.18);
+}
+
+/* ───────── Hook step ───────── */
+.lf-hook { position: relative; height: 100%; padding: 24px; display: flex; flex-direction: column; overflow: hidden; }
+.lf-hook-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(31,79,255,.34), transparent 50%),
+    radial-gradient(circle at 20% 90%, rgba(255,255,255,.04), transparent 55%),
+    linear-gradient(180deg, #0A0A0A, #050505);
+  animation: lf-hook-bg 6s ease-in-out infinite alternate;
+}
+@keyframes lf-hook-bg {
+  from { background-position: 0% 0%, 0% 0%, 0% 0%; }
+  to   { background-position: 10% 5%, -5% -5%, 0% 0%; }
+}
+.lf-hook-grain {
+  position: absolute; inset: 0;
+  opacity: .08; mix-blend-mode: overlay;
+  background-image:
+    radial-gradient(rgba(255,255,255,.5) .5px, transparent .5px),
+    radial-gradient(rgba(0,0,0,.5) .5px, transparent .5px);
+  background-size: 3px 3px, 3px 3px;
+}
+.lf-hook-content {
+  position: relative; z-index: 2;
+  flex: 1;
+  display: flex; flex-direction: column; justify-content: center; gap: 32px;
+}
+.lf-hook-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.6);
+  text-transform: uppercase;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 380ms, transform 380ms;
+}
+.lf-hook-eyebrow.in { opacity: 1; transform: translateY(0); }
+.lf-hook-source { color: var(--mc-blue); font-weight: 700; }
+
+.lf-hook-title {
+  font-family: var(--font-display);
+  font-size: 96px;
+  line-height: .82;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+.lf-hook-line {
+  display: block;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 460ms cubic-bezier(.2,.7,.2,1), transform 460ms cubic-bezier(.2,.7,.2,1);
+}
+.lf-hook-line.in { opacity: 1; transform: translateY(0); }
+.lf-hook-acc { color: var(--mc-blue); }
+
+.lf-hook-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255,255,255,.65);
+  max-width: 280px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 380ms, transform 380ms;
+}
+.lf-hook-sub.in { opacity: 1; transform: translateY(0); }
+
+.lf-hook-cta {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 480ms, transform 480ms;
+}
+.lf-hook-cta.in { opacity: 1; transform: translateY(0); }
+.lf-hook-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: rgba(255,255,255,.4);
+}
+
+/* ───────── Lanes ───────── */
+.lf-lanes { display: flex; flex-direction: column; gap: 10px; }
+.lf-lane {
+  position: relative;
+  text-align: left;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 20px 18px 18px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms, transform 120ms;
+  display: flex; flex-direction: column; gap: 4px;
+  color: #fff;
+}
+.lf-lane:hover { border-color: rgba(255,255,255,.25); }
+.lf-lane.on { border-color: var(--mc-blue); background: rgba(31,79,255,.12); }
+.lf-lane-num {
+  position: absolute; top: 16px; right: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255,255,255,.5);
+  letter-spacing: .14em;
+}
+.lf-lane-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+}
+.lf-lane-sub {
+  font-size: 12px;
+  color: rgba(255,255,255,.6);
+}
+.lf-lane-em {
+  font-family: var(--font-ui);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--mc-blue);
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+/* ───────── Services ───────── */
+.lf-services {
+  display: flex; flex-direction: column; gap: 8px;
+  flex: 1; overflow-y: auto;
+  padding: 2px;
+  margin: -2px;
+}
+.lf-services::-webkit-scrollbar { width: 0; }
+.lf-svc {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 160ms;
+  text-align: left;
+}
+.lf-svc:hover { border-color: rgba(255,255,255,.2); }
+.lf-svc.on { background: rgba(31,79,255,.14); border-color: var(--mc-blue); }
+.lf-svc-icon {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  color: var(--mc-blue);
+  width: 28px; text-align: center;
+  flex: 0 0 28px;
+}
+.lf-svc-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.lf-svc-label {
+  font-family: var(--font-ui);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -.005em;
+}
+.lf-svc-sub {
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+}
+.lf-svc-check {
+  width: 24px; height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.2);
+  display: grid; place-items: center;
+  font-size: 13px;
+  color: var(--mc-blue);
+  flex: 0 0 24px;
+}
+.lf-svc.on .lf-svc-check { border-color: var(--mc-blue); background: var(--mc-blue); color: #fff; }
+
+/* ───────── Service detail controls ───────── */
+.lf-optgrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.lf-opt {
+  text-align: left;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 16px 16px;
+  cursor: pointer;
+  transition: all 160ms;
+  color: #fff;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.lf-opt:hover { border-color: rgba(255,255,255,.25); }
+.lf-opt.on { border-color: var(--mc-blue); background: rgba(31,79,255,.12); }
+.lf-opt-title {
+  font-family: var(--font-ui);
+  font-weight: 850;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+.lf-opt-sub { font-size: 12px; color: rgba(255,255,255,.55); line-height: 1.45; }
+
+.lf-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.lf-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  padding: 9px 12px;
+  background: rgba(255,255,255,.06);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+.lf-pill:hover { border-color: rgba(255,255,255,.26); }
+.lf-pill.on { background: rgba(31,79,255,.18); border-color: var(--mc-blue); }
+.lf-pill--ghost { background: transparent; }
+
+.lf-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+}
+.lf-toggle-l {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.lf-toggle-k { font-family: var(--font-ui); font-weight: 850; letter-spacing: -.01em; font-size: 13px; text-transform: uppercase; }
+.lf-toggle-s { font-size: 12px; color: rgba(255,255,255,.55); line-height: 1.4; }
+.lf-switch {
+  width: 44px; height: 26px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06);
+  position: relative;
+  flex: 0 0 44px;
+}
+.lf-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 20px; height: 20px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.75);
+  transition: left 160ms, background 160ms;
+}
+.lf-switch.on { background: rgba(31,79,255,.28); border-color: rgba(31,79,255,.7); }
+.lf-switch.on::after { left: 21px; background: #fff; }
+
+.lf-textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.03);
+  color: #fff;
+  padding: 14px 14px;
+  font-family: var(--font-ui);
+  font-weight: 650;
+  outline: none;
+  line-height: 1.4;
+}
+.lf-textarea:focus { border-color: var(--mc-blue); }
+.lf-textarea::placeholder { color: rgba(255,255,255,.35); }
+
+/* ───────── Car panel picker ───────── */
+.lf-panels { display: flex; flex-direction: column; gap: 12px; }
+.lf-panels-top { display: flex; flex-direction: column; gap: 8px; }
+.lf-panels-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lf-panels-hint { font-size: 12px; color: rgba(255,255,255,.55); line-height: 1.45; }
+.lf-groups { display: flex; flex-direction: column; gap: 10px; }
+.lf-group {
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.02);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.lf-group-h {
+  width: 100%;
+  text-align: left;
+  padding: 14px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: transparent;
+  border: 0;
+}
+.lf-group-left { display: flex; flex-direction: column; gap: 2px; }
+.lf-group-title { font-family: var(--font-ui); font-weight: 900; letter-spacing: .02em; text-transform: uppercase; font-size: 12px; }
+.lf-group-sub { font-size: 12px; color: rgba(255,255,255,.55); }
+.lf-group-right { display: flex; align-items: center; gap: 10px; }
+.lf-group-count { font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; color: rgba(255,255,255,.65); }
+.lf-group-chev { transform: rotate(0deg); transition: transform 160ms; font-size: 22px; line-height: 1; opacity: .75; }
+.lf-group-chev.on { transform: rotate(90deg); }
+.lf-group-body { padding: 12px 14px 14px; border-top: 1px solid rgba(255,255,255,.08); display: grid; gap: 10px; }
+.lf-group-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lf-group-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lf-chip2 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.9);
+  cursor: pointer;
+  transition: all 160ms;
+  text-align: center;
+}
+.lf-chip2.on { background: rgba(31,79,255,.18); border-color: var(--mc-blue); color: #fff; }
+
+/* ───────── Timeframe ───────── */
+.lf-times { display: flex; flex-direction: column; gap: 10px; }
+.lf-time {
+  text-align: left;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  padding: 22px 20px;
+  cursor: pointer;
+  transition: all 160ms;
+  color: #fff;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.lf-time:hover { border-color: rgba(255,255,255,.25); }
+.lf-time.on { border-color: var(--mc-blue); background: rgba(31,79,255,.12); }
+.lf-time-label {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+}
+.lf-time-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,.55);
+}
+
+/* ───────── Loading screen ───────── */
+.lf-load {
+  flex: 1;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  gap: 40px;
+  padding: 40px;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(31,79,255,.2), transparent 50%),
+    #0A0A0A;
+}
+.lf-load-mark {
+  font-family: var(--font-display);
+  font-size: 96px;
+  line-height: .85;
+  letter-spacing: -.02em;
+  animation: lf-load-pulse 1.4s infinite;
+}
+@keyframes lf-load-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.7;transform:scale(.98)} }
+.lf-load-list {
+  display: flex; flex-direction: column; gap: 14px;
+  width: 100%;
+  max-width: 280px;
+}
+.lf-load-line {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .12em;
+  color: rgba(255,255,255,.3);
+  text-transform: uppercase;
+  transition: color 200ms;
+}
+.lf-load-line.on { color: #fff; }
+.lf-load-line.done { color: rgba(255,255,255,.5); }
+.lf-load-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.2);
+  flex: 0 0 6px;
+}
+.lf-load-line.on .lf-load-dot { background: var(--mc-blue); animation: lf-blink 1s infinite; }
+.lf-load-line.done .lf-load-dot { background: var(--mc-blue); }
+.lf-load-tick { margin-left: auto; color: var(--mc-blue); }
+
+/* ───────── Job ticket ───────── */
+.lf-ticket-wrap {
+  flex: 1;
+  display: flex; flex-direction: column;
+  padding: 24px 20px 28px;
+  gap: 16px;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 70% 0%, rgba(31,79,255,.16), transparent 40%),
+    #0A0A0A;
+}
+.lf-ticket-wrap::-webkit-scrollbar { width: 0; }
+.lf-ticket-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255,255,255,.6);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.lf-ticket-title {
+  font-family: var(--font-display);
+  font-size: 52px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+  margin: 4px 0 0;
+}
+.lf-ticket-reply {
+  font-family: var(--font-ui);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.4;
+  color: rgba(255,255,255,.85);
+  border-left: 2px solid var(--mc-blue);
+  padding: 4px 0 4px 14px;
+  margin: 4px 0 4px;
+}
+
+/* ticket card with perforated edges */
+.lf-ticket {
+  position: relative;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 4px;
+  padding: 22px 18px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.lf-ticket-perf {
+  position: absolute; left: -1px; right: -1px;
+  height: 8px;
+  top: -4px;
+  background-image: radial-gradient(circle, #0A0A0A 3px, transparent 3.5px);
+  background-size: 12px 8px;
+  background-position: 0 center;
+  background-repeat: repeat-x;
+}
+.lf-ticket-perf--bottom { top: auto; bottom: -4px; }
+.lf-ticket-row {
+  display: flex; justify-content: space-between; gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.lf-ticket-k { color: rgba(255,255,255,.5); letter-spacing: .14em; }
+.lf-ticket-v { color: #fff; text-align: right; max-width: 60%; }
+
+.lf-eta {
+  margin-top: 8px;
+  text-align: center;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 18px 16px;
+  border: 1px solid rgba(31,79,255,.4);
+  border-radius: 8px;
+  background: rgba(31,79,255,.05);
+}
+.lf-eta-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.65);
+  text-transform: uppercase;
+}
+.lf-eta-clock {
+  font-family: var(--font-display);
+  font-size: 56px;
+  line-height: 1;
+  letter-spacing: -.02em;
+  display: flex; gap: 6px; justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+.lf-eta-sep { color: var(--mc-blue); }
+.lf-eta-tick { color: var(--mc-blue); animation: lf-blink 1s infinite; }
+.lf-eta-foot {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.4);
+  text-transform: uppercase;
+}
+
+.lf-ticket-cta { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.lf-ticket-foot {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .18em;
+  color: rgba(255,255,255,.35);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* ───────── Share card ───────── */
+.lf-share {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,.85);
+  backdrop-filter: blur(20px);
+  z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  animation: lf-in 320ms cubic-bezier(.2,.7,.2,1);
+}
+.lf-share-card {
+  position: relative;
+  width: 240px;
+  aspect-ratio: 9/16;
+  background: #0A0A0A;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding: 24px;
+}
+.lf-share-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(31,79,255,.45), transparent 55%),
+    radial-gradient(circle at 20% 80%, rgba(255,255,255,.06), transparent 55%),
+    linear-gradient(180deg, #0A0A0A, #050505);
+}
+.lf-share-grain {
+  position: absolute; inset: 0;
+  opacity: .12; mix-blend-mode: overlay;
+  background-image:
+    radial-gradient(rgba(255,255,255,.5) .5px, transparent .5px);
+  background-size: 3px 3px;
+}
+.lf-share-eyebrow {
+  position: relative; z-index: 2;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .18em;
+  color: rgba(255,255,255,.7);
+  text-transform: uppercase;
+}
+.lf-share-mark {
+  position: relative; z-index: 2;
+  font-family: var(--font-display);
+  font-size: 64px;
+  line-height: 1;
+  letter-spacing: -.02em;
+  margin: 16px 0 24px;
+}
+.lf-share-title {
+  position: relative; z-index: 2;
+  font-family: var(--font-display);
+  font-size: 36px;
+  line-height: .88;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+.lf-share-foot {
+  position: relative; z-index: 2;
+  margin-top: auto;
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: .14em;
+  color: rgba(255,255,255,.5);
+  text-transform: uppercase;
+}
+.lf-share-close {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.lf-share-help {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .18em;
+  color: rgba(255,255,255,.4);
+  text-transform: uppercase;
+}
+
+.lf-minihead {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: rgba(255,255,255,.55);
+  text-transform: uppercase;
+}
+
+.lf-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.56);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+}
+.lf-modal-card {
+  width: min(460px, 100%);
+  background: rgba(10,10,10,.96);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.55);
+}
+.lf-modal-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+}
+.lf-modal-sub {
+  margin-top: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(255,255,255,.74);
+  line-height: 1.4;
+}
+.lf-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+.lf-modal-btn {
+  flex: 1;
+  border-radius: 999px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: transparent;
+  color: rgba(255,255,255,.9);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.lf-modal-btn--p {
+  border-color: rgba(31,79,255,.55);
+  background: rgba(31,79,255,.14);
+}
