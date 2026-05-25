@@ -106,7 +106,30 @@
       }
     }
   }
-  slides.forEach((slide, i) => initHlsVideo(slide.querySelector('video'), i === 0, i));
+  // Slide 0 — init immediately so the hero video is ready on first paint.
+  // Slides 1+ — lazy-init via IntersectionObserver so we don't fetch HLS
+  // manifests for slides the user hasn't swiped to yet.
+  if (slides[0]) initHlsVideo(slides[0].querySelector('video'), true, 0);
+
+  if (slides.length > 1) {
+    if ('IntersectionObserver' in window) {
+      const hlsObs = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          const slideEl = entry.target;
+          const idx = slides.indexOf(slideEl);
+          if (idx > 0) {
+            initHlsVideo(slideEl.querySelector('video'), false, idx);
+            hlsObs.unobserve(slideEl);
+          }
+        });
+      }, { rootMargin: '200px', threshold: 0 });
+      slides.slice(1).forEach(slide => hlsObs.observe(slide));
+    } else {
+      // Fallback for older browsers — init all slides immediately
+      slides.slice(1).forEach((slide, i) => initHlsVideo(slide.querySelector('video'), false, i + 1));
+    }
+  }
 
   // ── Progress bar-dots ────────────────────────────────────────────────
   if (progress) {

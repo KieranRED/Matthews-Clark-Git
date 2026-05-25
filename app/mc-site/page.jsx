@@ -45,6 +45,8 @@ const pageCSS = `
   /* ─── DESKTOP / MOBILE SECTION VISIBILITY ─── */
   .desktop-hero,.desktop-tagline,.desktop-log,.desktop-services,.desktop-brand,.desktop-event,.desktop-final-cta,.desktop-book,.desktop-footer{display:block}
   .mobile-hero,.mobile-below{display:none}
+  /* Skip layout/paint for below-fold desktop sections until they scroll into view */
+  .desktop-log,.desktop-services,.desktop-brand,.desktop-event,.desktop-final-cta,.desktop-book,.desktop-footer{content-visibility:auto;contain-intrinsic-size:auto 600px}
 
   /* ─── HEADER (floating) ─── */
   .nav{

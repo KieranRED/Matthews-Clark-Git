@@ -111,29 +111,94 @@ export default function McSiteLayout({ children }) {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgSchema) }} />
+
+      {/*
+        Critical CSS — inlined to eliminate render-blocking.
+        Covers everything visible above the fold: variables, resets, and the full nav.
+        site.css and service.css are loaded asynchronously below — they handle
+        drawer, footer, FAQ, service-page components etc. which are all below-fold
+        or hidden on load, so they can safely arrive after first paint.
+      */}
       <style>{`
-        /* Map Next.js loaded fonts to site.css variable names */
-        :root {
-          --display: var(--font-display), Impact, sans-serif;
-          --headline: var(--font-ui), system-ui, sans-serif;
-          --body: var(--font-sans), system-ui, sans-serif;
-          --mono: var(--font-mono), monospace;
+        /* ── Variables ── */
+        :root{
+          --black:#0D0D0D;--grey-dark:#1A1A1A;--grey-mid:#444444;--grey-light:#888888;
+          --border:#2A2A2A;--border-strong:#3A3A3A;--accent:#1F4FFF;--accent-deep:#1638CC;
+          --accent-bright:#4A78FF;--content-max:1280px;--gutter:48px;--gutter-sm:20px;
+          --nav-h:60px;--ease:cubic-bezier(.2,.8,.2,1);
+          /* Next.js loaded fonts — declared here so they're available before site.css arrives */
+          --display:var(--font-display),Impact,sans-serif;
+          --headline:var(--font-ui),system-ui,sans-serif;
+          --body:var(--font-sans),system-ui,sans-serif;
+          --mono:var(--font-mono),monospace;
         }
-        /* Reset CRM global styles that break page scrolling.
-           globals.css sets html,body{height:100%} and body{overflow-x:hidden}.
-           overflow-x:hidden implicitly makes overflow-y:auto, creating a second
-           scroll container inside the viewport — causing directional stickiness.
-           overflow-x:clip clips without creating a scroll container. */
-        html, body { height: auto !important; overflow-anchor: none; }
-        html { overflow-y: auto; }
-        body { background: #0D0D0D !important; overflow-x: clip !important; }
+        /* ── Resets ── */
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+        html,body{background:var(--black);color:#fff;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+        body{font-family:var(--body);font-size:16px;line-height:1.55;padding-bottom:0}
+        a{color:inherit;text-decoration:none}
+        button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+        img,video{display:block;max-width:100%}
+        ::selection{background:var(--accent);color:#fff}
+        @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.4}}
+        /* ── Container ── */
+        .container{max-width:var(--content-max);margin:0 auto;padding:0 var(--gutter)}
+        @media(max-width:760px){.container{padding:0 var(--gutter-sm)}:root{--gutter:20px}}
+        /* ── Nav ── */
+        .nav{position:fixed;top:20px;left:24px;right:24px;z-index:1000;height:var(--nav-h);display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;padding:0 8px 0 24px;background:rgba(13,13,13,0.55);backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);border:1px solid rgba(255,255,255,.08);border-radius:999px;box-shadow:0 10px 36px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.02) inset;transition:background .3s ease,border-color .3s ease,top .3s ease,box-shadow .3s ease}
+        .nav.scrolled{background:rgba(13,13,13,0.82);border-color:rgba(255,255,255,.10);top:14px;box-shadow:0 14px 44px rgba(0,0,0,.55)}
+        @media(max-width:760px){.nav{top:14px;left:14px;right:14px;padding:0 6px 0 18px;height:54px;grid-template-columns:auto 1fr auto;gap:8px}.nav.scrolled{top:10px}}
+        .nav .brand{display:flex;align-items:baseline;gap:14px;justify-self:start;padding-left:6px;color:#fff;line-height:1}
+        .nav .brand .wm{font-family:var(--display);font-size:22px;letter-spacing:.10em;text-transform:uppercase;color:#fff;display:inline-block}
+        .nav .brand .wm .slash{color:var(--accent);font-weight:500;margin:0 -2px;display:inline-block;transform:translateY(1px)}
+        .nav .brand .mono{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:rgba(255,255,255,.45);text-transform:uppercase;font-weight:400;border-left:1px solid rgba(255,255,255,.16);padding-left:12px}
+        @media(max-width:760px){.nav .brand .wm{font-size:18px}.nav .brand .mono{display:none}}
+        .nav .links{display:flex;align-items:center;gap:28px;justify-self:center;position:relative}
+        .nav .links a{font-family:var(--mono);font-size:11px;font-weight:500;color:rgba(255,255,255,.85);letter-spacing:.18em;text-transform:uppercase;position:relative;padding:8px 0;transition:color .15s ease}
+        .nav .links a:hover,.nav .links a.active{color:#fff}
+        .nav .links a::after{content:'';position:absolute;left:0;right:0;bottom:2px;height:1px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .25s var(--ease)}
+        .nav .links a:hover::after,.nav .links a.active::after{transform:scaleX(1)}
+        .nav .links .has-caret span{display:inline-block;margin-left:6px;font-size:8px;vertical-align:middle;color:rgba(255,255,255,.4);transform:translateY(-1px)}
+        @media(max-width:760px){.nav .links{display:none}}
+        .nav .right{display:flex;align-items:center;gap:10px;justify-self:end}
+        .nav .hamburger{width:44px;height:44px;display:none;align-items:center;justify-content:center;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(0,0,0,.3);color:#fff}
+        .nav .hamburger .lines{display:flex;flex-direction:column;gap:4px;width:16px}
+        .nav .hamburger .lines span{display:block;height:1.5px;background:#fff;width:100%}
+        .nav .hamburger .lines span:nth-child(2){width:11px;margin-left:auto}
+        @media(max-width:760px){.nav .hamburger{display:inline-flex}.nav .btn-accent{display:none}}
+        .btn-accent{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;padding:0 18px 0 22px;border-radius:999px;background:var(--accent);color:#fff;font-family:var(--headline);font-weight:700;font-size:13px;letter-spacing:.02em;transition:background .15s ease,transform .1s ease;white-space:nowrap}
+        .btn-accent:hover{background:var(--accent-bright)}.btn-accent:active{transform:scale(.985);background:var(--accent-deep)}
+        .btn-accent svg{transition:transform .2s ease}.btn-accent:hover svg{transform:translateX(2px)}
+        .nav .svc-drop{position:absolute;top:calc(100% + 12px);left:50%;transform:translate(-50%,-4px);background:#111;border:1px solid #1F1F1F;border-radius:14px;padding:24px;min-width:520px;display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;opacity:0;pointer-events:none;visibility:hidden;box-shadow:0 24px 56px rgba(0,0,0,.6);transition:opacity .2s ease,transform .2s ease,visibility .2s ease;z-index:1001}
+        .nav .svc-wrap{position:relative}
+        .nav .svc-wrap:hover .svc-drop,.nav .svc-wrap:focus-within .svc-drop{opacity:1;pointer-events:auto;visibility:visible;transform:translate(-50%,0)}
+        .nav .svc-drop a{font-family:var(--body);font-weight:500;font-size:14px;letter-spacing:0;text-transform:none;color:#fff;padding:8px 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.04)}
+        .nav .svc-drop a::after{display:none}
+        .nav .svc-drop a:last-child,.nav .svc-drop a:nth-last-child(2){border-bottom:0}
+        .nav .svc-drop a:hover{color:var(--accent)}
+        .nav .svc-drop a .arr{margin-left:auto;font-family:var(--mono);color:rgba(255,255,255,.3);transition:transform .2s ease,color .2s ease}
+        .nav .svc-drop a:hover .arr{color:var(--accent);transform:translateX(2px)}
+        /* ── CRM host overrides ── */
+        html,body{height:auto!important;overflow-anchor:none}
+        html{overflow-y:auto}
+        body{background:#0D0D0D!important;overflow-x:clip!important}
       `}</style>
-      {/* Preconnect to Cloudflare Stream so the TCP+TLS handshake is done before any video requests */}
-      <link rel="preconnect" href="https://customer-36nn7ohpldm6zgjs.cloudflarestream.com" crossOrigin="anonymous" />
-      {/* Preload hls.js from CDN — by the time mobile-hero.js requests it, the browser serves it from cache */}
+
+      {/*
+        Async CSS — preloaded but applied non-blocking after first paint.
+        Covers: drawer, footer, FAQ, service-page components, utilities.
+        noscript fallback for crawlers / JS-disabled browsers.
+      */}
+      <script dangerouslySetInnerHTML={{ __html: `(function(){function a(h){var l=document.createElement('link');l.rel='preload';l.as='style';l.href=h;l.onload=function(){this.onload=null;this.rel='stylesheet'};document.head.appendChild(l)}a('/site/site.css');a('/site/service.css')})();` }} />
+      <noscript>
+        <link rel="stylesheet" href="/site/site.css" />
+        <link rel="stylesheet" href="/site/service.css" />
+      </noscript>
+
+      {/* Preconnect to Cloudflare Stream — no crossOrigin so it matches the poster/thumbnail loads */}
+      <link rel="preconnect" href="https://customer-36nn7ohpldm6zgjs.cloudflarestream.com" />
+      {/* Preload hls.js from CDN */}
       <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" crossOrigin="anonymous" />
-      <link rel="stylesheet" href="/site/site.css" />
-      <link rel="stylesheet" href="/site/service.css" />
       {children}
       <Script src="/site/site.js" strategy="afterInteractive" />
     </>
