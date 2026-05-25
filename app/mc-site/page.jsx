@@ -851,7 +851,7 @@ const desktopHlsScript = `
         if (i === 0) v.play().catch(() => {});
         return;
       }
-      const hls = new window.Hls({ startLevel: -1, abrEwmaDefaultEstimate: 5000000 });
+      const hls = new window.Hls({ startLevel: 0, abrEwmaDefaultEstimate: 500000 });
       hls.loadSource(src);
       hls.attachMedia(v);
       if (i === 0) {

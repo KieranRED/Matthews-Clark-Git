@@ -80,7 +80,11 @@
         return;
       }
       if (!window.Hls || !window.Hls.isSupported()) return;
-      const hls = new window.Hls({ debug: false, startLevel: -1, abrEwmaDefaultEstimate: 5000000 });
+      // startLevel: 0  → always begin at the lowest rendition so the first segment
+      // downloads fast and playback starts immediately. Quality adapts up within 1-2s.
+      // abrEwmaDefaultEstimate: 500000 → conservative 500 Kbps seed; prevents hls.js
+      // from optimistically picking a 4-5 Mbps stream and stalling on the first segment.
+      const hls = new window.Hls({ debug: false, startLevel: 0, abrEwmaDefaultEstimate: 500000 });
       hlsInstances[slideIdx] = hls;
       hls.loadSource(src);
       hls.attachMedia(video);
@@ -106,30 +110,13 @@
       }
     }
   }
-  // Slide 0 — init immediately so the hero video is ready on first paint.
-  // Slides 1+ — lazy-init via IntersectionObserver so we don't fetch HLS
-  // manifests for slides the user hasn't swiped to yet.
-  if (slides[0]) initHlsVideo(slides[0].querySelector('video'), true, 0);
-
-  if (slides.length > 1) {
-    if ('IntersectionObserver' in window) {
-      const hlsObs = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (!entry.isIntersecting) return;
-          const slideEl = entry.target;
-          const idx = slides.indexOf(slideEl);
-          if (idx > 0) {
-            initHlsVideo(slideEl.querySelector('video'), false, idx);
-            hlsObs.unobserve(slideEl);
-          }
-        });
-      }, { rootMargin: '200px', threshold: 0 });
-      slides.slice(1).forEach(slide => hlsObs.observe(slide));
-    } else {
-      // Fallback for older browsers — init all slides immediately
-      slides.slice(1).forEach((slide, i) => initHlsVideo(slide.querySelector('video'), false, i + 1));
-    }
-  }
+  // Init all slides upfront. The dedup guard in initHlsVideo ensures hls.min.js is
+  // only fetched once — subsequent slides attach a load listener to the same script tag.
+  // Slide 0 autoplays; slides 1+ are silent until the play engine activates them.
+  // (A viewport IntersectionObserver was tried but backfired: slides live inside a
+  // position:fixed scroller so all appear intersecting at once, triggering parallel
+  // init of every HLS instance and causing a large TBT spike.)
+  slides.forEach((slide, i) => initHlsVideo(slide.querySelector('video'), i === 0, i));
 
   // ── Progress bar-dots ────────────────────────────────────────────────
   if (progress) {

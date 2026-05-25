@@ -197,8 +197,9 @@ export default function McSiteLayout({ children }) {
 
       {/* Preconnect to Cloudflare Stream — no crossOrigin so it matches the poster/thumbnail loads */}
       <link rel="preconnect" href="https://customer-36nn7ohpldm6zgjs.cloudflarestream.com" />
-      {/* Preload hls.js from CDN */}
-      <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" crossOrigin="anonymous" />
+      {/* Preload hls.js from CDN — no crossOrigin: must match the no-CORS dynamic <script> tag
+          so the browser reuses the preload cache entry instead of fetching twice. */}
+      <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" />
       {children}
       <Script src="/site/site.js" strategy="afterInteractive" />
     </>
