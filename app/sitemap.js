@@ -16,6 +16,8 @@ const pages = [
   { path: '/mc-site/starlight',    priority: 0.7, changeFrequency: 'monthly' },
   { path: '/mc-site/about',        priority: 0.6, changeFrequency: 'monthly' },
   { path: '/mc-site/community',    priority: 0.5, changeFrequency: 'weekly' },
+  { path: '/mc-site/terms',        priority: 0.3, changeFrequency: 'yearly' },
+  { path: '/mc-site/privacy',      priority: 0.3, changeFrequency: 'yearly' },
 ];
 
 export default function sitemap() {

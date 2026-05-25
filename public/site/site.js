@@ -194,7 +194,7 @@
           <div class="legal">
             © 2026 Matthews / Clark<br/>
             Cape Town, South Africa<br/>
-            <a href="#">Terms</a>  ·  <a href="#">Privacy</a>
+            <a href="/mc-site/terms">Terms</a>  ·  <a href="/mc-site/privacy">Privacy</a>
           </div>
         </div>
       </footer>
