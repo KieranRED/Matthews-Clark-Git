@@ -1,8 +1,8 @@
-import "./globals.css";
-import "./styles/lead-flow.css";
-import "./styles/crm-kit.css";
-import "./styles/invoice.css";
-import "./styles/client-portal.css";
+// Root layout — minimal on purpose.
+// CRM styles (globals.css, lead-flow.css, crm-kit.css, invoice.css, client-portal.css)
+// live in app/(crm)/layout.jsx so they only load for CRM routes.
+// mc-site routes skip the (crm) layout entirely, eliminating the render-blocking
+// CSS bundle from the marketing site's critical path.
 
 import { Anton, Archivo, Inter_Tight, JetBrains_Mono } from "next/font/google";
 
