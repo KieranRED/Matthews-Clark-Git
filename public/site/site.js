@@ -11,22 +11,22 @@
 (() => {
   // ── SERVICE INDEX (single source of truth) ─────────────────────
   const SERVICES = [
-    { name: 'PPF',                  href: '/ppf',             id: 'ppf' },
-    { name: 'Wrapping',             href: '/wrapping',        id: 'wrapping' },
-    { name: 'Ceramic Coating',      href: '/ceramic',         id: 'ceramic' },
-    { name: 'Paint Correction',     href: '/correction',      id: 'correction' },
-    { name: 'Detailing',            href: '/detailing',       id: 'detailing' },
-    { name: 'Body Kits',            href: '/body-kits',       id: 'body-kits' },
-    { name: 'Custom Wheels',        href: '/wheels',          id: 'wheels' },
-    { name: 'Starlight Headliners', href: '/starlight',       id: 'starlight' },
+    { name: 'PPF',                  href: '/mc-site/ppf',             id: 'ppf' },
+    { name: 'Wrapping',             href: '/mc-site/wrapping',        id: 'wrapping' },
+    { name: 'Ceramic Coating',      href: '/mc-site/ceramic',         id: 'ceramic' },
+    { name: 'Paint Correction',     href: '/mc-site/correction',      id: 'correction' },
+    { name: 'Detailing',            href: '/mc-site/detailing',       id: 'detailing' },
+    { name: 'Body Kits',            href: '/mc-site/body-kits',       id: 'body-kits' },
+    { name: 'Custom Wheels',        href: '/mc-site/wheels',          id: 'wheels' },
+    { name: 'Starlight Headliners', href: '/mc-site/starlight',       id: 'starlight' },
   ];
 
   const TOP_LINKS = [
     { label: 'The Log',    href: '#',             id: 'log' },
-    { label: 'Community',  href: '/community',    id: 'community' },
-    { label: 'Work',       href: '/work',         id: 'work' },
-    { label: 'About',      href: '/about',        id: 'about' },
-    { label: 'Shop',       href: '/shop',         id: 'shop' },
+    { label: 'Community',  href: '/mc-site/community',    id: 'community' },
+    { label: 'Work',       href: '/mc-site/work',         id: 'work' },
+    { label: 'About',      href: '/mc-site/about',        id: 'about' },
+    { label: 'The Drops',       href: '/mc-site/drops',         id: 'drops' },
   ];
 
   const page = document.body.dataset.page || '';
@@ -53,7 +53,7 @@
         <nav class="links" aria-label="Primary">
           <span class="svc-wrap">
             <a class="has-caret ${SERVICES.some(s => s.id === page) || page === 'services' ? 'active' : ''}"
-               href="/services">Services <span>▾</span></a>
+               href="/mc-site/services">Services <span>▾</span></a>
             <div class="svc-drop" role="menu">${svcDrop}</div>
           </span>
           ${links}
@@ -81,60 +81,70 @@
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
-  }
 
-  // ── DRAWER ───────────────────────────────────────────────────────
-  const drawer = document.createElement('aside');
-  drawer.className = 'drawer';
-  drawer.setAttribute('aria-hidden', 'true');
-  drawer.innerHTML = `
-    <div class="top">
-      <span class="wm">Matthews<span class="slash">/</span>Clark</span>
-      <button class="close" id="mcDrawerClose" aria-label="Close menu">✕</button>
-    </div>
-    <nav>
-      <a href="#" class="svc-toggle" id="mcDrawerServices">Services <span class="ix">01</span></a>
-      <div class="svc-sub" id="mcDrawerServicesSub">
-        ${SERVICES.map(s => `<a href="${s.href}">${s.name}</a>`).join('')}
+    // ── DRAWER ─────────────────────────────────────────────────────
+    const drawer = document.createElement('aside');
+    drawer.className = 'drawer';
+    drawer.setAttribute('aria-hidden', 'true');
+    drawer.innerHTML = `
+      <div class="top">
+        <span class="wm">Matthews<span class="slash">/</span>Clark</span>
+        <button class="close" id="mcDrawerClose" aria-label="Close menu">✕</button>
       </div>
-      <a href="#">The Log <span class="ix">02</span></a>
-      <a href="/community">Community <span class="ix">03</span></a>
-      <a href="/work">Work <span class="ix">04</span></a>
-      <a href="/about">About <span class="ix">05</span></a>
-      <a href="/shop">Shop <span class="ix">06</span></a>
-    </nav>
-    <div class="spacer"></div>
-    <div class="socials">
-      <a href="#">Instagram</a>
-      <a href="#">TikTok</a>
-      <a href="#">WhatsApp</a>
-    </div>
-    <a class="dm-big" href="#book" data-book data-close-drawer>Book a Slot <span>→</span></a>
-  `;
-  document.body.appendChild(drawer);
+      <nav>
+        <a href="#" class="svc-toggle" id="mcDrawerServices">Services <span class="ix">01</span></a>
+        <div class="svc-sub" id="mcDrawerServicesSub">
+          ${SERVICES.map(s => `<a href="${s.href}">${s.name}</a>`).join('')}
+        </div>
+        <a href="#">The Log <span class="ix">02</span></a>
+        <a href="/mc-site/community">Community <span class="ix">03</span></a>
+        <a href="/mc-site/work">Work <span class="ix">04</span></a>
+        <a href="/mc-site/about">About <span class="ix">05</span></a>
+        <a href="/mc-site/drops" class="coming-soon-link">The Drops <span class="ix">06</span><span class="cs-tag">Coming Soon</span></a>
+      </nav>
+      <div class="spacer"></div>
+      <div class="socials">
+        <a href="#">Instagram</a>
+        <a href="#">TikTok</a>
+        <a href="#">WhatsApp</a>
+      </div>
+      <a class="dm-big" href="#book" data-book data-close-drawer>Book a Slot <span>→</span></a>
+    `;
+    document.body.appendChild(drawer);
 
-  const hamburger = document.getElementById('mcHamburger');
-  const closeBtn  = document.getElementById('mcDrawerClose');
-  const svcToggle = document.getElementById('mcDrawerServices');
-  const svcSub    = document.getElementById('mcDrawerServicesSub');
+    const hamburger = document.getElementById('mcHamburger');
+    const closeBtn  = document.getElementById('mcDrawerClose');
+    const svcToggle = document.getElementById('mcDrawerServices');
+    const svcSub    = document.getElementById('mcDrawerServicesSub');
 
-  const openDrawer  = () => { drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; };
-  const closeDrawer = () => { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); document.body.style.overflow=''; if (svcSub){ svcSub.classList.remove('open'); svcToggle.classList.remove('open'); } };
+    const openDrawer  = () => { drawer.classList.add('open'); drawer.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; };
+    const closeDrawer = () => { drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); document.body.style.overflow=''; if (svcSub){ svcSub.classList.remove('open'); svcToggle.classList.remove('open'); } };
 
-  if (hamburger) hamburger.addEventListener('click', openDrawer);
-  if (closeBtn)  closeBtn.addEventListener('click', closeDrawer);
-  if (svcToggle) svcToggle.addEventListener('click', (e) => {
-    e.preventDefault();
-    svcSub.classList.toggle('open');
-    svcToggle.classList.toggle('open');
-  });
-
-  // Close drawer on link click (other than services toggle)
-  drawer.querySelectorAll('a:not(.svc-toggle)').forEach(a => {
-    a.addEventListener('click', () => {
-      if (a.hasAttribute('data-close-drawer') || a.getAttribute('href') !== '#') closeDrawer();
+    if (hamburger) hamburger.addEventListener('click', openDrawer);
+    if (closeBtn)  closeBtn.addEventListener('click', closeDrawer);
+    if (svcToggle) svcToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      svcSub.classList.toggle('open');
+      svcToggle.classList.toggle('open');
     });
-  });
+
+    // Close drawer on link click (other than services toggle)
+    drawer.querySelectorAll('a:not(.svc-toggle)').forEach(a => {
+      a.addEventListener('click', () => {
+        if (a.hasAttribute('data-close-drawer') || a.getAttribute('href') !== '#') closeDrawer();
+      });
+    });
+
+    // ── MOBILE STICKY CTA (sub-pages only) ─────────────────────────
+    if (!document.querySelector('.sticky-cta')) {
+      const sticky = document.createElement('a');
+      sticky.className = 'sticky-cta';
+      sticky.href = '#book';
+      sticky.setAttribute('data-book', '');
+      sticky.innerHTML = `<span>Book a Slot</span><span class="arr">→</span>`;
+      document.body.appendChild(sticky);
+    }
+  }
 
   // ── FOOTER ───────────────────────────────────────────────────────
   const footHost = document.querySelector('[data-mc-footer]');
@@ -155,10 +165,10 @@
             <h4>Explore</h4>
             <ul>
               <li><a href="#">The Log</a></li>
-              <li><a href="/community">Community</a></li>
-              <li><a href="/work">Work</a></li>
-              <li><a href="/about">About</a></li>
-              <li><a href="/shop">Shop</a></li>
+              <li><a href="/mc-site/community">Community</a></li>
+              <li><a href="/mc-site/work">Work</a></li>
+              <li><a href="/mc-site/about">About</a></li>
+              <li><a href="/mc-site/drops">The Drops <span style="font-size:10px;color:var(--accent);letter-spacing:.1em">(Soon)</span></a></li>
             </ul>
           </div>
           <div>
@@ -172,7 +182,7 @@
           <div>
             <h4>Visit</h4>
             <ul>
-              <li>3 Muir Road, Woodstock</li>
+              <li>3 Muir St, Woodstock</li>
               <li>By appointment only</li>
               <li>Mon–Fri 08–17</li>
               <li><a href="#book" data-book>Book a slot →</a></li>
@@ -191,16 +201,6 @@
     `;
   }
 
-  // ── MOBILE STICKY CTA ────────────────────────────────────────────
-  if (!document.querySelector('.sticky-cta')) {
-    const sticky = document.createElement('a');
-    sticky.className = 'sticky-cta';
-    sticky.href = '#book';
-    sticky.setAttribute('data-book', '');
-    sticky.innerHTML = `<span>Book a Slot</span><span class="arr">→</span>`;
-    document.body.appendChild(sticky);
-  }
-
   // ── BOOK-A-SLOT SMOOTH SCROLL ────────────────────────────────────
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-book]');
@@ -209,7 +209,8 @@
     const target = document.getElementById('book');
     if (target) {
       e.preventDefault();
-      if (drawer.classList.contains('open')) closeDrawer();
+      const openDrawerEl = document.querySelector('.drawer.open');
+      if (openDrawerEl) openDrawerEl.classList.remove('open');
       window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 80, behavior:'smooth' });
       setTimeout(() => {
         const f = target.querySelector('input,select,textarea');
@@ -224,6 +225,7 @@
 
   // Escape closes drawer
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+    const openDrawerEl = document.querySelector('.drawer.open');
+    if (e.key === 'Escape' && openDrawerEl) openDrawerEl.classList.remove('open');
   });
 })();

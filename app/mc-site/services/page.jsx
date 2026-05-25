@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Services',
-  description: 'Everything we do at Matthews & Clark — PPF, wrapping, ceramic, paint correction, detailing, body kits, wheels and starlight headliners. Cape Town.',
+  description: 'Everything M/C and Izimoto offer together in Cape Town — PPF, wrapping, ceramic, paint correction, detailing, body kits, wheels and starlight headliners.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/services' },
+  openGraph: {
+    title: 'Services — Matthews / Clark Cape Town',
+    description: 'Everything M/C and Izimoto offer together in Cape Town — PPF, wrapping, ceramic, paint correction, detailing, body kits, wheels and starlight headliners.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/services',
+  },
+  twitter: {
+    title: 'Services — Matthews / Clark Cape Town',
+    description: 'Everything M/C and Izimoto offer together in Cape Town — PPF, wrapping, ceramic, paint correction, detailing, body kits, wheels and starlight headliners.',
+  },
 };
 
 const pageCSS = `
@@ -46,7 +56,7 @@ export default function ServicesPage() {
           <h1>Everything <span className="blue">we do.</span></h1>
           <div className="intro-row">
             <div>
-              <p className="lede">One workshop. Two guys. Eight things we&apos;re very good at. Tell us what you&apos;re trying to do and we&apos;ll tell you exactly what your job costs.</p>
+              <p className="lede">One address, two brands working as one. Matthews &amp; Clark manages the client relationship and project — Izimoto&apos;s team does the work. Eight services, one number to call.</p>
               <div className="actions">
                 <a className="btn-primary" href="#book" data-book="">
                   Book a Slot
@@ -54,13 +64,13 @@ export default function ServicesPage() {
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </span>
                 </a>
-                <a className="btn-ghost" href="/about">About the studio →</a>
+                <a className="btn-ghost" href="/mc-site/about">About the studio →</a>
               </div>
             </div>
             <div className="intro-stat">
               <span className="b">08</span> services<br/>
-              <span className="b">2</span> founders, on every job<br/>
-              <span className="b">1</span> studio, Woodstock CPT
+              <span className="b">2</span> brands, one team<br/>
+              <span className="b">1</span> workshop, Woodstock CPT
             </div>
           </div>
         </div>
@@ -68,35 +78,35 @@ export default function ServicesPage() {
 
       <section className="container" style={{paddingTop:0,paddingBottom:'120px'}}>
         <div className="svc-grid">
-          <a className="svc-card" href="/ppf">
+          <a className="svc-card" href="/mc-site/ppf">
             <div className="img"><span className="ix">01</span><span className="ph">PHOTO / PPF</span><div className="meta"><span>Protection</span><span>5–7 days</span></div></div>
             <div className="body"><h3>PPF</h3><p className="desc">Clear or coloured film bonded to your paint. Chips and scratches stop here.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/wrapping">
+          <a className="svc-card" href="/mc-site/wrapping">
             <div className="img"><span className="ix">02</span><span className="ph">PHOTO / WRAP</span><div className="meta"><span>Presence</span><span>5–10 days</span></div></div>
             <div className="body"><h3>Wrapping</h3><p className="desc">Full colour change or partial wrap. No commitment to factory paint.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/ceramic">
+          <a className="svc-card" href="/mc-site/ceramic">
             <div className="img"><span className="ix">03</span><span className="ph">PHOTO / CERAMIC</span><div className="meta"><span>Protection</span><span>1.5–5 yr</span></div></div>
             <div className="body"><h3>Ceramic Coating</h3><p className="desc">A chemical bond to your clear coat that lasts years, not weeks.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/correction">
+          <a className="svc-card" href="/mc-site/correction">
             <div className="img"><span className="ix">04</span><span className="ph">PHOTO / CORRECTION</span><div className="meta"><span>Restoration</span><span>1–2 days</span></div></div>
             <div className="body"><h3>Paint Correction</h3><p className="desc">Swirl marks, scratches, oxidation — removed with machine polishing.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/detailing">
+          <a className="svc-card" href="/mc-site/detailing">
             <div className="img"><span className="ix">05</span><span className="ph">PHOTO / DETAILING</span><div className="meta"><span>Care</span><span>1–5 days</span></div></div>
             <div className="body"><h3>Detailing</h3><p className="desc">From a quick valet to full strip wash with paint work.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/body-kits">
+          <a className="svc-card" href="/mc-site/body-kits">
             <div className="img"><span className="ix">06</span><span className="ph">PHOTO / BODYKIT</span><div className="meta"><span>Presence</span><span>By project</span></div></div>
             <div className="body"><h3>Body Kits</h3><p className="desc">We source and fit imported kits. Widebody, aero, OEM+ — done properly.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/wheels">
+          <a className="svc-card" href="/mc-site/wheels">
             <div className="img"><span className="ix">07</span><span className="ph">PHOTO / WHEELS</span><div className="meta"><span>Presence</span><span>Sourced</span></div></div>
             <div className="body"><h3>Custom Wheels</h3><p className="desc">Real wheels. Not reps. Right fitment for your car.</p><span className="more">Learn more →</span></div>
           </a>
-          <a className="svc-card" href="/starlight">
+          <a className="svc-card" href="/mc-site/starlight">
             <div className="img"><span className="ix">08</span><span className="ph">PHOTO / STARLIGHT</span><div className="meta"><span>Interior</span><span>2–3 days</span></div></div>
             <div className="body"><h3>Starlight Headliners</h3><p className="desc">Fibre optic ceiling panels. The interior upgrade nobody expects.</p><span className="more">Learn more →</span></div>
           </a>
@@ -105,7 +115,7 @@ export default function ServicesPage() {
 
       <section className="final-cta" id="book">
         <h2>Not sure what <span className="blue">you need?</span></h2>
-        <p className="sub">Send the car, send the goal. We&apos;ll come back same day with what we&apos;d actually do — and what it costs.</p>
+        <p className="sub">Send the car, send the goal. We come back same day with what we&apos;d actually do and what it costs. M&amp;C manages the project. Izimoto does the work. You get the result.</p>
         <a className="btn-big" href="https://matthewsandclark.co.za">
           Book a Slot
           <span className="arr">

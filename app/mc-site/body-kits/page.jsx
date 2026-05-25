@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Body Kits',
-  description: 'Matthews & Clark imports and fits widebody, OEM+ and aero body kits in Cape Town. Sourcing, importing and fitment done in-house.',
+  description: 'Matthews & Clark sources and manages body kit projects in Cape Town through our partnership with Izimoto. Widebody, OEM+ and aero — sourced, imported and fitted.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/body-kits' },
+  openGraph: {
+    title: 'Body Kits — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark sources and manages body kit projects in Cape Town through our partnership with Izimoto. Widebody, OEM+ and aero — sourced, imported and fitted.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/body-kits',
+  },
+  twitter: {
+    title: 'Body Kits — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark sources and manages body kit projects in Cape Town through our partnership with Izimoto. Widebody, OEM+ and aero — sourced, imported and fitted.',
+  },
 };
 
 const baScript = `
@@ -30,6 +40,17 @@ export default function BodyKitsPage() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: `document.body.dataset.page='body-kits';` }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"Which cars can you source body kits for?","acceptedAnswer":{"@type":"Answer","text":"Most popular platforms. European and Japanese primarily. Tell us what you're building."}},
+    {"@type":"Question","name":"How long does body kit import take?","acceptedAnswer":{"@type":"Answer","text":"Lead times vary by supplier and destination. Typically 3–6 weeks. We'll confirm before you commit."}},
+    {"@type":"Question","name":"Can you fit kits I have already bought?","acceptedAnswer":{"@type":"Answer","text":"Yes. If you've sourced a kit and need it fitted properly, we can do that through our workshop partner Izimoto."}},
+    {"@type":"Question","name":"Do you paint-match body kits?","acceptedAnswer":{"@type":"Answer","text":"We can arrange paint matching. Discuss at consultation."}},
+    {"@type":"Question","name":"What is the difference between a widebody kit and a regular body kit?","acceptedAnswer":{"@type":"Answer","text":"A widebody kit flares the arches to accommodate wider wheels and tyres. A standard kit adds aero and styling elements without altering the arch width. Different purpose, different budget."}}
+  ]
+}` }} />
       <header data-mc-nav=""></header>
 
       <section className="svc-hero">
@@ -39,8 +60,8 @@ export default function BodyKitsPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">Body Kits</span>
             </div>
             <h1>Body Kit Imports <span className="blue">&amp; fitting.</span></h1>
@@ -56,7 +77,7 @@ export default function BodyKitsPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark sources and installs imported body kits in Cape Town. We import widebody conversion kits, OEM+ aero packages, front splitters, rear diffusers, and full body conversion kits for a wide range of vehicles. Fitment is handled in-house. We work with verified overseas suppliers and advise on fitment compatibility before ordering.</p>
+          <p>Matthews &amp; Clark sources and manages body kit projects in Cape Town through our partnership with Izimoto. We handle sourcing, importing and project coordination — Izimoto&apos;s workshop team handles all fitment at their Woodstock facility. We work with verified overseas suppliers and confirm compatibility before anything is ordered. Widebody conversions, OEM+ aero packages, front splitters, rear diffusers, and full conversion kits across a wide range of vehicles.</p>
         </div>
       </section>
 
@@ -64,8 +85,8 @@ export default function BodyKitsPage() {
         <div className="container">
           <div className="copy">
             <p>Importing a body kit isn&apos;t complicated until it is. Wrong supplier, wrong fitment, panels that don&apos;t align. We&apos;ve done this enough to know which suppliers are worth the money and which ones aren&apos;t.</p>
-            <p>We source. We import. We fit. You collect the car looking the way you planned it.</p>
-            <p>Most body-kit builds end with <a href="/ppf" style={{color:'var(--accent)'}}>PPF</a> or a <a href="/wrapping" style={{color:'var(--accent)'}}>wrap</a> in the studio — and the right <a href="/wheels" style={{color:'var(--accent)'}}>wheels</a> underneath. Plan it as one project, not three.</p>
+            <p>We source. We import. Izimoto fits. You collect the car looking exactly the way you planned it.</p>
+            <p>Most body-kit builds end with <a href="/mc-site/ppf" style={{color:'var(--accent)'}}>PPF</a> or a <a href="/mc-site/wrapping" style={{color:'var(--accent)'}}>wrap</a> — and the right <a href="/mc-site/wheels" style={{color:'var(--accent)'}}>wheels</a> underneath. We manage it as one project. You deal with us.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
           </div>
           <div className="photo"><span className="stamp">PHOTO  /  BODYKIT  /  STUDIO</span></div>
@@ -100,7 +121,7 @@ export default function BodyKitsPage() {
             <div className="proc-step"><span className="num">01</span><h4>Consultation</h4><p>Tell us the car, the vision. We advise on available kits and fitment compatibility.</p></div>
             <div className="proc-step"><span className="num">02</span><h4>Sourcing</h4><p>We confirm the right kit from a verified supplier. Lead times vary.</p></div>
             <div className="proc-step"><span className="num">03</span><h4>Import &amp; inspection</h4><p>Kit arrives, we inspect it before anything gets fitted.</p></div>
-            <div className="proc-step"><span className="num">04</span><h4>Fitment</h4><p>Installed and adjusted in-workshop. We don&apos;t hand you panels and send you away.</p></div>
+            <div className="proc-step"><span className="num">04</span><h4>Fitment</h4><p>Installed and adjusted at Izimoto&apos;s workshop. We manage the quality check. You don&apos;t get handed panels and sent away.</p></div>
           </div>
         </div>
       </section>
@@ -109,9 +130,9 @@ export default function BodyKitsPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/wheels"><div className="left"><span className="k">Presence</span><span className="n">Custom Wheels</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/wheels"><div className="left"><span className="k">Presence</span><span className="n">Custom Wheels</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>
@@ -134,7 +155,7 @@ export default function BodyKitsPage() {
 
       <section className="final-cta" id="book">
         <h2>Tell us what <span className="blue">you&apos;re building.</span></h2>
-        <p className="sub">Vision, reference photos, current setup — anything. We&apos;ll come back with what&apos;s realistic.</p>
+        <p className="sub">Vision, reference photos, current setup — anything. We source, coordinate and manage. Izimoto builds. You collect something to be proud of.</p>
         <a className="btn-big" href="https://matthewsandclark.co.za">Book a Slot <span className="arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></span></a>
       </section>
 

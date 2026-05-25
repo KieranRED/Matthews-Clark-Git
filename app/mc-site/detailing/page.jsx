@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Car Detailing',
-  description: 'Matthews & Clark offers full car detailing in Cape Town — interior, exterior, wheels and glass. Often combined with ceramic, PPF or correction.',
+  description: 'Matthews & Clark coordinates car detailing in Cape Town through our workshop partnership with Izimoto. Interior, exterior, wheels and glass. Often combined with ceramic, PPF or correction.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/detailing' },
+  openGraph: {
+    title: 'Car Detailing — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark coordinates car detailing in Cape Town through our workshop partnership with Izimoto. Interior, exterior, wheels and glass. Often combined with ceramic, PPF or correction.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/detailing',
+  },
+  twitter: {
+    title: 'Car Detailing — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark coordinates car detailing in Cape Town through our workshop partnership with Izimoto. Interior, exterior, wheels and glass. Often combined with ceramic, PPF or correction.',
+  },
 };
 
 const baScript = `
@@ -30,6 +40,17 @@ export default function DetailingPage() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: `document.body.dataset.page='detailing';` }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"How long does a full detail take?","acceptedAnswer":{"@type":"Answer","text":"A standalone full valet takes a day. Package services take 2–5 days depending on the work involved."}},
+    {"@type":"Question","name":"Do you detail supercars?","acceptedAnswer":{"@type":"Answer","text":"Yes. We've detailed Ferraris, Rolls Royces, Lamborghinis and Porsches. Every car gets the same attention."}},
+    {"@type":"Question","name":"Can I combine detailing with other services?","acceptedAnswer":{"@type":"Answer","text":"Yes — most clients combine a full detail with ceramic coating, paint correction or PPF in the same workshop visit."}},
+    {"@type":"Question","name":"What is the difference between a valet and a detail?","acceptedAnswer":{"@type":"Answer","text":"A valet is a thorough clean. A detail includes paint inspection, decontamination, and often machine polishing. A detail takes longer and costs more — because it's more."}},
+    {"@type":"Question","name":"Do you do interior-only detailing?","acceptedAnswer":{"@type":"Answer","text":"Yes. Interior deep clean including steam cleaning, fabric treatment, and leather conditioning where applicable."}}
+  ]
+}` }} />
       <header data-mc-nav=""></header>
 
       <section className="svc-hero">
@@ -39,8 +60,8 @@ export default function DetailingPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">Detailing</span>
             </div>
             <h1>Car Detailing <span className="blue">in Cape Town.</span></h1>
@@ -55,7 +76,7 @@ export default function DetailingPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark offers car detailing and valeting in Cape Town. Services include full exterior wash, interior deep clean, wheel detailing, and window treatment. Detailing packages can be combined with ceramic coating, paint correction, and PPF as part of the same visit. Most detailing runs alongside other services in the workshop.</p>
+          <p>Matthews &amp; Clark coordinates car detailing in Cape Town through our workshop partnership with Izimoto. Services include full exterior wash, interior deep clean, wheel detailing, and window treatment — all carried out at Izimoto&apos;s 3 Muir St, Woodstock facility. Detailing packages can be combined with ceramic coating, paint correction, and PPF as part of the same visit. Most detailing runs alongside other services.</p>
         </div>
       </section>
 
@@ -63,7 +84,7 @@ export default function DetailingPage() {
         <div className="container">
           <div className="copy">
             <p>A proper detail isn&apos;t a car wash. It&apos;s a full inspection and clean of every surface — paint, glass, interior, wheels, jams and trim. Done before a ceramic, before PPF, or on its own.</p>
-            <p>Most of our detailing clients come in for a <a href="/ceramic" style={{color:'var(--accent)'}}>ceramic</a> or <a href="/correction" style={{color:'var(--accent)'}}>correction</a> — the detail is part of the package, not a standalone. But if your car just needs a proper clean done properly, we can sort that too.</p>
+            <p>Most of our detailing clients come in for a <a href="/mc-site/ceramic" style={{color:'var(--accent)'}}>ceramic</a> or <a href="/mc-site/correction" style={{color:'var(--accent)'}}>correction</a> — the detail is part of the package, not a standalone. But if your car just needs a proper clean done right, we can sort that through Izimoto too.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
           </div>
           <div className="photo"><span className="stamp">PHOTO  /  DETAILING  /  STUDIO</span></div>
@@ -99,9 +120,9 @@ export default function DetailingPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>
@@ -124,7 +145,7 @@ export default function DetailingPage() {
 
       <section className="final-cta" id="book">
         <h2>Ready to <span className="blue">sort it?</span></h2>
-        <p className="sub">Whether it&apos;s a one-off valet or the full lock-in — tell us what the car needs.</p>
+        <p className="sub">Whether it&apos;s a one-off valet or the full lock-in — tell us what the car needs. We manage the project, Izimoto does the work.</p>
         <a className="btn-big" href="https://matthewsandclark.co.za">Book a Slot <span className="arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></span></a>
       </section>
 

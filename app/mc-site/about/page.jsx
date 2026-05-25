@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'About',
-  description: 'Two guys. One garage. Too many cars. Keanan Matthews and Sam Clark — the two faces of M/C, on every job.',
+  description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/about' },
+  openGraph: {
+    title: 'About — Matthews / Clark Cape Town',
+    description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/about',
+  },
+  twitter: {
+    title: 'About — Matthews / Clark Cape Town',
+    description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+  },
 };
 
 const pageCSS = `
@@ -72,7 +82,7 @@ export default function AboutPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
               <span className="here">About</span>
             </div>
             <h1>Two guys.<br/>One garage.<br/><span className="blue">Too many cars.</span></h1>
@@ -139,8 +149,8 @@ export default function AboutPage() {
         <div className="container">
           <div>
             <h2>The new floor.<br/><span className="blue">Twice the bays.</span></h2>
-            <p className="lede">Year one in the old shop is done. The new floor in Woodstock is finished — six bays, two lifts, the new studio next door. Same two guys. Same standard. More room to work.</p>
-            <a className="link-arrow" href="/community" style={{marginTop:'32px'}}>Come see it — RSVP to the launch
+            <p className="lede">Year one in the old shop is done. The new floor in Woodstock is finished — six bays, two lifts, the Izimoto build room next door. Same two guys. Same standard. More room to work.</p>
+            <a className="link-arrow" href="/mc-site/community" style={{marginTop:'32px'}}>Come see it — RSVP to the launch
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </a>
           </div>

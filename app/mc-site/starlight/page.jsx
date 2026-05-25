@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Starlight Headliners',
-  description: 'Matthews & Clark installs custom fibre-optic starlight headliners in Cape Town — standard or shooting-star configurations. 2–3 day install.',
+  description: 'Matthews & Clark manages starlight headliner installations in Cape Town through our partnership with Izimoto. Standard and shooting-star configurations. 2–3 day install.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/starlight' },
+  openGraph: {
+    title: 'Starlight Headliners — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark manages starlight headliner installations in Cape Town through our partnership with Izimoto. Standard and shooting-star configurations. 2–3 day install.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/starlight',
+  },
+  twitter: {
+    title: 'Starlight Headliners — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark manages starlight headliner installations in Cape Town through our partnership with Izimoto. Standard and shooting-star configurations. 2–3 day install.',
+  },
 };
 
 const baScript = `
@@ -52,8 +62,8 @@ export default function StarlightPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">Starlight</span>
             </div>
             <h1>Starlight Headliners <span className="blue">in Cape Town.</span></h1>
@@ -69,7 +79,7 @@ export default function StarlightPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark installs starlight headliners in Cape Town — custom fibre optic roof lining panels that create an illuminated night sky effect inside your vehicle. Each installation is custom to the vehicle&apos;s roof dimensions. Available in standard star configuration and shooting star configuration. Most installations take 2–3 working days.</p>
+          <p>Matthews &amp; Clark manages starlight headliner installations in Cape Town through our partnership with Izimoto. Izimoto&apos;s interior specialists install custom fibre optic roof lining panels that create an illuminated night sky effect inside your vehicle. Each installation is custom to your car&apos;s roof dimensions. Available in standard star configuration and shooting star configuration. Most installations take 2–3 working days.</p>
         </div>
       </section>
 
@@ -78,7 +88,7 @@ export default function StarlightPage() {
           <div className="copy">
             <p>You&apos;ve done the outside. The headliner is the detail nobody sees until they get in — and then they can&apos;t stop looking up.</p>
             <p>Fibre optic panels, installed into your existing roof lining. Custom to your car&apos;s dimensions. Available in standard star configuration or with a shooting star sequence.</p>
-            <p>Most starlight clients pair it with the wider interior package — talk to us about <a href="/detailing" style={{color:'var(--accent)'}}>detailing</a> or full <a href="/wrapping" style={{color:'var(--accent)'}}>build work</a> at the same time.</p>
+            <p>Most starlight clients pair it with the wider interior package — talk to us about <a href="/mc-site/detailing" style={{color:'var(--accent)'}}>detailing</a> or full <a href="/mc-site/wrapping" style={{color:'var(--accent)'}}>build work</a>. We manage all of it as one project at Izimoto&apos;s Woodstock workshop.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
           </div>
           <div className="photo"><span className="stamp">PHOTO  /  STARLIGHT  /  STUDIO</span></div>
@@ -120,8 +130,8 @@ export default function StarlightPage() {
           <div className="sec-h"><span className="label"><span className="num">05</span><span>How it works</span><span className="div"></span><span className="sub">2–3 days</span></span></div>
           <div className="proc-grid">
             <div className="proc-step"><span className="num">01</span><h4>Measurement</h4><p>Roof dimensions taken. Panel cut to fit.</p></div>
-            <div className="proc-step"><span className="num">02</span><h4>Installation</h4><p>Roof lining removed, fibre optic panel fitted, lining reinstalled.</p></div>
-            <div className="proc-step"><span className="num">03</span><h4>Inspection</h4><p>Every fibre tested. You see it before you collect.</p></div>
+            <div className="proc-step"><span className="num">02</span><h4>Installation</h4><p>Izimoto removes the roof lining, fits the fibre optic panel, and reinstalls everything cleanly.</p></div>
+            <div className="proc-step"><span className="num">03</span><h4>Inspection</h4><p>Every fibre tested. We sign it off. You see it before you collect.</p></div>
           </div>
         </div>
       </section>
@@ -130,9 +140,9 @@ export default function StarlightPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/body-kits"><div className="left"><span className="k">Build</span><span className="n">Body Kits</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/detailing"><div className="left"><span className="k">Care</span><span className="n">Detailing</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/body-kits"><div className="left"><span className="k">Build</span><span className="n">Body Kits</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/detailing"><div className="left"><span className="k">Care</span><span className="n">Detailing</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>

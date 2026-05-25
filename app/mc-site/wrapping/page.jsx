@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Vehicle Wrapping',
-  description: 'Matthews & Clark offers vehicle wrapping in Cape Town — full and partial colour change wraps in gloss, matte, satin and colour-shift finishes. 5–10 day install.',
+  description: 'Matthews & Clark coordinates vehicle wrapping in Cape Town through our partnership with Izimoto. Full and partial colour change wraps. 5–10 day turnaround.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/wrapping' },
+  openGraph: {
+    title: 'Vehicle Wrapping — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark coordinates vehicle wrapping in Cape Town through our partnership with Izimoto. Full and partial colour change wraps. 5–10 day turnaround.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/wrapping',
+  },
+  twitter: {
+    title: 'Vehicle Wrapping — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark coordinates vehicle wrapping in Cape Town through our partnership with Izimoto. Full and partial colour change wraps. 5–10 day turnaround.',
+  },
 };
 
 const baScript = `
@@ -30,6 +40,17 @@ export default function WrappingPage() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: `document.body.dataset.page='wrapping';` }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: `{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type":"Question","name":"How long does a wrap last?","acceptedAnswer":{"@type":"Answer","text":"5–7 years with proper care. Keep it out of direct sun where possible, hand wash rather than auto-wash."}},
+    {"@type":"Question","name":"Will a wrap damage my paint?","acceptedAnswer":{"@type":"Answer","text":"Not if your paint is in good condition. If it isn't, we'll tell you before we apply anything."}},
+    {"@type":"Question","name":"How much does wrapping a car cost in Cape Town?","acceptedAnswer":{"@type":"Answer","text":"Depends on the car and the coverage. Drop your car details in the form and we'll give you a real number fast."}},
+    {"@type":"Question","name":"What colours and finishes are available?","acceptedAnswer":{"@type":"Answer","text":"Gloss, matte, satin, chrome, colour-shift. We work with what you're after."}},
+    {"@type":"Question","name":"Can I ceramic coat over a wrap?","acceptedAnswer":{"@type":"Answer","text":"Yes. Ceramic over vinyl adds protection and improves the finish. We do this regularly."}}
+  ]
+}` }} />
       <header data-mc-nav=""></header>
 
       <section className="svc-hero">
@@ -39,8 +60,8 @@ export default function WrappingPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">Wrapping</span>
             </div>
             <h1>Vehicle Wrapping <span className="blue">in Cape Town.</span></h1>
@@ -56,7 +77,7 @@ export default function WrappingPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark offers vehicle wrapping in Cape Town for all vehicle types — full colour change wraps, partial wraps, and accent wraps. Vinyl wrap is applied over factory paint with no permanent change to your car&apos;s original finish. Available in gloss, matte, satin, and colour-shift finishes. Most full-car wraps take 5–10 working days.</p>
+          <p>Matthews &amp; Clark coordinates vehicle wrapping in Cape Town through our partnership with Izimoto. You bring us the vision — we spec the job and manage it through Izimoto&apos;s experienced install team at their Woodstock workshop. Full colour change wraps, partial wraps, and accent wraps. Vinyl is applied over factory paint with no permanent change to your car&apos;s original finish. Available in gloss, matte, satin, and colour-shift finishes. Most full-car wraps take 5–10 working days.</p>
         </div>
       </section>
 
@@ -64,8 +85,8 @@ export default function WrappingPage() {
         <div className="container">
           <div className="copy">
             <p>A wrap gives you a colour change without touching your factory paint. When you&apos;re done with it — or when you&apos;re ready to sell — it comes off clean. The original paint stays underneath, unaffected.</p>
-            <p>That&apos;s not a compromise. That&apos;s smarter than a respray.</p>
-            <p>Pair it with <a href="/ppf" style={{color:'var(--accent)'}}>PPF</a> on the high-impact panels or a <a href="/ceramic" style={{color:'var(--accent)'}}>ceramic coat</a> over the vinyl for extra protection and a sharper finish.</p>
+            <p>That&apos;s not a compromise. That&apos;s smarter than a respray — and you deal with us the whole way through.</p>
+            <p>Pair it with <a href="/mc-site/ppf" style={{color:'var(--accent)'}}>PPF</a> on the high-impact panels or a <a href="/mc-site/ceramic" style={{color:'var(--accent)'}}>ceramic coat</a> over the vinyl for extra protection and a sharper finish.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
           </div>
           <div className="photo"><span className="stamp">PHOTO  /  WRAP  /  STUDIO</span></div>
@@ -98,10 +119,10 @@ export default function WrappingPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">05</span><span>How it works</span><span className="div"></span><span className="sub">5–10 days</span></span></div>
           <div className="proc-grid">
-            <div className="proc-step"><span className="num">01</span><h4>Colour consultation</h4><p>We work through finish and colour options with you. Swatches available in-studio.</p></div>
+            <div className="proc-step"><span className="num">01</span><h4>Colour consultation</h4><p>We work through finish and colour options with you. Swatches available. Izimoto confirms prep requirements before anything is ordered.</p></div>
             <div className="proc-step"><span className="num">02</span><h4>Surface prep</h4><p>The car is cleaned and decontaminated. Any paint damage noted before vinyl goes near it.</p></div>
             <div className="proc-step"><span className="num">03</span><h4>Application</h4><p>Vinyl applied panel by panel. Door jams, edges and cut lines done properly.</p></div>
-            <div className="proc-step"><span className="num">04</span><h4>Inspection</h4><p>Every edge, every seam. You collect it when it&apos;s right.</p></div>
+            <div className="proc-step"><span className="num">04</span><h4>Inspection</h4><p>Every edge, every seam. We sign it off with Izimoto. You collect it when it&apos;s right.</p></div>
           </div>
         </div>
       </section>
@@ -110,9 +131,9 @@ export default function WrappingPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>
@@ -135,7 +156,7 @@ export default function WrappingPage() {
 
       <section className="final-cta" id="book">
         <h2>Ready to <span className="blue">sort it?</span></h2>
-        <p className="sub">Tell us the car and the look. We&apos;ll come back with the right finish and the real timeline.</p>
+        <p className="sub">Tell us the car and the look. We handle the rest — from spec to collection. Izimoto does the installation. You get the result.</p>
         <a className="btn-big" href="https://matthewsandclark.co.za">Book a Slot <span className="arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></span></a>
       </section>
 

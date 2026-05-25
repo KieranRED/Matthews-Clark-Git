@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Custom Wheels',
-  description: 'Matthews & Clark sources and fits genuine non-replica aftermarket alloy wheels in Cape Town. Correct fitment for your car, every time.',
+  description: 'Matthews & Clark sources and manages custom wheel fitment in Cape Town through our partnership with Izimoto. Genuine aftermarket alloys. Correct fitment, every time.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/wheels' },
+  openGraph: {
+    title: 'Custom Wheels — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark sources and manages custom wheel fitment in Cape Town through our partnership with Izimoto. Genuine aftermarket alloys. Correct fitment, every time.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/wheels',
+  },
+  twitter: {
+    title: 'Custom Wheels — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark sources and manages custom wheel fitment in Cape Town through our partnership with Izimoto. Genuine aftermarket alloys. Correct fitment, every time.',
+  },
 };
 
 const baScript = `
@@ -52,8 +62,8 @@ export default function WheelsPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">Custom Wheels</span>
             </div>
             <h1>Custom Wheels.<br/><span className="blue">Real,</span> not reps.</h1>
@@ -68,7 +78,7 @@ export default function WheelsPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark sources and fits non-replica custom alloy wheels in Cape Town. We supply genuine aftermarket wheels across a range of brands, finishes, and fitments. Sizing and offset is confirmed before ordering to ensure correct fitment for your specific vehicle and setup.</p>
+          <p>Matthews &amp; Clark sources and manages custom wheel projects in Cape Town through our partnership with Izimoto. We supply genuine aftermarket wheels from verified suppliers across a range of brands, finishes, and fitments. Sizing and offset is confirmed before ordering — Izimoto handles fitting, balancing and alignment at their Woodstock workshop. We won&apos;t spec a wheel that doesn&apos;t fit your setup correctly.</p>
         </div>
       </section>
 
@@ -76,8 +86,8 @@ export default function WheelsPage() {
         <div className="container">
           <div className="copy">
             <p>Replica wheels exist. We don&apos;t sell them.</p>
-            <p>The wheels we source are genuine aftermarket alloys from verified suppliers. Correct fitment, correct load rating — and they won&apos;t crack on the N2. If you&apos;re building your car properly, the last thing you should be cutting corners on is what it rolls on.</p>
-            <p>Pair them with <a href="/body-kits" style={{color:'var(--accent)'}}>a body kit</a>, lock them in with <a href="/ppf" style={{color:'var(--accent)'}}>PPF</a> on the painted barrels, or refinish a set you already love.</p>
+            <p>The wheels we source are genuine aftermarket alloys from verified suppliers. Correct fitment, correct load rating — and they won&apos;t crack on the N2. Izimoto fits them properly. If you&apos;re building your car right, the last thing you should cut corners on is what it rolls on.</p>
+            <p>Pair them with <a href="/mc-site/body-kits" style={{color:'var(--accent)'}}>a body kit</a>, protect the barrels with <a href="/mc-site/ppf" style={{color:'var(--accent)'}}>PPF</a>, or refinish a set you already love. We manage all of it as one project.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></a>
           </div>
           <div className="photo"><span className="stamp">PHOTO  /  WHEELS  /  STUDIO</span></div>
@@ -109,9 +119,9 @@ export default function WheelsPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/body-kits"><div className="left"><span className="k">Build</span><span className="n">Body Kits</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/body-kits"><div className="left"><span className="k">Build</span><span className="n">Body Kits</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ppf"><div className="left"><span className="k">Protection</span><span className="n">PPF</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/wrapping"><div className="left"><span className="k">Presence</span><span className="n">Wrapping</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>

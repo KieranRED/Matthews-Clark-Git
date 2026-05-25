@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Community',
-  description: 'The Cape Town car community. One event a month. Open to all.',
+  description: 'The M/C community. Cape Town car culture — events, builds and the people behind them.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/community' },
+  openGraph: {
+    title: 'Community — Matthews / Clark Cape Town',
+    description: 'The M/C community. Cape Town car culture — events, builds and the people behind them.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/community',
+  },
+  twitter: {
+    title: 'Community — Matthews / Clark Cape Town',
+    description: 'The M/C community. Cape Town car culture — events, builds and the people behind them.',
+  },
 };
 
 const pageCSS = `
@@ -219,7 +229,7 @@ export default function CommunityPage() {
       <section className="comm-hero">
         <div className="container">
           <div className="crumbs">
-            <a href="/">Home</a><span className="sep">/</span>
+            <a href="/mc-site">Home</a><span className="sep">/</span>
             <span className="here">Community</span>
           </div>
           <h1>The Cape Town<br/>car community.<br/><span className="blue">We run the scene.</span></h1>
@@ -261,8 +271,8 @@ export default function CommunityPage() {
             </div>
             <div className="ne-body">
               <span className="eyebrow">— No.05 / 2026 · Opening night</span>
-              <h2>The new floor <span className="blue">launch.</span></h2>
-              <p className="lede">Year one done. The new floor is finished — twice the bays, the new studio next door, the lift bank we&apos;ve been waiting on. One night to see it before the cars start rolling in. Sam and Keanan on the floor all evening.</p>
+              <h2>The new shop.<br/><span className="blue">M<span className="slash">/</span>C × Izimoto</span> launch.</h2>
+              <p className="lede">Year one done. The new floor is finished — twice the bays, the Izimoto build room next door, the lift bank we&apos;ve been waiting on. One night to see it before the cars start rolling in.</p>
               <div className="details">
                 <div className="cell">
                   <div className="k">— Where</div>

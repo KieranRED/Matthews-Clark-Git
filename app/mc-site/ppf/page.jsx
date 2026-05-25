@@ -1,6 +1,16 @@
 export const metadata = {
   title: 'Paint Protection Film (PPF)',
-  description: 'Matthews & Clark installs paint protection film (PPF) in Cape Town — clear or coloured urethane film bonded to your paint. 5–7 day install for full coverage.',
+  description: 'Matthews & Clark manages PPF installation in Cape Town through our workshop partnership with Izimoto. Clear or coloured urethane film. 5–7 day turnaround.',
+  alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/ppf' },
+  openGraph: {
+    title: 'Paint Protection Film (PPF) — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark manages PPF installation in Cape Town through our workshop partnership with Izimoto. Clear or coloured urethane film. 5–7 day turnaround.',
+    url: 'https://www.matthewsandclark.co.za/mc-site/ppf',
+  },
+  twitter: {
+    title: 'Paint Protection Film (PPF) — Matthews / Clark Cape Town',
+    description: 'Matthews & Clark manages PPF installation in Cape Town through our workshop partnership with Izimoto. Clear or coloured urethane film. 5–7 day turnaround.',
+  },
 };
 
 const baScript = `
@@ -61,8 +71,8 @@ export default function PPFPage() {
         <div className="container">
           <div className="content">
             <div className="crumbs">
-              <a href="/">Home</a><span className="sep">/</span>
-              <a href="/services">Services</a><span className="sep">/</span>
+              <a href="/mc-site">Home</a><span className="sep">/</span>
+              <a href="/mc-site/services">Services</a><span className="sep">/</span>
               <span className="here">PPF</span>
             </div>
             <h1>Paint Protection Film <span className="blue">in Cape Town.</span></h1>
@@ -81,7 +91,7 @@ export default function PPFPage() {
       <section className="svc-intro">
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
-          <p>Matthews &amp; Clark installs paint protection film (PPF) in Cape Town from our workshop for all vehicle types — daily drivers, supercars, and modified builds. PPF is a clear or coloured urethane film bonded directly to your painted surfaces, protecting against stone chips, scratches, bug damage, and UV fade. Clear PPF preserves your factory colour. Coloured PPF changes it. Installation takes 5–7 working days depending on coverage.</p>
+          <p>Matthews &amp; Clark manages PPF projects in Cape Town through our workshop partnership with Izimoto. You deal with us from first consultation through to collection — Izimoto&apos;s installation team carries out the application at their 3 Muir St, Woodstock facility. PPF is a clear or coloured urethane film bonded directly to your painted surfaces, protecting against stone chips, scratches, bug damage, and UV fade. Clear PPF preserves your factory colour. Coloured PPF changes it. Most jobs take 5–7 working days.</p>
         </div>
       </section>
 
@@ -89,8 +99,8 @@ export default function PPFPage() {
         <div className="container">
           <div className="copy">
             <p>Paint gets damaged. It&apos;s not a question of if — it&apos;s a question of when. Motorway chips, car-park scratches, bird strikes, tree sap. Factory paint is softer than most people realise, and once the damage is in, it&apos;s expensive to get out.</p>
-            <p>PPF is a sacrificial layer. It takes the damage so your paint doesn&apos;t. Unlike <a href="/ceramic" style={{color:'var(--accent)'}}>ceramic coating</a> — which is a surface treatment — PPF is a physical barrier. You can&apos;t replicate that with wax or spray sealant.</p>
-            <p>If you drive it, you need it. PPF isn&apos;t just for Ferraris — though we&apos;ve done a few of those. A Golf GTI on the N1 collects the same chips as a 911. The film doesn&apos;t care what the car cost. Pair it with <a href="/correction" style={{color:'var(--accent)'}}>paint correction</a> first if your paint already has defects we should lock out, not seal in.</p>
+            <p>PPF is a sacrificial layer. It takes the damage so your paint doesn&apos;t. Unlike <a href="/mc-site/ceramic" style={{color:'var(--accent)'}}>ceramic coating</a> — which is a surface treatment — PPF is a physical barrier. You can&apos;t replicate that with wax or spray sealant.</p>
+            <p>If you drive it, you need it. PPF isn&apos;t just for Ferraris — a Golf GTI on the N1 collects the same chips as a 911. The film doesn&apos;t care what the car cost. Pair it with <a href="/mc-site/correction" style={{color:'var(--accent)'}}>paint correction</a> first if your paint already has defects we should lock out, not seal in.</p>
             <a className="link-arrow" href="#book" data-book="">Get a quote on your car
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </a>
@@ -141,10 +151,10 @@ export default function PPFPage() {
             <span className="label"><span className="num">05</span><span>How it works</span><span className="div"></span><span className="sub">5–7 working days</span></span>
           </div>
           <div className="proc-grid">
-            <div className="proc-step"><span className="num">01</span><h4>Paint assessment</h4><p>We inspect your paint before we touch it. Damage that should be corrected first, gets corrected first.</p></div>
+            <div className="proc-step"><span className="num">01</span><h4>Paint assessment</h4><p>We inspect your paint before anything goes near it. Damage that should be corrected first, gets corrected first.</p></div>
             <div className="proc-step"><span className="num">02</span><h4>Surface prep</h4><p>The car is stripped and decontaminated. PPF needs a clean, prepared surface to bond properly.</p></div>
             <div className="proc-step"><span className="num">03</span><h4>Application</h4><p>Film is cut and applied section by section. High-wear areas first: bonnet, bumper, mirrors, headlights.</p></div>
-            <div className="proc-step"><span className="num">04</span><h4>Inspection</h4><p>No bubbles, no lifted edges, no shortcuts. You collect a car we&apos;re proud of.</p></div>
+            <div className="proc-step"><span className="num">04</span><h4>Inspection</h4><p>No bubbles, no lifted edges, no shortcuts. You collect a car we&apos;re all proud of.</p></div>
           </div>
         </div>
       </section>
@@ -153,9 +163,9 @@ export default function PPFPage() {
         <div className="container">
           <div className="sec-h"><span className="label"><span className="num">06</span><span>Pair it with</span></span></div>
           <div className="rel-grid">
-            <a className="rel-card" href="/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
-            <a className="rel-card" href="/detailing"><div className="left"><span className="k">Care</span><span className="n">Detailing</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/ceramic"><div className="left"><span className="k">Protection</span><span className="n">Ceramic</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/correction"><div className="left"><span className="k">Restoration</span><span className="n">Paint Correction</span></div><span className="arr">→</span></a>
+            <a className="rel-card" href="/mc-site/detailing"><div className="left"><span className="k">Care</span><span className="n">Detailing</span></div><span className="arr">→</span></a>
           </div>
         </div>
       </section>
@@ -182,7 +192,7 @@ export default function PPFPage() {
 
       <section className="final-cta" id="book">
         <h2>Ready to <span className="blue">sort it?</span></h2>
-        <p className="sub">Tell us the car and the goal. One slot per car, per studio block — booked in person, finished in person.</p>
+        <p className="sub">Tell us the car and the goal. We manage it end to end — you deal with us, Izimoto does the work. One car, one standard.</p>
         <a className="btn-big" href="https://matthewsandclark.co.za">
           Book a Slot
           <span className="arr"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
