@@ -929,7 +929,7 @@ export default function HomePage() {
 
         {/* Topbar */}
         <header className="mobile-topbar" id="m-topbar">
-          <a className="m-wordmark" href="/mc-site"><img src="/site/media/logo-mc.png" alt="Matthews / Clark" /></a>
+          <a className="m-wordmark" href="/mc-site"><img src="/site/media/logo-mc.png" alt="Matthews / Clark" width="280" height="162" /></a>
           <button className="m-hamburger" id="m-menuBtn" aria-label="Open menu">
             <span className="lines"><span></span><span></span></span>
           </button>
@@ -1097,9 +1097,9 @@ export default function HomePage() {
             {/* Beat 3 — Next Event */}
             <section className="m-event">
               <div className="m-event-logos">
-                <img src="/site/media/logo-mc.png" alt="Matthews / Clark" className="m-evt-logo" />
+                <img src="/site/media/logo-mc.png" alt="Matthews / Clark" className="m-evt-logo" width="280" height="162" />
                 <span className="m-evt-x">×</span>
-                <img src="/brand/izimoto-logo.png" alt="Izimoto" className="m-evt-logo m-evt-logo-izi" />
+                <img src="/brand/izimoto-logo.png" alt="Izimoto" className="m-evt-logo m-evt-logo-izi" width="200" height="74" />
               </div>
               <div className="m-event-grid">
                 <div className="m-event-lbl"><span style={{color:'#1F4FFF',marginRight:'6px'}}>05</span>Next event · <span style={{color:'#1F4FFF'}}>Open event</span></div>
@@ -1192,7 +1192,7 @@ export default function HomePage() {
         <aside className="mobile-drawer" id="m-drawer" aria-hidden="true">
           <div className="row1">
             <button className="m-close" id="m-closeDrawer" aria-label="Close menu">✕</button>
-            <span className="m-wordmark"><img src="/site/media/logo-mc.png" alt="Matthews / Clark" /></span>
+            <span className="m-wordmark"><img src="/site/media/logo-mc.png" alt="Matthews / Clark" width="280" height="162" /></span>
           </div>
           <nav id="m-mainNav">
             <a href="#" id="m-servicesToggle">Services <span className="ix">01</span></a>
@@ -1476,9 +1476,9 @@ export default function HomePage() {
 
             <div className="event-grid">
               <div className="lockup">
-                <img className="logo mc" src="/site/media/logo-mc.png" alt="Matthews / Clark"/>
+                <img className="logo mc" src="/site/media/logo-mc.png" alt="Matthews / Clark" width="280" height="162"/>
                 <span className="lockup-x">×</span>
-                <img className="logo izi" src="/brand/izimoto-logo.png" alt="Izimoto"/>
+                <img className="logo izi" src="/brand/izimoto-logo.png" alt="Izimoto" width="200" height="74"/>
               </div>
 
               <h2 className="event-date">
