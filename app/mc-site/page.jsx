@@ -1022,6 +1022,7 @@ export default function HomePage() {
 (function(){
   if(window.innerWidth>860)return;
   var vids=document.querySelectorAll('#m-scroller video[data-hls]');
+  var needsHls=false;
   vids.forEach(function(v,i){
     v.setAttribute('muted','');
     v.muted=true;
@@ -1029,14 +1030,17 @@ export default function HomePage() {
       v.dataset.preinit='1';
       v.load();
       if(i===0)v.addEventListener('canplay',function(){v.play().catch(function(){});},{once:true});
-    } else if(!window.Hls) {
-      // Non-Safari: kick off hls.js load now so it's ready when mobile-hero.js fires
-      var s=document.createElement('script');
-      s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js';
-      s.async=true;
-      document.head.appendChild(s);
+    } else {
+      needsHls=true;
     }
   });
+  // Load hls.js exactly once — not inside forEach which would create one tag per slide
+  if(needsHls&&!window.Hls&&!document.querySelector('script[src*="hls.min.js"]')){
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js';
+    s.async=true;
+    document.head.appendChild(s);
+  }
 })();
           `}} />
 
