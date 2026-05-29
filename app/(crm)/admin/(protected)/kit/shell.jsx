@@ -20,6 +20,9 @@ function parsePath(pathname) {
   if (slug[0] === "clients") return { name: "clients", params: {} };
   if (slug[0] === "calendar") return { name: "calendar", params: {} };
   if (slug[0] === "settings") return { name: "settings", params: {} };
+  if (slug[0] === "content" && slug[1] === "new") return { name: "content-new", params: {} };
+  if (slug[0] === "content") return { name: "content", params: {} };
+  if (slug[0] === "pricing") return { name: "pricing", params: {} };
   return { name: "dashboard", params: {} };
 }
 
@@ -28,11 +31,11 @@ export function useCrmRoute() {
   return useMemo(() => parsePath(pathname), [pathname]);
 }
 
-export function TopBar({ route, index, onSearch, onBell }) {
+export function TopBar({ route, index, onSearch, onBell, onSettings }) {
   const router = useRouter();
   const isIzimoto = String(index?.VIEWER?.role || "").startsWith("izimoto");
 
-  const isRoot = ["dashboard", "leads", "clients", "calendar", "settings"].includes(route.name);
+  const isRoot = ["dashboard", "leads", "clients", "calendar", "settings", "pricing", "content"].includes(route.name);
   let title = "";
   let crumbs = "";
 
@@ -71,6 +74,18 @@ export function TopBar({ route, index, onSearch, onBell }) {
     title = c?.name || "Client";
     crumbs = "CLIENT";
   }
+  if (route.name === "pricing") {
+    title = "Pricing Guide";
+    crumbs = "ANALYTICS";
+  }
+  if (route.name === "content") {
+    title = "Content";
+    crumbs = "SOCIAL · QUEUE";
+  }
+  if (route.name === "content-new") {
+    title = "New Post";
+    crumbs = "SOCIAL · NEW POST";
+  }
 
   return (
     <div className="crm-top">
@@ -107,6 +122,9 @@ export function TopBar({ route, index, onSearch, onBell }) {
           <Icon.bell />
           <span className="badge" />
         </button>
+        <button className="icon-btn" title="Settings" aria-label="Open settings" onClick={onSettings}>
+          <Icon.set />
+        </button>
       </div>
     </div>
   );
@@ -126,8 +144,8 @@ export function BottomNav({ route, index }) {
         { id: "dashboard", label: "Today", href: "/admin", ic: <Icon.home /> },
         { id: "leads", label: "Pipeline", href: "/admin/leads", ic: <Icon.leads /> },
         { id: "clients", label: "Clients", href: "/admin/clients", ic: <Icon.clients /> },
-        { id: "calendar", label: "Calendar", href: "/admin/calendar", ic: <Icon.cal /> },
-        { id: "settings", label: "Settings", href: "/admin/settings", ic: <Icon.set /> }
+        { id: "pricing", label: "Pricing", href: "/admin/pricing", ic: <Icon.spark /> },
+        { id: "content", label: "Content", href: "/admin/content", ic: <Icon.cam /> }
       ];
   const activeMap = {
     dashboard: "dashboard",
@@ -137,7 +155,10 @@ export function BottomNav({ route, index }) {
     clients: "clients",
     client: "clients",
     calendar: "calendar",
-    settings: "settings"
+    pricing: "pricing",
+    settings: "settings",
+    content: "content",
+    "content-new": "content"
   };
   const active = activeMap[route.name] || "dashboard";
 

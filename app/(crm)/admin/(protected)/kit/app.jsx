@@ -17,6 +17,8 @@ import QuoteScreen from "./screens-quote";
 import { ClientDetailScreen, ClientsScreen } from "./screens-clients";
 import CalendarScreen from "./screens-calendar";
 import SettingsScreen from "./screens-settings";
+import PricingScreen from "./screens-pricing";
+import ContentScreen from "./screens-content";
 import { TeamModal } from "./team-modal";
 
 export default function AdminCrmKitApp() {
@@ -67,6 +69,8 @@ export default function AdminCrmKitApp() {
     );
   if (route.name === "calendar") body = <CalendarScreen index={index} onRefresh={refresh} />;
   if (route.name === "settings") body = <SettingsScreen index={index} onRefresh={refresh} onEditTeam={(m) => setTeamModal(m)} />;
+  if (route.name === "pricing") body = <PricingScreen index={index} />;
+  if (route.name === "content") body = <ContentScreen />;
 
   const showFab = !isIzimoto && ["dashboard", "leads", "clients"].includes(route.name);
 
@@ -77,6 +81,7 @@ export default function AdminCrmKitApp() {
         index={index}
         onSearch={() => setOverlay("search")}
         onBell={() => setOverlay("activity")}
+        onSettings={() => router.push("/admin/settings")}
       />
       {loading ? <LoadingShell /> : error ? <ErrorShell error={error} onRetry={refresh} /> : body}
       {showFab ? (
