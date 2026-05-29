@@ -1,0 +1,209 @@
+.screen { padding: 0 18px calc(var(--nav-h) + 96px); }
+
+.form { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+
+/* Dropzone */
+.dropzone {
+  border: 2px dashed var(--bd-2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  min-height: 160px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.dropzoneOver {
+  border-color: var(--mc-blue);
+  background: rgba(31, 79, 255, 0.06);
+}
+.dropzoneIdle {
+  text-align: center;
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  color: var(--fg-3);
+}
+.dropzoneState { display: flex; flex-direction: column; gap: 8px; }
+.dropzoneMsg {
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  color: #fff;
+}
+.dropzoneFile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.filename {
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+}
+.filesize {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--fg-3);
+  letter-spacing: 0.12em;
+}
+.progressBar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--mc-blue);
+  border-radius: 2px;
+  transition: width 120ms ease;
+}
+.fieldErr {
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  color: rgba(235, 87, 87, 0.85);
+}
+
+/* Quality tags */
+.qtag {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+}
+.qtagOk { background: rgba(39, 174, 96, 0.14); border: 1px solid rgba(39, 174, 96, 0.3); color: #27AE60; }
+.qtagWarn { background: rgba(242, 201, 76, 0.12); border: 1px solid rgba(242, 201, 76, 0.28); color: #F2C94C; }
+.qtagChecking {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--bd-2);
+  color: var(--fg-3);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Form fields */
+.field { display: flex; flex-direction: column; gap: 8px; }
+.label {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.input, .textarea {
+  border-radius: 12px;
+  border: 1px solid var(--bd-1);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color-scheme: dark;
+  outline: none;
+}
+.input { height: 44px; padding: 0 14px; }
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+  padding: 12px 14px;
+  line-height: 1.5;
+}
+.input:focus, .textarea:focus {
+  border-color: rgba(31, 79, 255, 0.7);
+  box-shadow: 0 0 0 4px rgba(31, 79, 255, 0.12);
+}
+
+/* Platform toggles */
+.toggleRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: var(--bg-2);
+  border-radius: 12px;
+}
+.toggle {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--bd-2);
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  background: transparent;
+  color: var(--fg-3);
+}
+.toggleActive {
+  background: rgba(31, 79, 255, 0.14);
+  border-color: rgba(31, 79, 255, 0.45);
+  color: #fff;
+}
+.toggleDisabled {
+  background: transparent;
+  border-color: var(--bd-1);
+  color: var(--fg-3);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* PDF picker */
+.pdfPicker {
+  height: 44px;
+  border: 1px dashed var(--bd-2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pdfLabel {
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--fg-3);
+}
+
+/* Submit */
+.submitErr {
+  font-family: var(--font-sans), 'Inter Tight', sans-serif;
+  font-size: 14px;
+  color: rgba(235, 87, 87, 0.85);
+}
+.cta {
+  width: 100%;
+  background: var(--mc-blue);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 16px 18px;
+  font-family: var(--font-ui), Archivo, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 8px;
+}
+.ctaDisabled { opacity: 0.6; cursor: not-allowed; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
