@@ -29,7 +29,17 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A scheduled post advances automatically to "Processing" then "Published" on Instagram at the scheduled time, with the ig_media_id stored on the record
   4. A failed post displays the error reason and offers a retry button; the team receives a Telegram notification on failure
   5. Video files older than 7 days are automatically deleted from Vercel Blob by the daily cleanup cron
-**Plans**: TBD
+**Plans**: 9 plans
+Plans:
+- [ ] 01-01-PLAN.md — KV primitives (kvZRangeByScore) + lib/contentStore.js (post CRUD foundation)
+- [ ] 01-02-PLAN.md — Install mediainfo.js + unpdf; next.config.js WASM tracing; /api/test-mediainfo validation gate
+- [ ] 01-03-PLAN.md — Upload token endpoint + mediainfo.js quality-check API + lib/pdfExtract.js
+- [ ] 01-04-PLAN.md — Content CRUD API (GET/POST list+create, GET/PATCH/DELETE per-id, Retry contract)
+- [ ] 01-05-PLAN.md — Shell nav wiring (Content slot + gear icon) + content queue screen (grouped, with Retry)
+- [ ] 01-06-PLAN.md — Post creation screen (dropzone, async quality check, PDF, form, submit)
+- [ ] 01-07-PLAN.md — vercel.json + lib/igPublish.js + /api/cron/post (15-min posting cron with IG state machine + lock)
+- [ ] 01-08-PLAN.md — /api/cron/token-refresh + /api/cron/blob-cleanup (daily housekeeping)
+- [ ] 01-09-PLAN.md — End-to-end UAT checkpoint covering all 18 requirements + 5 Success Criteria
 **UI hint**: yes
 
 ### Phase 2: TikTok
@@ -73,7 +83,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/9 | Not started | - |
 | 2. TikTok | 0/TBD | Not started | - |
 | 3. Analytics & Intelligence | 0/TBD | Not started | - |
 | 4. Obsidian Vault | 0/TBD | Not started | - |
