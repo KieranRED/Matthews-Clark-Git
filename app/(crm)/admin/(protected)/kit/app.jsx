@@ -19,6 +19,7 @@ import CalendarScreen from "./screens-calendar";
 import SettingsScreen from "./screens-settings";
 import PricingScreen from "./screens-pricing";
 import ContentScreen from "./screens-content";
+import ContentNewScreen from "./screens-content-new";
 import { TeamModal } from "./team-modal";
 
 export default function AdminCrmKitApp() {
@@ -71,6 +72,7 @@ export default function AdminCrmKitApp() {
   if (route.name === "settings") body = <SettingsScreen index={index} onRefresh={refresh} onEditTeam={(m) => setTeamModal(m)} />;
   if (route.name === "pricing") body = <PricingScreen index={index} />;
   if (route.name === "content") body = <ContentScreen />;
+  if (route.name === "content-new") body = <ContentNewScreen onSaved={() => router.push("/admin/content")} />;
 
   const showFab = !isIzimoto && ["dashboard", "leads", "clients"].includes(route.name);
 
