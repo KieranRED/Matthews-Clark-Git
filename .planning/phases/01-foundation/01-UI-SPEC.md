@@ -30,7 +30,7 @@ Source: `app/(crm)/layout.jsx`, `app/styles/crm-kit.css`
 
 ## Spacing Scale
 
-All spacing follows the existing CRM convention. The project uses `--pad: 18px` as the standard horizontal gutter. Declared multiples of 4 used across crm-kit.css:
+Declared values (all multiples of 4):
 
 | Token | Value | Usage |
 |-------|-------|-------|
@@ -40,35 +40,53 @@ All spacing follows the existing CRM convention. The project uses `--pad: 18px` 
 | lg | 24px | Section padding (`section-h` padding-top) |
 | xl | 32px | Generous vertical rhythm between major blocks |
 | 2xl | 48px | Reserved for page-level blank space |
-| gutter | 18px | Horizontal page padding (`--pad`); all screen edges use this |
 
-Exceptions:
-- Bottom nav is fixed 14px from viewport edges (matches `.crm-nav` left/right/bottom)
-- FAB is fixed `right: 14px`, `bottom: calc(var(--nav-h) + 28px)` — content FAB follows same rule
-- Touch targets: minimum 44×44px for all icon buttons (matches `.icon-btn` 36px + 4px tap area)
-- TopBar height: `--top-h: 56px`; BottomNav height: `--nav-h: 64px`
+Exceptions: none — see inherited constants table below.
+
+### Inherited Constants (not modified)
+
+These values are pre-existing codebase constants carried forward unchanged. They are exempt from the spacing contract and must not be altered during Phase 1 implementation.
+
+| Constant | Value | Location | Rationale |
+|----------|-------|----------|-----------|
+| `--pad` (horizontal gutter) | 18px | `crm-kit.css` `.crm-root` | Established CRM page-edge gutter used across all screens; changing it would shift every existing layout. Carried forward as-is. — 2026-05-29 |
+| Bottom nav edge offset | 14px | `crm-kit.css` `.crm-nav` left/right/bottom | Existing nav positioning constant. Not a spacing token — it is a fixed layout offset for the floating nav element. Carried forward as-is. — 2026-05-29 |
+| FAB right offset | 14px | `crm-kit.css` `.fab` | Matches nav edge offset; changing independently would create visual misalignment. Carried forward as-is. — 2026-05-29 |
+| Card inner padding | 14px | `.list-row` pattern in `crm-kit.css` | Existing card padding used consistently across job cards, lead cards, and invoice rows. Carried forward as-is. — 2026-05-29 |
+
+Touch targets: minimum 44×44px for all icon buttons (matches `.icon-btn` 36px + 4px tap area).
+TopBar height: `--top-h: 56px`; BottomNav height: `--nav-h: 64px`.
 
 ---
 
 ## Typography
 
-Four roles used across the CRM. New content screens must use these roles exclusively.
+Exactly 4 roles. All content-screen components must map to one of these roles — no additional size values are introduced in Phase 1.
 
 | Role | Family | Size | Weight | Line Height | Letter Spacing | Transform |
 |------|--------|------|--------|-------------|----------------|-----------|
 | Body | Inter Tight (`--font-sans`) | 14px | 400 | 1.5 | normal | none |
-| Label / Meta | JetBrains Mono (`--font-mono`) | 9–11px | 400 | 1.4 | 0.12–0.18em | uppercase |
-| Subheading / Name | Archivo (`--font-ui`) | 13–15px | 600 | 1.2 | -0.005em | none |
-| Display / Section title | Anton (`--font-display`) | 24–48px | 400 (Anton has single weight) | 1.0 | 0.02em | uppercase |
+| Label / Meta | JetBrains Mono (`--font-mono`) | 10px | 400 | 1.4 | 0.12–0.18em | uppercase |
+| Subheading / Name | Archivo (`--font-ui`) | 15px | 600 | 1.2 | -0.005em | none |
+| Display / Section title | Anton (`--font-display`) | 24–48px | 400 (Anton is single-weight) | 1.0 | 0.02em | uppercase |
 
-**Content-screen specific sizes:**
-- Post card caption preview: 13px, Inter Tight, weight 400, opacity 0.9
-- Quality tag text: 10px, JetBrains Mono, weight 700, letter-spacing 0.1em, uppercase
-- Status section header: 10px, JetBrains Mono, letter-spacing 0.18em, uppercase, `var(--fg-3)` colour
-- Platform badge text: 9px, JetBrains Mono, weight 700, letter-spacing 0.12em, uppercase
-- Scheduled timestamp: 10px, JetBrains Mono, letter-spacing 0.1em, `var(--fg-3)` colour
-- Form labels: 10px, JetBrains Mono, letter-spacing 0.16em, uppercase, `var(--fg-3)` colour
-- Form inputs: 14px, Inter Tight, weight 400
+Exactly 2 weights in use: 400 and 600.
+
+**Component-to-role mapping (Phase 1 content screens):**
+
+| Component | Role applied | Notes |
+|-----------|-------------|-------|
+| Post card caption preview | Body (14px, 400) | Opacity 0.9 for de-emphasis; no size change |
+| Quality tags ("Optimised ✓", "Check export ⚠", "Checking…") | Label / Meta (10px, 400) | Weight 400 — no 700 override |
+| Status section headers (FAILED, SCHEDULED, etc.) | Label / Meta (10px, 400) | Per-section colour via `color` property only |
+| Platform badges (IG / TT) | Label / Meta (10px, 400) | Weight 400 — no 700 override |
+| Scheduled timestamp | Label / Meta (10px, 400) | `var(--fg-3)` colour |
+| Form labels | Label / Meta (10px, 400) | `var(--fg-3)` colour, 0.16em letter-spacing |
+| Form inputs | Body (14px, 400) | — |
+| Dropzone filename + file size (after upload) | Body (14px, 400) | Previously 11px — collapsed to Body role |
+| PDF filename (after upload) | Body (14px, 400) | Previously 12px — collapsed to Body role |
+| Failed card inline error text | Body (14px, 400) | `color: rgba(235,87,87,.85)`; previously 12px — collapsed to Body role |
+| "Schedule Post →" CTA | Subheading / Name (15px, 600) | Follows `.bigbtn` Archivo pattern; arrow glyph in JetBrains Mono Label role |
 
 Source: `app/styles/crm-kit.css` — `.eyebrow`, `.kpi .lbl`, `.list-row .who .name`, `.greeting h1`
 
@@ -83,14 +101,13 @@ All tokens are defined in `.crm-root` in `app/styles/crm-kit.css`. New screens i
 | Dominant (60%) | `#050505` (`--bg-0`) | Page background |
 | Secondary (30%) | `#111111` (`--bg-2`) | Cards, post cards, queue section containers |
 | Accent (10%) | `#1F4FFF` (`--mc-blue`) | See reserved list below |
-| Destructive | `rgba(235,87,87,…)` | Failed post border, Retry action, delete confirmations only |
+| Destructive | `rgba(235,87,87,…)` | Failed post border, Retry Post action, delete confirmations only |
 
 **Accent (`--mc-blue` / `#1F4FFF`) reserved for:**
 - Active bottom nav item (text + background tint)
 - Active TopBar gear icon state (when settings screen is open)
 - Content FAB background
 - "Schedule Post" primary CTA button background
-- Quality tag "Optimised ✓" — use `#27AE60` (green, existing semantic) not blue
 - Focus ring on inputs (`box-shadow: 0 0 0 4px rgba(31,79,255,.12)`)
 - Active platform toggle — Instagram toggle active state
 - Section title `.acc` span accent (e.g., "Content." → "content" word in blue)
@@ -123,10 +140,11 @@ New components required for Phase 1. Each maps to existing crm-kit.css class pat
 
 **TopBar additions:**
 - Add `onSettings` prop alongside existing `onSearch` / `onBell`
-- Add third `.icon-btn` in `.right` div using `Icon.set` (gear SVG already exists)
+- Add third `.icon-btn` in `.right` div using `Icon.set` (gear SVG already exists); `aria-label="Open settings"`
 - `isRoot` array: add `"content"` — `["dashboard", "leads", "clients", "calendar", "settings", "pricing", "content"]`
 - Content route breadcrumb: `crumbs = "SOCIAL · QUEUE"`, `title = "Content"`
 - Content new route: `crumbs = "SOCIAL · NEW POST"`, `title = "New Post"` (back-button mode, not isRoot)
+- Primary focal point (Queue screen): the Failed section header and failed cards, which render at top of scroll
 
 **BottomNav change:**
 - Replace `{ id: "settings", label: "Settings", href: "/admin/settings", ic: <Icon.set /> }` with `{ id: "content", label: "Content", href: "/admin/content", ic: <Icon.cam /> }` — `Icon.cam` already exists
@@ -134,9 +152,11 @@ New components required for Phase 1. Each maps to existing crm-kit.css class pat
 
 ### Content Queue Screen (`screens-content.jsx`)
 
+Primary focal point: Failed section header and failed post cards render at the top of the scroll, drawing the eye immediately to posts requiring action.
+
 **Status section headers:**
 ```
-.content-section-hd — JetBrains Mono 10px, 0.18em letter-spacing, uppercase
+.content-section-hd — Label / Meta role: JetBrains Mono 10px, weight 400, 0.18em letter-spacing, uppercase
   Failed:     color #EB5757, left border 2px solid rgba(235,87,87,.4)
   Scheduled:  color #4A78FF, left border 2px solid rgba(74,120,255,.3)
   Processing: color #56CCF2, left border 2px solid rgba(86,204,242,.3)
@@ -144,61 +164,63 @@ New components required for Phase 1. Each maps to existing crm-kit.css class pat
 ```
 
 **Post card:**
-- Follows `.list-row` pattern: `border-radius: 12px`, `background: var(--bg-2)`, `border: 1px solid var(--bd-1)`, `padding: 14px`
+- Follows `.list-row` pattern: `border-radius: 12px`, `background: var(--bg-2)`, `border: 1px solid var(--bd-1)`, `padding: 14px` (inherited constant — see spacing table)
 - Top row: platform badges (left) + scheduled timestamp (right)
 - Middle row: caption preview (1 line, ellipsis) + quality tag (inline, right-aligned)
-- Bottom row (failed only): error reason text + Retry button
+- Bottom row (failed only): error reason text + Retry Post button
 
-**Platform badges (IG / TT):**
-- `border-radius: 999px`, `padding: 3px 8px`, `font-size: 9px`, JetBrains Mono, uppercase
+**Platform badges (IG / TT) — Label / Meta role:**
+- `border-radius: 999px`, `padding: 3px 8px`, `font-size: 10px`, JetBrains Mono, weight 400, uppercase
 - Instagram active: `background: rgba(31,79,255,.14)`, `border: 1px solid rgba(31,79,255,.35)`, `color: #4A78FF`
 - TikTok (Phase 2, visible inactive in Phase 1): `background: rgba(255,255,255,.04)`, `border: 1px solid var(--bd-1)`, `color: var(--fg-3)`, `opacity: 0.4`
 
-**Quality tags:**
-- "Optimised ✓": `background: rgba(39,174,96,.14)`, `border: 1px solid rgba(39,174,96,.3)`, `color: #27AE60`, 10px mono uppercase
-- "Check export ⚠": `background: rgba(242,201,76,.12)`, `border: 1px solid rgba(242,201,76,.28)`, `color: #F2C94C`, 10px mono uppercase
-- "Checking…": `background: rgba(255,255,255,.04)`, `border: 1px solid var(--bd-2)`, `color: var(--fg-3)`, 10px mono uppercase + animated pulse opacity
+**Quality tags — Label / Meta role:**
+- "Optimised ✓": `background: rgba(39,174,96,.14)`, `border: 1px solid rgba(39,174,96,.3)`, `color: #27AE60`, 10px mono weight 400 uppercase
+- "Check export ⚠": `background: rgba(242,201,76,.12)`, `border: 1px solid rgba(242,201,76,.28)`, `color: #F2C94C`, 10px mono weight 400 uppercase
+- "Checking…": `background: rgba(255,255,255,.04)`, `border: 1px solid var(--bd-2)`, `color: var(--fg-3)`, 10px mono weight 400 uppercase + animated pulse opacity
 
 **Content FAB:**
-- Identical to existing `.fab`: `width: 52px`, `height: 52px`, `border-radius: 999px`, `background: var(--mc-blue)`, `position: fixed`, `right: 14px`, `bottom: calc(var(--nav-h) + 28px)`, `z-index: 50`
-- Icon: `Icon.plus` (already exists)
+- Identical to existing `.fab`: `width: 52px`, `height: 52px`, `border-radius: 999px`, `background: var(--mc-blue)`, `position: fixed`, `right: 14px` (inherited constant), `bottom: calc(var(--nav-h) + 28px)`, `z-index: 50`
+- Icon: `Icon.plus` (already exists); `aria-label="Create new post"`
 - Only visible on `/admin/content` route (not global)
 
 ### Post Creation Form (`screens-content-new.jsx`)
+
+Primary focal point: the video dropzone — it is the first and largest interactive element on the screen, occupying the top of the form.
 
 **Video dropzone:**
 - `border: 2px dashed var(--bd-2)`, `border-radius: 14px`, `background: rgba(255,255,255,.02)`, `min-height: 160px`
 - Drag-over state: `border-color: var(--mc-blue)`, `background: rgba(31,79,255,.06)`
 - Uploading state: progress bar (4px height, `background: var(--mc-blue)`, `border-radius: 2px`) fills left-to-right inside dropzone
-- After upload: shows filename + file size in JetBrains Mono 11px + quality tag inline below filename
+- After upload: shows filename + file size in Body role (14px Inter Tight, weight 400) + quality tag inline below filename
 - Quality check in-progress: "Checking…" animated tag (pulse keyframe, existing `@keyframes pulse` in crm-kit.css)
 
 **Form field pattern (matches existing `.kv` / `.inputSmall` / `.textarea`):**
-- Label: JetBrains Mono 10px, 0.16em letter-spacing, uppercase, `color: var(--fg-3)`, `margin-bottom: 6px`
-- Text input height: 44px (touch-safe), `border-radius: 12px`, `border: 1px solid var(--bd-1)`, `background: rgba(0,0,0,.35)`, `padding: 0 14px`, `color: #fff`, `font-size: 14px`
-- Textarea: `min-height: 96px`, `resize: vertical`, same border/background pattern, `padding: 12px 14px`
+- Label: Label / Meta role (10px JetBrains Mono, weight 400, 0.16em letter-spacing, uppercase, `color: var(--fg-3)`, `margin-bottom: 6px`)
+- Text input height: 44px (touch-safe), `border-radius: 12px`, `border: 1px solid var(--bd-1)`, `background: rgba(0,0,0,.35)`, `padding: 0 14px` (inherited constant), `color: #fff`, Body role (14px, 400)
+- Textarea: `min-height: 96px`, `resize: vertical`, same border/background pattern, `padding: 12px 14px` (inherited constant)
 - Focus: `border-color: rgba(31,79,255,.7)`, `box-shadow: 0 0 0 4px rgba(31,79,255,.12)` (matches existing `.search:focus`)
 - Hashtags input: text input, comma-separated, identical field style — label reads "HASHTAGS"
 
 **Platform toggles:**
-- Row: `display: flex`, `gap: 12px`, `align-items: center`, `padding: 14px`, card background (`--bg-2`, `border-radius: 12px`)
-- Toggle button: `height: 32px`, `padding: 0 14px`, `border-radius: 999px`, `border: 1px solid var(--bd-2)`, `font-size: 10px`, JetBrains Mono, uppercase
+- Row: `display: flex`, `gap: 12px`, `align-items: center`, `padding: 14px` (inherited constant), card background (`--bg-2`, `border-radius: 12px`)
+- Toggle button: `height: 32px`, `padding: 0 14px` (inherited constant), `border-radius: 999px`, `border: 1px solid var(--bd-2)`, Label / Meta role (10px JetBrains Mono, weight 400, uppercase)
 - Instagram (active, only active platform in Phase 1): `background: rgba(31,79,255,.14)`, `border-color: rgba(31,79,255,.45)`, `color: #fff`
-- TikTok (inactive, disabled in Phase 1): `background: transparent`, `border-color: var(--bd-1)`, `color: var(--fg-3)`, `opacity: 0.45`, `cursor: not-allowed`, tooltip on hover: "Available in Phase 2"
+- TikTok (inactive, disabled in Phase 1): `background: transparent`, `border-color: var(--bd-1)`, `color: var(--fg-3)`, `opacity: 0.45`, `cursor: not-allowed`, tooltip on hover: "TikTok posting coming soon"
 
 **Datetime picker:**
 - Uses native `<input type="datetime-local">` styled to match other text inputs (44px height, same border/bg). `color-scheme: dark` to force dark calendar popup.
-- Label: "SCHEDULE FOR" in JetBrains Mono uppercase
+- Label: "SCHEDULE FOR" in Label / Meta role
 
 **PDF script upload:**
 - Smaller secondary dropzone or file picker button: `height: 44px`, `border: 1px dashed var(--bd-2)`, `border-radius: 10px`, `background: rgba(255,255,255,.02)`
-- After upload: shows PDF filename in 12px Inter Tight, `color: var(--fg-2)`
+- After upload: shows PDF filename in Body role (14px Inter Tight, weight 400, `color: var(--fg-2)`)
 - Label: "SCRIPT (PDF, OPTIONAL)"
 
 **"Schedule Post" CTA:**
-- Follows `.bigbtn.bigbtn--p` pattern: full-width, `background: var(--mc-blue)`, `color: #fff`, `border-radius: 8px`, `padding: 16px 18px`, Archivo 800 13px uppercase
-- Right arrow glyph: `→` in JetBrains Mono
-- Disabled state (never hard-blocked, but if submission is in-flight): `opacity: 0.6`, `cursor: not-allowed`
+- Follows `.bigbtn.bigbtn--p` pattern: full-width, `background: var(--mc-blue)`, `color: #fff`, `border-radius: 8px`, `padding: 16px 18px` (inherited constant), Subheading / Name role (Archivo 15px, weight 600, uppercase)
+- Right arrow glyph: `→` in Label / Meta role (JetBrains Mono)
+- Disabled state (submission in-flight): `opacity: 0.6`, `cursor: not-allowed`
 
 ---
 
@@ -220,8 +242,8 @@ New components required for Phase 1. Each maps to existing crm-kit.css class pat
 | Scheduled section header | "SCHEDULED" |
 | Processing section header | "PROCESSING" |
 | Published section header | "PUBLISHED" |
-| Failed card error inline | Verbatim API error string, max 1 line, `font-size: 12px`, `color: rgba(235,87,87,.85)` |
-| Failed card retry button | "Retry" |
+| Failed card error inline | Verbatim API error string, max 1 line, Body role, `color: rgba(235,87,87,.85)` |
+| Failed card retry button | "Retry Post" |
 | Retry confirmation | None — retry is low-stakes; no confirmation dialog required |
 | TikTok toggle tooltip (disabled) | "TikTok posting coming soon" |
 | Post creation screen eyebrow | "SOCIAL · NEW POST" |
@@ -258,13 +280,13 @@ Source: CONTEXT.md quality tag copy, REQUIREMENTS.md UPLOAD-05, existing CRM gre
 - Failed cards render at top, draw eye immediately
 
 ### Navigation — Settings Move
-- TopBar `.right` gains third icon button: `Icon.set` (gear) — `width: 36px`, `height: 36px`, `.icon-btn` class
+- TopBar `.right` gains third icon button: `Icon.set` (gear) — `width: 36px`, `height: 36px`, `.icon-btn` class, `aria-label="Open settings"`
 - Click routes to `/admin/settings` (same as existing settings screen)
 - BottomNav 5th slot: Content replaces Settings — `Icon.cam`, label "Content", href `/admin/content`
 - `activeMap` in shell.jsx: `content` and `content-new` both map to `"content"` for BottomNav highlighting
 
-### Post Card — Retry
-- Retry button on failed card: `height: 28px`, `padding: 0 10px`, `.kvAction`-class style (ghost pill)
+### Post Card — Retry Post
+- Retry Post button on failed card: `height: 28px`, `padding: 0 10px`, `.kvAction`-class style (ghost pill), label "Retry Post"
 - Click → PATCH `/api/admin/content/{id}` with `{ status: "pending", igError: null, retryCount: retryCount + 1 }`
 - Card optimistically updates status to "Scheduled" and moves to Scheduled section
 - On API error: card remains in Failed, error text updates to "Retry failed. Try again."
