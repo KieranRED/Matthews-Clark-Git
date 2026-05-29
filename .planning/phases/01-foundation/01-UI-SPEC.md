@@ -170,7 +170,7 @@ Primary focal point: Failed section header and failed post cards render at the t
 - Bottom row (failed only): error reason text + Retry Post button
 
 **Platform badges (IG / TT) — Label / Meta role:**
-- `border-radius: 999px`, `padding: 3px 8px`, `font-size: 10px`, JetBrains Mono, weight 400, uppercase
+- `border-radius: 999px`, `padding: 4px 8px`, `font-size: 10px`, JetBrains Mono, weight 400, uppercase
 - Instagram active: `background: rgba(31,79,255,.14)`, `border: 1px solid rgba(31,79,255,.35)`, `color: #4A78FF`
 - TikTok (Phase 2, visible inactive in Phase 1): `background: rgba(255,255,255,.04)`, `border: 1px solid var(--bd-1)`, `color: var(--fg-3)`, `opacity: 0.4`
 
@@ -196,7 +196,7 @@ Primary focal point: the video dropzone — it is the first and largest interact
 - Quality check in-progress: "Checking…" animated tag (pulse keyframe, existing `@keyframes pulse` in crm-kit.css)
 
 **Form field pattern (matches existing `.kv` / `.inputSmall` / `.textarea`):**
-- Label: Label / Meta role (10px JetBrains Mono, weight 400, 0.16em letter-spacing, uppercase, `color: var(--fg-3)`, `margin-bottom: 6px`)
+- Label: Label / Meta role (10px JetBrains Mono, weight 400, 0.16em letter-spacing, uppercase, `color: var(--fg-3)`, `margin-bottom: 8px`)
 - Text input height: 44px (touch-safe), `border-radius: 12px`, `border: 1px solid var(--bd-1)`, `background: rgba(0,0,0,.35)`, `padding: 0 14px` (inherited constant), `color: #fff`, Body role (14px, 400)
 - Textarea: `min-height: 96px`, `resize: vertical`, same border/background pattern, `padding: 12px 14px` (inherited constant)
 - Focus: `border-color: rgba(31,79,255,.7)`, `box-shadow: 0 0 0 4px rgba(31,79,255,.12)` (matches existing `.search:focus`)
@@ -310,11 +310,11 @@ No third-party component registry is used. All UI is custom CSS following existi
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: SKIPPED (ui_safety_gate: false)
 
-**Approval:** pending
+**Approval:** approved — 2026-05-29
