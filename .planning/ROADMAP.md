@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Video files older than 7 days are automatically deleted from Vercel Blob by the daily cleanup cron
 **Plans**: 9 plans
 Plans:
-- [ ] 01-01-PLAN.md — KV primitives (kvZRangeByScore) + lib/contentStore.js (post CRUD foundation)
+- [x] 01-01-PLAN.md — KV primitives (kvZRangeByScore) + lib/contentStore.js (post CRUD foundation)
 - [ ] 01-02-PLAN.md — Install mediainfo.js + unpdf; next.config.js WASM tracing; /api/test-mediainfo validation gate
 - [ ] 01-03-PLAN.md — Upload token endpoint + mediainfo.js quality-check API + lib/pdfExtract.js
 - [ ] 01-04-PLAN.md — Content CRUD API (GET/POST list+create, GET/PATCH/DELETE per-id, Retry contract)

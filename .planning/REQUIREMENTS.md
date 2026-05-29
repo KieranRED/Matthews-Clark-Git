@@ -22,7 +22,7 @@ Self-hosted content scheduler inside the M&C CRM. Auto-posts Reels to Instagram 
 ### SCHEDULE — Post Management UI
 
 - [ ] **SCHEDULE-01**: User can create a new content post with: video upload, PDF script upload, caption, hashtags, platform toggles (Instagram / TikTok), and scheduled date/time
-- [ ] **SCHEDULE-02**: Post record is saved to Upstash KV with status `pending` and `scheduledAt` timestamp
+- [x] **SCHEDULE-02**: Post record is saved to Upstash KV with status `pending` and `scheduledAt` timestamp
 - [ ] **SCHEDULE-03**: User can view all posts in a feed grouped by status: Scheduled, Processing, Published, Failed
 - [ ] **SCHEDULE-04**: Vercel Cron runs every 15 minutes and picks up posts where `scheduledAt ≤ now` and `status = pending`, advancing them to `processing`
 - [ ] **SCHEDULE-05**: Failed posts display the error reason and allow the user to retry
