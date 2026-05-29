@@ -12,7 +12,7 @@ Self-hosted content scheduler inside the M&C CRM. Auto-posts Reels to Instagram 
 
 - [ ] **UPLOAD-01**: User can upload a video file (drag/drop or file picker) from the content post creation screen
 - [ ] **UPLOAD-02**: Video is stored in Vercel Blob under a `social-videos/` prefix and the public URL is saved to the post record
-- [ ] **UPLOAD-03**: After upload, the system runs a `mediainfo.js` quality check server-side and returns a result within 10 seconds
+- [x] **UPLOAD-03**: After upload, the system runs a `mediainfo.js` quality check server-side and returns a result within 10 seconds
 - [ ] **UPLOAD-04**: Quality check evaluates: codec (H.264/MP4 required), resolution + aspect ratio (1080×1920 / 9:16), bitrate (4–50 Mbps sweet spot), frame rate (29.97 or 60fps acceptable)
 - [ ] **UPLOAD-05**: Quality result is displayed as a tag on the post — "Optimised ✓" (all checks pass) or "Check export ⚠" (any check fails) with a breakdown of which checks failed
 - [ ] **UPLOAD-06**: User can upload a PDF script file alongside the video

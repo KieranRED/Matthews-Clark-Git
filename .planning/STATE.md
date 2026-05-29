@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md (KV primitives + contentStore.js)
-last_updated: "2026-05-29T18:06:41.489Z"
+stopped_at: "Completed 01-02 Tasks 1-2; checkpoint:human-verify at Task 3 (Vercel /api/test-mediainfo)"
+last_updated: "2026-05-29T18:10:27.857Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 9
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -67,6 +67,8 @@ Recent decisions affecting current work:
 - [Pre-Phase 1]: Two-phase KV state machine for Instagram (container creation on cron N, poll+publish on cron N+1).
 - [Phase 01-foundation]: content:schedule is the single source of truth for cron pickup — only status=pending posts with valid scheduledAt are members
 - [Phase 01-foundation]: updatePost is the only safe status transition path — it atomically manages content:schedule membership
+- [Phase 01-foundation]: WASM glob './node_modules/mediainfo.js/dist/*.wasm' confirmed correct — MediaInfoModule.wasm is the exact filename in node_modules/mediainfo.js/dist/
+- [Phase 01-foundation]: /api/test-mediainfo endpoint is intentionally unauthenticated — no sensitive data, designed for curl smoke testing
 
 ### Pending Todos
 
@@ -80,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-29T18:06:41.485Z
-Stopped at: Completed 01-01-PLAN.md (KV primitives + contentStore.js)
+Last session: 2026-05-29T18:10:23.049Z
+Stopped at: Completed 01-02 Tasks 1-2; checkpoint:human-verify at Task 3 (Vercel /api/test-mediainfo)
 Resume file: None
