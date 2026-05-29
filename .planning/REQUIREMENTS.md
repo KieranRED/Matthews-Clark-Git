@@ -88,8 +88,39 @@ Self-hosted content scheduler inside the M&C CRM. Auto-posts Reels to Instagram 
 
 ## Traceability
 
-*(Filled by roadmapper)*
-
 | REQ-ID | Phase |
 |---|---|
-| | |
+| UPLOAD-01 | Phase 1 |
+| UPLOAD-02 | Phase 1 |
+| UPLOAD-03 | Phase 1 |
+| UPLOAD-04 | Phase 1 |
+| UPLOAD-05 | Phase 1 |
+| UPLOAD-06 | Phase 1 |
+| UPLOAD-07 | Phase 1 |
+| UPLOAD-08 | Phase 1 |
+| SCHEDULE-01 | Phase 1 |
+| SCHEDULE-02 | Phase 1 |
+| SCHEDULE-03 | Phase 1 |
+| SCHEDULE-04 | Phase 1 |
+| SCHEDULE-05 | Phase 1 |
+| PUBLISH-01 | Phase 1 |
+| PUBLISH-02 | Phase 1 |
+| PUBLISH-03 | Phase 1 |
+| PUBLISH-04 | Phase 1 |
+| PUBLISH-05 | Phase 1 |
+| PUBLISH-06 | Phase 2 |
+| PUBLISH-07 | Phase 2 |
+| PUBLISH-08 | Phase 2 |
+| PUBLISH-09 | Phase 2 |
+| ANALYTICS-01 | Phase 3 |
+| ANALYTICS-02 | Phase 3 |
+| ANALYTICS-03 | Phase 3 |
+| ANALYTICS-04 | Phase 3 |
+| ANALYTICS-05 | Phase 3 |
+| ANALYTICS-06 | Phase 3 |
+| VAULT-01 | Phase 4 |
+| VAULT-02 | Phase 4 |
+| VAULT-03 | Phase 4 |
+| VAULT-04 | Phase 4 |
+| VAULT-05 | Phase 4 |
+| VAULT-06 | Phase 4 |
