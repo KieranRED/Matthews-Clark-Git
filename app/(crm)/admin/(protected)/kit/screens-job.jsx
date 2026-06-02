@@ -13,7 +13,7 @@ const SERVICE_LABELS = {
   ppf: "PPF",
   wrap: "Wrap",
   tint: "Tint",
-  ceramic: "Ceramic / Graphene",
+  ceramic: "Ceramic",
   correct: "Paint correction",
   detail: "Detail",
   wheel: "Wheels (Powder / Refurb)",
@@ -89,6 +89,7 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
 
   const lead = j?.raw || null;
   const phone = cleanTel(lead?.number || c?.phone || "");
+  const vendorPricingDeferred = Boolean(lead?.vendorPricingDeferred);
   const vendorByService =
     lead?.vendorQuoteByServiceExVat && typeof lead.vendorQuoteByServiceExVat === "object" ? lead.vendorQuoteByServiceExVat : null;
   const vendorVatRate = safeNum(lead?.vendorVatRate) ?? 0.15;
@@ -232,6 +233,28 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
   const [actionStatus, setActionStatus] = useState({ state: "idle", message: "" });
   const [openSection, setOpenSection] = useState(null);
   const [partnerPickerOpen, setPartnerPickerOpen] = useState(false);
+
+  // Vendor pricing override (M&C admin)
+  const [vendorOverrideDraft, setVendorOverrideDraft] = useState({});
+  const [vendorOverrideDeferred, setVendorOverrideDeferred] = useState(false);
+  const [vendorOverrideOpen, setVendorOverrideOpen] = useState(false);
+
+  // Upsell queue — items staged to send to Izimoto
+  const [upsellQueue, setUpsellQueue] = useState([]); // [{ service, label, details, notes }]
+  const [upsellModal, setUpsellModal] = useState(null); // { service, label } | null
+  const [upsellDetailDraft, setUpsellDetailDraft] = useState({});
+  const [upsellNotesDraft, setUpsellNotesDraft] = useState("");
+  const [upsellCustomLabelDraft, setUpsellCustomLabelDraft] = useState("");
+  // Confirmed upsell line items on the invoice
+  const upsells = Array.isArray(lead?.upsells) ? lead.upsells : [];
+  // Upsell requests (pending/priced)
+  const upsellRequests = Array.isArray(lead?.upsellRequests) ? lead.upsellRequests : [];
+  // Markup state for priced requests: { [requestId]: amountStr }
+  const [upsellConfirmAmounts, setUpsellConfirmAmounts] = useState({});
+  const UPSELL_OPTIONS = [
+    ...Object.entries(SERVICE_LABELS).map(([id, label]) => ({ id, label })),
+    { id: "custom", label: "Custom" }
+  ];
 
   // ── Check-in photos ──────────────────────────────────────────────────────
   const [photos, setPhotos] = useState(Array.isArray(lead?.photos) ? lead.photos : []);
@@ -677,12 +700,12 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
       const payload = {};
       for (const [sid, val] of Object.entries(vendorDraft || {})) {
         const n = safeNum(val);
-        if (n != null && n > 0) payload[sid] = n;
+        if (n != null) payload[sid] = n;
       }
       const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/vendor-quote`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ amountsByServiceExVat: payload })
+        body: JSON.stringify({ amountsByServiceExVat: payload, allowZero: true })
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error || "Failed to submit vendor quote.");
@@ -690,6 +713,160 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
       onRefresh?.();
     } catch (err) {
       setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to submit vendor quote." });
+    }
+  }
+
+  async function saveVendorOverride() {
+    if (!lead?.id) return;
+    setActionStatus({ state: "loading", message: "Saving vendor pricing…" });
+    try {
+      const amounts = {};
+      if (!vendorOverrideDeferred) {
+        for (const sid of servicesForQuote) {
+          const raw = String(vendorOverrideDraft?.[sid] ?? "").trim();
+          const n = safeNum(raw);
+          amounts[sid] = n ?? 0;
+        }
+      }
+      const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/vendor-quote`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ amountsByServiceExVat: amounts, allowZero: true, deferred: vendorOverrideDeferred })
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Failed to save vendor pricing.");
+      setActionStatus({ state: "success", message: vendorOverrideDeferred ? "Pricing deferred — invoice unlocked." : "Vendor pricing set." });
+      setVendorOverrideOpen(false);
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to save vendor pricing." });
+    }
+  }
+
+  function formatUpsellDetails(service, details) {
+    if (!details || typeof details !== "object") return null;
+    const parts = [];
+    if (service === "ppf") {
+      const covMap = { "full-front": "Full front", "track-pack": "Track pack", full: "Full car", custom: "Custom panels" };
+      const filmMap = { clear: "Clear PPF", stealth: "Stealth (matte)", colour: "Colour PPF", carbon: "Carbon / forged" };
+      if (details.coverage) parts.push(`Coverage: ${covMap[details.coverage] || details.coverage}`);
+      if (details.film) parts.push(`Film: ${filmMap[details.film] || details.film}`);
+      if (details.doorJambs) parts.push("Door jambs: yes");
+      if (Array.isArray(details.panels) && details.panels.length) parts.push(`Panels: ${details.panels.join(", ")}`);
+    } else if (service === "wrap") {
+      const scopeMap = { full: "Full wrap", partial: "Partial / accents", custom: "Custom panels" };
+      const finishMap = { gloss: "Gloss", satin: "Satin", matte: "Matte" };
+      if (details.scope) parts.push(`Scope: ${scopeMap[details.scope] || details.scope}`);
+      if (details.finish) parts.push(`Finish: ${finishMap[details.finish] || details.finish}`);
+      if (details.colour) parts.push(`Colour: ${details.colour}`);
+      if (details.doorJambs) parts.push("Door jambs: yes");
+    } else if (service === "tint") {
+      const winMap = { "front-only": "Front 2 windows", all: "All windows", "all+windscreen": "All + windscreen" };
+      if (details.windows) parts.push(`Windows: ${winMap[details.windows] || details.windows}`);
+      if (details.shade) parts.push(`Shade: ${details.shade}% VLT`);
+    } else if (service === "ceramic") {
+      const pkgMap = { "2y": "2 Year", "5y": "5 Year", "10y": "10 Year" };
+      if (details.package) parts.push(`Package: ${pkgMap[details.package] || details.package}`);
+      const extras = [details.wheels && "Wheels", details.glass && "Glass", details.trim && "Trim"].filter(Boolean);
+      if (extras.length) parts.push(`Add-ons: ${extras.join(", ")}`);
+    } else if (service === "correct") {
+      const stageMap = { stage1: "Stage 1", stage2: "Stage 2", stage3: "Stage 3" };
+      if (details.stage) parts.push(`Stage: ${stageMap[details.stage] || details.stage}`);
+    } else if (service === "detail") {
+      const kindMap = { interior: "Interior only", exterior: "Exterior only", full: "Full detail" };
+      if (details.kind) parts.push(`Type: ${kindMap[details.kind] || details.kind}`);
+    } else if (service === "wheel") {
+      const svcMap = { powder: "Powder coating", refurb: "Refurbishment" };
+      if (details.service) parts.push(`Service: ${svcMap[details.service] || details.service}`);
+      if (details.finish) parts.push(`Finish: ${details.finish}`);
+      if (details.colour) parts.push(`Colour: ${details.colour}`);
+    }
+    return parts.length ? parts.join(" · ") : null;
+  }
+
+  function openUpsellModal(service, label) {
+    setUpsellDetailDraft({});
+    setUpsellNotesDraft("");
+    setUpsellCustomLabelDraft("");
+    setUpsellModal({ service, label });
+  }
+
+  function addUpsellToQueue() {
+    if (!upsellModal) return;
+    const { service } = upsellModal;
+    const label = service === "custom" ? upsellCustomLabelDraft.trim() : (SERVICE_LABELS[service] || service);
+    if (!label) return;
+    setUpsellQueue((prev) => [...prev, { service, label, details: { ...upsellDetailDraft }, notes: upsellNotesDraft.trim() }]);
+    setUpsellModal(null);
+  }
+
+  async function requestUpsell() {
+    if (!lead?.id || upsellQueue.length === 0) return;
+    setActionStatus({ state: "loading", message: "Sending to Izimoto…" });
+    try {
+      await Promise.all(upsellQueue.map((item) => {
+        const detailStr = formatUpsellDetails(item.service, item.details);
+        const notes = [detailStr, item.notes].filter(Boolean).join("\n") || undefined;
+        return fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/upsell-request`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ service: item.service, label: item.label, notes })
+        }).then((r) => r.json());
+      }));
+      setUpsellQueue([]);
+      setActionStatus({ state: "success", message: `${upsellQueue.length} quote request${upsellQueue.length > 1 ? "s" : ""} sent to Izimoto.` });
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to send request." });
+    }
+  }
+
+  async function confirmUpsell(req) {
+    const amount = safeNum(upsellConfirmAmounts[req.id]);
+    const label = req.label || (SERVICE_LABELS[req.service] || req.service);
+    if (!amount || amount <= 0 || !lead?.id) return;
+    setActionStatus({ state: "loading", message: "Adding to invoice…" });
+    try {
+      const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/upsell`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label, amountExVat: amount, requestId: req.id })
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Failed to add to invoice.");
+      setUpsellConfirmAmounts((p) => { const n = { ...p }; delete n[req.id]; return n; });
+      setActionStatus({ state: "success", message: "Added to invoice — resend when ready." });
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to add to invoice." });
+    }
+  }
+
+  async function removeUpsellRequest(id) {
+    if (!lead?.id) return;
+    setActionStatus({ state: "loading", message: "Removing request…" });
+    try {
+      const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/upsell-request?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Failed to remove request.");
+      setActionStatus({ state: "success", message: "Request removed." });
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to remove request." });
+    }
+  }
+
+  async function removeUpsell(id) {
+    if (!lead?.id) return;
+    setActionStatus({ state: "loading", message: "Removing upsell…" });
+    try {
+      const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/upsell?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Failed to remove upsell.");
+      setActionStatus({ state: "success", message: "Upsell removed." });
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to remove upsell." });
     }
   }
 
@@ -1069,6 +1246,56 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
                     {quoteLink ? (
                       <div style={{ padding: 10, background: "var(--bg-1)", borderRadius: 8, fontSize: 11, color: "var(--fg-2)", wordBreak: "break-all" }}>{quoteLink}</div>
                     ) : null}
+
+                    {/* Admin vendor pricing override */}
+                    <div style={{ borderTop: "1px solid var(--bd-1)", paddingTop: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => setVendorOverrideOpen((v) => !v)}
+                        style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", color: "var(--fg-2)", cursor: "pointer", padding: 0, fontSize: 12, fontFamily: "var(--font-mono)", letterSpacing: ".12em", textTransform: "uppercase" }}
+                      >
+                        <span style={{ fontSize: 10 }}>{vendorOverrideOpen ? "▾" : "▸"}</span>
+                        Set vendor pricing manually
+                      </button>
+                      {vendorOverrideOpen && (
+                        <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={vendorOverrideDeferred}
+                              onChange={(e) => setVendorOverrideDeferred(e.target.checked)}
+                            />
+                            <div>
+                              <div style={{ fontSize: 12, color: "var(--fg-1)", fontWeight: 600 }}>Defer Izimoto pricing</div>
+                              <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2 }}>Unlock the invoice now — fill in Izimoto's cut after the job.</div>
+                            </div>
+                          </label>
+                          {!vendorOverrideDeferred && (
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".16em", color: "var(--fg-3)", textTransform: "uppercase" }}>
+                                Vendor cost per service (ex VAT) — enter 0 for no cut
+                              </div>
+                              {servicesForQuote.map((sid) => (
+                                <div key={sid} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                  <div style={{ fontFamily: "var(--font-display)", textTransform: "uppercase", letterSpacing: ".02em", fontSize: 13, minWidth: 90 }}>{serviceLabel(sid)}</div>
+                                  <input
+                                    inputMode="decimal"
+                                    placeholder="0.00"
+                                    value={String(vendorOverrideDraft?.[sid] ?? "")}
+                                    onChange={(e) => setVendorOverrideDraft((prev) => ({ ...prev, [sid]: e.target.value }))}
+                                    style={{ ...inputStyle, flex: 1 }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <button type="button" className="bigbtn bigbtn--p" onClick={saveVendorOverride} disabled={actionStatus.state === "loading"}>
+                            <span><Icon.check /> &nbsp; {vendorOverrideDeferred ? "Defer pricing — unlock invoice" : "Set vendor pricing"}</span>
+                            <span className="arr">→</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
@@ -1095,6 +1322,37 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
                 {/* Quote builder */}
                 <div>
                   <div className="eyebrow" style={{ marginBottom: 8 }}>M&amp;C COMMISSION</div>
+                  {vendorPricingDeferred && quoteLines.length === 0 && (
+                    <div style={{ padding: "10px 12px", marginBottom: 10, borderRadius: 10, background: "rgba(242,201,76,.08)", border: "1px solid rgba(242,201,76,.3)", fontSize: 12, color: "rgba(242,201,76,.9)", lineHeight: 1.5 }}>
+                      ⏳ Izimoto pricing deferred — enter the client total per service below. Vendor cost can be filled in later.
+                    </div>
+                  )}
+                  {vendorPricingDeferred && quoteLines.length === 0 && (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {servicesForQuote.map((sid) => {
+                        const sum = serviceSummary(lead, sid);
+                        return (
+                          <div key={sid} style={rowCard}>
+                            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: sum ? 6 : 8 }}>
+                              <div style={{ fontFamily: "var(--font-display)", textTransform: "uppercase", letterSpacing: ".02em" }}>{serviceLabel(sid)}</div>
+                              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".12em", color: "var(--fg-3)", textTransform: "uppercase" }}>Client total ex VAT</div>
+                            </div>
+                            {sum ? <div style={{ fontSize: 12, color: "var(--fg-2)", lineHeight: 1.35, marginBottom: 8 }}>{sum}</div> : null}
+                            <input
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              value={String(commissionValueDraft?.[sid] ?? "")}
+                              onChange={(e) => {
+                                setCommissionModeDraft((prev) => ({ ...(prev || {}), [sid]: "total" }));
+                                setCommissionValueDraft((prev) => ({ ...(prev || {}), [sid]: e.target.value }));
+                              }}
+                              style={inputStyle}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ display: "grid", gap: 8 }}>
                     {quoteLines.map((ln) => {
                       const sid = ln.sid;
@@ -1157,6 +1415,95 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
                     <span><Icon.check /> &nbsp; Save quote</span>
                     <span className="arr">→</span>
                   </button>
+                </div>
+
+                {/* Upsells */}
+                <div style={{ paddingTop: 16, borderTop: "1px solid var(--bd-1)" }}>
+                  <div className="eyebrow" style={{ marginBottom: 8 }}>UPSELLS</div>
+
+                  {/* Confirmed upsell line items */}
+                  {upsells.length > 0 && (
+                    <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+                      {upsells.map((u) => (
+                        <div key={u.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "var(--bg-2)", borderRadius: 10, border: "1px solid var(--bd-1)" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{u.label}</div>
+                            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", marginTop: 2 }}>{moneyZAR(u.amountExVat)} ex VAT</div>
+                          </div>
+                          <button type="button" onClick={() => removeUpsell(u.id)} disabled={actionStatus.state === "loading"} style={{ background: "none", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: "4px 8px", fontSize: 16, lineHeight: 1 }} title="Remove">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pending / priced upsell requests */}
+                  {upsellRequests.length > 0 && (
+                    <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                      {upsellRequests.map((req) => {
+                        const label = req.label || (SERVICE_LABELS[req.service] || req.service);
+                        const isPriced = req.status === "priced";
+                        const vendorIncVat = isPriced && req.vendorExVat ? Math.round(req.vendorExVat * 1.15 * 100) / 100 : null;
+                        const confirmAmt = upsellConfirmAmounts[req.id] ?? (vendorIncVat != null ? String(vendorIncVat) : "");
+                        return (
+                          <div key={req.id} style={{ padding: "12px 14px", background: isPriced ? "rgba(39,174,96,.08)" : "var(--bg-2)", borderRadius: 12, border: `1px solid ${isPriced ? "rgba(39,174,96,.3)" : "var(--bd-1)"}` }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{label}</div>
+                                {req.notes && <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2 }}>{req.notes}</div>}
+                                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, marginTop: 4, color: isPriced ? "rgba(39,174,96,.9)" : "var(--fg-3)" }}>
+                                  {isPriced ? `Izimoto: ${moneyZAR(req.vendorExVat)} ex VAT (${moneyZAR(vendorIncVat)} inc VAT)` : "⏳ Awaiting Izimoto quote"}
+                                </div>
+                              </div>
+                              <button type="button" onClick={() => removeUpsellRequest(req.id)} disabled={actionStatus.state === "loading"} style={{ background: "none", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: "2px 6px", fontSize: 16, lineHeight: 1, flexShrink: 0 }} title="Delete request">×</button>
+                            </div>
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <input
+                                inputMode="decimal"
+                                value={confirmAmt}
+                                onChange={(e) => setUpsellConfirmAmounts((p) => ({ ...p, [req.id]: e.target.value }))}
+                                placeholder="Our client price ex VAT"
+                                style={inputStyle}
+                              />
+                              <button type="button" className="bigbtn bigbtn--g" onClick={() => confirmUpsell(req)} disabled={!safeNum(confirmAmt) || actionStatus.state === "loading"}>
+                                <span>Add to invoice</span>
+                                <span className="arr">→</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Upsell queue */}
+                  {upsellQueue.length > 0 && (
+                    <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+                      {upsellQueue.map((item, idx) => (
+                        <div key={idx} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, padding: "10px 12px", background: "rgba(31,79,255,.08)", borderRadius: 10, border: "1px solid rgba(31,79,255,.25)" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{item.label}</div>
+                            {item.notes && <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 2, whiteSpace: "pre-wrap" }}>{item.notes}</div>}
+                          </div>
+                          <button type="button" onClick={() => setUpsellQueue((prev) => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: "2px 6px", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+                        </div>
+                      ))}
+                      <button type="button" className="bigbtn bigbtn--p" onClick={requestUpsell} disabled={actionStatus.state === "loading"}>
+                        <span>Send {upsellQueue.length} request{upsellQueue.length > 1 ? "s" : ""} to Izimoto</span>
+                        <span className="arr">→</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Service pills — each opens detail modal */}
+                  <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 8 }}>Tap a service to add details and queue a quote request:</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {UPSELL_OPTIONS.map((opt) => (
+                      <button key={opt.id} type="button" className="pill" onClick={() => openUpsellModal(opt.id, opt.label)}>
+                        <span className="dot" />
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Invoice details */}
@@ -1584,6 +1931,201 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
         </div>
       </div>
 
+      {/* ── Upsell detail modal ───────────────────────────── */}
+      {upsellModal && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setUpsellModal(null); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9000,
+            background: "rgba(0,0,0,.72)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
+            padding: "0 0 env(safe-area-inset-bottom, 0px)",
+          }}
+        >
+          <div style={{
+            width: "min(480px, 100%)",
+            background: "var(--bg-1)",
+            border: "1px solid var(--bd-1)",
+            borderRadius: "18px 18px 0 0",
+            padding: "0 0 24px",
+            maxHeight: "88svh",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+          }}>
+            {/* Modal header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px 14px", borderBottom: "1px solid var(--bd-1)", position: "sticky", top: 0, background: "var(--bg-1)", zIndex: 1 }}>
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".2em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 3 }}>Upsell Request</div>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--fg-1)" }}>{upsellModal.label}</div>
+              </div>
+              <button type="button" onClick={() => setUpsellModal(null)} style={{ background: "var(--bg-2)", border: "1px solid var(--bd-1)", borderRadius: 999, width: 32, height: 32, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--fg-2)", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+            </div>
+
+            {/* Service-specific detail form */}
+            <div style={{ padding: "18px 18px 0", display: "grid", gap: 16, flex: 1 }}>
+
+              {/* PPF */}
+              {upsellModal.service === "ppf" && (<>
+                <UpsellSelect label="Coverage" field="coverage" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "full-front", l: "Full Front" }, { v: "track-pack", l: "Track Pack" }, { v: "full", l: "Full Car" }, { v: "custom", l: "Custom Panels" }]} />
+                <UpsellSelect label="Film Type" field="film" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "clear", l: "Clear PPF" }, { v: "stealth", l: "Stealth (Matte)" }, { v: "colour", l: "Colour PPF" }, { v: "carbon", l: "Carbon / Forged" }]} />
+                <UpsellToggle label="Include Door Jambs?" field="doorJambs" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+                <UpsellMulti label="Custom Panels" field="panels" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={["bonnet", "roof", "front doors", "rear doors", "bumper", "mirrors", "boot"]} />
+              </>)}
+
+              {/* Wrap */}
+              {upsellModal.service === "wrap" && (<>
+                <UpsellSelect label="Scope" field="scope" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "full", l: "Full Wrap" }, { v: "partial", l: "Partial / Accents" }, { v: "custom", l: "Custom Panels" }]} />
+                <UpsellSelect label="Finish" field="finish" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "gloss", l: "Gloss" }, { v: "satin", l: "Satin" }, { v: "matte", l: "Matte" }, { v: "chrome", l: "Chrome" }, { v: "colour-shift", l: "Colour Shift" }]} />
+                <UpsellText label="Colour / Reference" field="colour" placeholder="e.g. Satin Black, Avery SW900…" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+                <UpsellToggle label="Include Door Jambs?" field="doorJambs" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+              </>)}
+
+              {/* Tint */}
+              {upsellModal.service === "tint" && (<>
+                <UpsellSelect label="Windows" field="windows" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "front-only", l: "Front 2 Windows" }, { v: "all", l: "All Windows" }, { v: "all+windscreen", l: "All + Windscreen" }]} />
+                <UpsellText label="Shade % VLT" field="shade" placeholder="e.g. 35" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+              </>)}
+
+              {/* Ceramic */}
+              {upsellModal.service === "ceramic" && (<>
+                <UpsellSelect label="Package" field="package" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "2y", l: "2 Year" }, { v: "5y", l: "5 Year" }, { v: "10y", l: "10 Year" }]} />
+                <div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 8 }}>Add-ons</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {[["wheels", "Wheels"], ["glass", "Glass"], ["trim", "Trim"]].map(([k, lbl]) => (
+                      <button key={k} type="button" className="pill" onClick={() => setUpsellDetailDraft((p) => ({ ...p, [k]: !p[k] }))}
+                        style={{ borderColor: upsellDetailDraft[k] ? "rgba(31,79,255,.55)" : undefined, background: upsellDetailDraft[k] ? "rgba(31,79,255,.14)" : undefined, color: upsellDetailDraft[k] ? "#fff" : undefined }}>
+                        <span className="dot" style={{ background: upsellDetailDraft[k] ? "var(--mc-blue)" : "var(--fg-3)" }} />
+                        {lbl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>)}
+
+              {/* Paint Correction */}
+              {upsellModal.service === "correct" && (
+                <UpsellSelect label="Stage" field="stage" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "stage1", l: "Stage 1 — Light Polish" }, { v: "stage2", l: "Stage 2 — Cut & Polish" }, { v: "stage3", l: "Stage 3 — Full Correction" }]} />
+              )}
+
+              {/* Detailing */}
+              {upsellModal.service === "detail" && (
+                <UpsellSelect label="Type" field="kind" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "interior", l: "Interior Only" }, { v: "exterior", l: "Exterior Only" }, { v: "full", l: "Full Detail" }]} />
+              )}
+
+              {/* Wheels */}
+              {upsellModal.service === "wheel" && (<>
+                <UpsellSelect label="Service Type" field="service" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft}
+                  options={[{ v: "powder", l: "Powder Coating" }, { v: "refurb", l: "Refurbishment" }, { v: "both", l: "Powder + Refurb" }]} />
+                <UpsellText label="Finish" field="finish" placeholder="e.g. Gloss Black, Gunmetal" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+                <UpsellText label="Colour" field="colour" placeholder="e.g. RAL 9005" draft={upsellDetailDraft} setDraft={setUpsellDetailDraft} />
+              </>)}
+
+              {/* Custom service */}
+              {upsellModal.service === "custom" && (
+                <div>
+                  <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 6 }}>Service Name</div>
+                  <input value={upsellCustomLabelDraft} onChange={(e) => setUpsellCustomLabelDraft(e.target.value)} placeholder="e.g. Interior Restoration" style={inputStyle} />
+                </div>
+              )}
+
+              {/* Notes — all services */}
+              <div>
+                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 6 }}>Notes for Izimoto (optional)</div>
+                <textarea value={upsellNotesDraft} onChange={(e) => setUpsellNotesDraft(e.target.value)} placeholder="Any special requirements, references, or context…" rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+              </div>
+
+              <button
+                type="button"
+                className="bigbtn bigbtn--p"
+                onClick={addUpsellToQueue}
+                disabled={upsellModal.service === "custom" && !upsellCustomLabelDraft.trim()}
+                style={{ marginBottom: 4 }}
+              >
+                <span>Add to queue</span>
+                <span className="arr">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+/* ── Upsell modal helper sub-components ──────────────── */
+
+function UpsellSelect({ label, field, options, draft, setDraft }) {
+  return (
+    <div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {options.map(({ v, l }) => {
+          const active = draft[field] === v;
+          return (
+            <button key={v} type="button" className="pill" onClick={() => setDraft((p) => ({ ...p, [field]: active ? undefined : v }))}
+              style={{ borderColor: active ? "rgba(31,79,255,.55)" : undefined, background: active ? "rgba(31,79,255,.14)" : undefined, color: active ? "#fff" : undefined }}>
+              <span className="dot" style={{ background: active ? "var(--mc-blue)" : "var(--fg-3)" }} />
+              {l}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function UpsellToggle({ label, field, draft, setDraft }) {
+  const active = Boolean(draft[field]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: "var(--bg-2)", borderRadius: 10, border: "1px solid var(--bd-1)" }}>
+      <div style={{ fontSize: 13, color: "var(--fg-1)" }}>{label}</div>
+      <button type="button" onClick={() => setDraft((p) => ({ ...p, [field]: !p[field] }))}
+        style={{ width: 44, height: 26, borderRadius: 999, border: "none", cursor: "pointer", background: active ? "var(--mc-blue)" : "rgba(255,255,255,.12)", position: "relative", transition: "background .2s", flexShrink: 0 }}>
+        <span style={{ position: "absolute", top: 3, left: active ? 21 : 3, width: 20, height: 20, borderRadius: 999, background: "#fff", transition: "left .2s", display: "block" }} />
+      </button>
+    </div>
+  );
+}
+
+function UpsellText({ label, field, placeholder, draft, setDraft }) {
+  return (
+    <div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+      <input value={draft[field] || ""} onChange={(e) => setDraft((p) => ({ ...p, [field]: e.target.value }))} placeholder={placeholder}
+        style={{ width: "100%", padding: "10px 12px", background: "var(--bg-2)", border: "1px solid var(--bd-2)", borderRadius: 10, color: "var(--fg-1)", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+    </div>
+  );
+}
+
+function UpsellMulti({ label, field, options, draft, setDraft }) {
+  const selected = Array.isArray(draft[field]) ? draft[field] : [];
+  return (
+    <div>
+      <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".18em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {options.map((o) => {
+          const active = selected.includes(o);
+          return (
+            <button key={o} type="button" className="pill" onClick={() => setDraft((p) => ({ ...p, [field]: active ? selected.filter((x) => x !== o) : [...selected, o] }))}
+              style={{ borderColor: active ? "rgba(31,79,255,.55)" : undefined, background: active ? "rgba(31,79,255,.14)" : undefined, color: active ? "#fff" : undefined }}>
+              <span className="dot" style={{ background: active ? "var(--mc-blue)" : "var(--fg-3)" }} />
+              {o}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
