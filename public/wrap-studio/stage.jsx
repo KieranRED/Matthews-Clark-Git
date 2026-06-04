@@ -1,15 +1,31 @@
 /**
- * WrapStage — canvas stage + photo upload/ingest
+ * WrapStage — canvas stage + photo upload/ingest + recolour fx layers
  *
  * Props:
- *   originalUrl  {string|null}  dataURL of raw resized photo (for before/after)
- *   carUrl       {string|null}  dataURL of bg-removed cutout PNG
- *   onIngest     {function}     called with { originalUrl, carUrl } when pipeline finishes
- *   activeSwatch {string|null}  hex colour for background fill
+ *   originalUrl  {string|null}          dataURL of raw resized photo (for before/after)
+ *   carUrl       {string|null}          dataURL of bg-removed cutout PNG
+ *   onIngest     {function}             called with { originalUrl, carUrl } when pipeline finishes
+ *   activeSwatch {string|object|null}   hex string OR swatch object { hex, hex2?, finish }
  */
 
-const IMGLY_CDN = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
-const MAX_WIDTH  = 1920;
+const IMGLY_CDN    = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
+const HEIC2ANY_CDN = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+const MAX_WIDTH    = 1920;
+
+// ─── helper: lazy-load heic2any UMD (only when a .heic/.heif file is seen) ──
+let _heicReady = null;
+function loadHeic2Any() {
+  if (window.heic2any) return Promise.resolve();
+  if (_heicReady) return _heicReady;
+  _heicReady = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src    = HEIC2ANY_CDN;
+    s.onload  = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load HEIC converter"));
+    document.head.appendChild(s);
+  });
+  return _heicReady;
+}
 
 // ─── helper: load @imgly lazily, store fn on window ─────────────────────────
 async function loadImgly() {
@@ -66,33 +82,57 @@ function blobToDataUrl(blob) {
   });
 }
 
+// ─── fxFor — maps swatch finish to recolour layer config ────────────────────
+// sw: { hex, hex2?, finish } OR a plain hex string (treated as gloss)
+function fxFor(sw) {
+  if (!sw) return null;
+  // Normalise plain-hex usage (legacy / simple app.jsx swatches)
+  const c  = typeof sw === "string" ? sw : (sw.hex  || "#000");
+  const c2 = typeof sw === "string" ? sw : (sw.hex2 || c);
+  const finish = typeof sw === "string" ? "gloss" : (sw.finish || "gloss");
+
+  switch (finish) {
+    case "gloss":
+      return { tint: { background: c, mixBlendMode: "color", opacity: .98 },
+               sheen: { opacity: .34 }, tone: { opacity: .12 } };
+    case "satin":
+      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
+               sheen: { opacity: .16 }, tone: { opacity: .16 } };
+    case "matte":
+      return { tint: { background: c, mixBlendMode: "color", opacity: 1 },
+               sheen: { opacity: 0 }, tone: { opacity: .4 } };
+    case "chrome":
+      return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
+                       mixBlendMode: "hard-light", opacity: .95 }, anim: "anim-chrome",
+               sheen: { opacity: .5 }, tone: { opacity: .1 } };
+    case "shift":
+      return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
+                       mixBlendMode: "color", opacity: .96 }, anim: "anim-shift",
+               sheen: { opacity: .26 }, tone: { opacity: .14 } };
+    case "metallic":
+      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
+               sheen: { opacity: .22 }, tone: { opacity: .18 }, noise: true };
+    case "carbon":
+      return { tint: { background: c, mixBlendMode: "color", opacity: 1 },
+               sheen: { opacity: .08 }, tone: { opacity: .38 } };
+    case "ppf-clear":
+      return { tint: { background: c, mixBlendMode: "color", opacity: .12 },
+               sheen: { opacity: .42 }, tone: { opacity: 0 } };
+    case "ppf-matte":
+      return { tint: { background: c, mixBlendMode: "color", opacity: .18 },
+               sheen: { opacity: 0 }, tone: { opacity: .34 } };
+    default:
+      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
+               sheen: { opacity: .2 }, tone: { opacity: .14 } };
+  }
+}
+
 // ─── WrapStage component ────────────────────────────────────────────────────
 function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
   const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
   const [progress, setProgress]       = React.useState(0);
   const [lastFile, setLastFile]        = React.useState(null);
-  const canvasRef                      = React.useRef(null);
   const fileInputRef                   = React.useRef(null);
-
-  // ── Render composite when carUrl / activeSwatch changes ──────────────────
-  React.useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !carUrl) return;
-    const ctx = canvas.getContext("2d");
-    const car = new Image();
-    car.onload = () => {
-      canvas.width  = car.naturalWidth;
-      canvas.height = car.naturalHeight;
-      if (activeSwatch) {
-        ctx.fillStyle = activeSwatch;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      ctx.drawImage(car, 0, 0);
-    };
-    car.src = carUrl;
-  }, [carUrl, activeSwatch]);
 
   // ── 3-stage ingest pipeline ───────────────────────────────────────────────
   async function ingest(file) {
@@ -101,12 +141,20 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
     setIngestState("removing");
     setProgress(0);
     try {
-      // Stage 1 (HEIC placeholder): future Plan 02 handles HEIC→JPEG conversion.
-      // For now, if HEIC is detected we still pass the file through — it may
-      // fail at the resize step on unsupported browsers, surfacing a friendly error.
+      // Stage 1: HEIC → JPEG conversion (lazy-loads heic2any only when needed)
+      const ext  = (file.name || "").split(".").pop().toLowerCase();
+      const mime = file.type || "";
+      const isHeic = ext === "heic" || ext === "heif" ||
+                     mime === "image/heic" || mime === "image/heif";
+      let processFile = file;
+      if (isHeic) {
+        await loadHeic2Any();
+        const out = await window.heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
+        processFile = Array.isArray(out) ? out[0] : out;
+      }
 
       // Stage 2: pre-resize to 1920px via canvas → get resizedBlob + originalUrl
-      const { resizedBlob, dataUrl: origDataUrl } = await resizeToCap(file);
+      const { resizedBlob, dataUrl: origDataUrl } = await resizeToCap(processFile);
 
       // Stage 3: lazy-load @imgly → removeBackground → carUrl dataURL
       const removeBackground = await loadImgly();
@@ -144,7 +192,7 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
   function handleDragLeave(e) { e.currentTarget.classList.remove("drag-over"); }
   function handleRetry() { if (lastFile) ingest(lastFile); }
 
-  // ── Render: uploading / progress / error / canvas ────────────────────────
+  // ── Render: uploading / progress / error / stage ─────────────────────────
   if (ingestState === "removing") {
     return (
       <div className="removal-progress">
@@ -168,9 +216,84 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
   }
 
   if (carUrl) {
+    const fx = fxFor(activeSwatch);
+    // Mask / clip: use the car image as a CSS mask so fx layers only paint the car silhouette
+    const maskStyle = {
+      position: "absolute", inset: 0,
+      WebkitMaskImage: `url(${carUrl})`,
+      maskImage: `url(${carUrl})`,
+      WebkitMaskSize: "contain",
+      maskSize: "contain",
+      WebkitMaskRepeat: "no-repeat",
+      maskRepeat: "no-repeat",
+      WebkitMaskPosition: "center",
+      maskPosition: "center",
+    };
+    const clip = {};
+
     return (
       <div className="ws-stage">
-        <canvas ref={canvasRef} />
+        {/* SVG noise filter — hidden, referenced by metallic tint via url(#metallic-noise) */}
+        <svg style={{ position: "absolute", width: 0, height: 0 }} aria-hidden="true">
+          <defs>
+            <filter id="metallic-noise" x="0%" y="0%" width="100%" height="100%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="2" result="noise" />
+              <feColorMatrix type="saturate" values="0" in="noise" result="grey" />
+              <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended" />
+              <feComponentTransfer>
+                <feFuncA type="linear" slope="1" />
+              </feComponentTransfer>
+            </filter>
+          </defs>
+        </svg>
+
+        {/* Base car image */}
+        <img
+          src={carUrl}
+          alt=""
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", position: "relative", zIndex: 1 }}
+        />
+
+        {/* Recolour fx layers — painted over the car using CSS mask */}
+        {fx && (
+          <>
+            {/* Tone layer — luminance base correction */}
+            <div
+              className="car-fx car-tone"
+              style={{
+                ...maskStyle,
+                ...clip,
+                background: "rgba(0,0,0,1)",
+                mixBlendMode: "luminosity",
+                ...fx.tone,
+                zIndex: 2,
+              }}
+            />
+            {/* Tint layer — colour blend; metallic uses SVG noise filter */}
+            <div
+              className="car-fx car-tint"
+              style={{
+                ...maskStyle,
+                ...clip,
+                ...fx.tint,
+                filter: fx.noise ? "url(#metallic-noise)" : undefined,
+                zIndex: 3,
+              }}
+            />
+            {/* Sheen layer — specular highlight */}
+            <div
+              className="car-fx car-sheen"
+              style={{
+                ...maskStyle,
+                ...clip,
+                background: "linear-gradient(135deg, rgba(255,255,255,.55) 0%, transparent 55%)",
+                mixBlendMode: "screen",
+                ...fx.sheen,
+                zIndex: 4,
+              }}
+            />
+          </>
+        )}
       </div>
     );
   }
