@@ -30,8 +30,10 @@ This phase does NOT include:
 
 ### Background Removal
 - Library: `@imgly/background-removal` v1.4.5
-- CDN: `https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser.js`
-- Call `BackgroundRemoval.removeBackground(file, { progress: (p) => setRemoveProgress(p) })`
+- **RESEARCH OVERRIDE (confirmed 2026-06-04):** Library ships ESM only — no `dist/browser.js`, no UMD, no `window.BackgroundRemoval` global
+- CDN: `https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm` (ESM endpoint)
+- Loading: inject `<script type="module">` at runtime, dynamic `import()` from the ESM endpoint, store result function on `window.__imglyRemoveBackground`
+- Progress callback signature: `(key, current, total)` — compute `Math.round((current/total)*100)` for percentage
 - Result is a `Blob` — convert to dataURL via FileReader for storage
 
 ### What to Store (CRITICAL)

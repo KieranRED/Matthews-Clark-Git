@@ -27,7 +27,7 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [ ] **UPLOAD-04**: Customer sees a progress indicator while background removal runs
 
 ### Recolour Engine (Fast Preview)
-- [ ] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using canvas HSL pixel transform
+- [ ] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using the CSS blend-mode recolour engine (canvas HSL pixel transform deferred per CONTEXT.md)
 - [ ] **RCOL-02**: Gloss finish: preserves and amplifies specular highlights with a sheen layer
 - [ ] **RCOL-03**: Matte finish: applies flat diffuse — zero specularity
 - [ ] **RCOL-04**: Satin finish: preserves shadow/highlight structure, dampens specular by ~60%
