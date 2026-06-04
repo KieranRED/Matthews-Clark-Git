@@ -36,7 +36,7 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [x] **RCOL-07**: Colour-shift finish: animated two-tone HSL gradient simulating angle-dependent flip
 - [x] **RCOL-08**: PPF clear/matte: thin tint overlay only, preserving underlying paint character
 - [ ] **RCOL-09**: Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body)
-- [ ] **RCOL-10**: Before/after swipe slider shows original vs wrapped car
+- [x] **RCOL-10**: Before/after swipe slider shows original vs wrapped car
 
 ### GPT-Image-2 Studio Render
 - [ ] **RENDER-01**: Customer can trigger a "Studio Render" which calls `/api/wrap-render`
