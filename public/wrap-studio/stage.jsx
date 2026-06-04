@@ -1,415 +1,315 @@
-/**
- * WrapStage — canvas stage + photo upload/ingest + recolour fx layers
- *
- * Props:
- *   originalUrl  {string|null}          dataURL of raw resized photo (for before/after)
- *   carUrl       {string|null}          dataURL of bg-removed cutout PNG
- *   onIngest     {function}             called with { originalUrl, carUrl } when pipeline finishes
- *   activeSwatch {string|object|null}   hex string OR swatch object { hex, hex2?, finish }
- *   baActive     {boolean}              before/after slider active
- *   setBaActive  {function}             toggle before/after slider
- */
+/* Wrap Studio — Stage: studio bay, recolour engine, lighting, before/after, HUD */
+(function () {
+  const { useState, useRef, useEffect, useCallback } = React;
+  const h = React.createElement;
+  const I = window.Icon;
 
-const IMGLY_CDN    = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
-const HEIC2ANY_CDN = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
-const MAX_WIDTH    = 1920;
-
-// ─── helper: lazy-load heic2any UMD (only when a .heic/.heif file is seen) ──
-let _heicReady = null;
-function loadHeic2Any() {
-  if (window.heic2any) return Promise.resolve();
-  if (_heicReady) return _heicReady;
-  _heicReady = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src    = HEIC2ANY_CDN;
-    s.onload  = () => resolve();
-    s.onerror = () => reject(new Error("Failed to load HEIC converter"));
-    document.head.appendChild(s);
-  });
-  return _heicReady;
-}
-
-// ─── helper: remove background via Next.js API route ────────────────────────
-// @imgly/background-removal-node runs server-side (avoids CDN module issues)
-async function removeBgViaApi(blob) {
-  const fd = new FormData();
-  fd.append("image", blob, "photo.jpg");
-  const res = await fetch("/api/wrap-remove-bg", { method: "POST", body: fd });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Remove-bg API ${res.status}: ${txt}`);
-  }
-  return await res.blob(); // returns PNG with transparent background
-}
-
-// ─── helper: resize blob via canvas, return { resizedBlob, dataUrl } ────────
-async function resizeToCap(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(objUrl);
-      const scale  = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
-      const w      = Math.round(img.width  * scale);
-      const h      = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width  = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        if (!blob) return reject(new Error("Canvas toBlob failed"));
-        const reader = new FileReader();
-        reader.onload  = () => resolve({ resizedBlob: blob, dataUrl: reader.result });
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      }, "image/jpeg", 0.92);
-    };
-    img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error("Image load failed")); };
-    img.src = objUrl;
-  });
-}
-
-// ─── helper: blob → dataURL ──────────────────────────────────────────────────
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const r  = new FileReader();
-    r.onload  = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(blob);
-  });
-}
-
-// ─── fxFor — maps swatch finish to recolour layer config ────────────────────
-// sw: { hex, hex2?, finish } OR a plain hex string (treated as gloss)
-function fxFor(sw) {
-  if (!sw) return null;
-  // Normalise plain-hex usage (legacy / simple app.jsx swatches)
-  const c  = typeof sw === "string" ? sw : (sw.hex  || "#000");
-  const c2 = typeof sw === "string" ? sw : (sw.hex2 || c);
-  const finish = typeof sw === "string" ? "gloss" : (sw.finish || "gloss");
-
-  switch (finish) {
-    case "gloss":
-      return { tint: { background: c, mixBlendMode: "color", opacity: .98 },
-               sheen: { opacity: .34 }, tone: { opacity: .12 } };
-    case "satin":
-      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
-               sheen: { opacity: .16 }, tone: { opacity: .16 } };
-    case "matte":
-      return { tint: { background: c, mixBlendMode: "color", opacity: 1 },
-               sheen: { opacity: 0 }, tone: { opacity: .4 } };
-    case "chrome":
-      return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
-                       mixBlendMode: "hard-light", opacity: .95 }, anim: "anim-chrome",
-               sheen: { opacity: .5 }, tone: { opacity: .1 } };
-    case "shift":
-      return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
-                       mixBlendMode: "color", opacity: .96 }, anim: "anim-shift",
-               sheen: { opacity: .26 }, tone: { opacity: .14 } };
-    case "metallic":
-      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
-               sheen: { opacity: .22 }, tone: { opacity: .18 }, noise: true };
-    case "carbon":
-      return { tint: { background: c, mixBlendMode: "color", opacity: 1 },
-               sheen: { opacity: .08 }, tone: { opacity: .38 } };
-    case "ppf-clear":
-      return { tint: { background: c, mixBlendMode: "color", opacity: .12 },
-               sheen: { opacity: .42 }, tone: { opacity: 0 } };
-    case "ppf-matte":
-      return { tint: { background: c, mixBlendMode: "color", opacity: .18 },
-               sheen: { opacity: 0 }, tone: { opacity: .34 } };
-    default:
-      return { tint: { background: c, mixBlendMode: "color", opacity: .96 },
-               sheen: { opacity: .2 }, tone: { opacity: .14 } };
-  }
-}
-
-// ─── WrapStage component ────────────────────────────────────────────────────
-function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setBaActive }) {
-  const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
-  const [errorMsg, setErrorMsg]       = React.useState("");
-  const [progress, setProgress]       = React.useState(0);
-  const [lastFile, setLastFile]        = React.useState(null);
-  const [baPos, setBaPos]              = React.useState(50); // 0–100 percent
-  const fileInputRef                   = React.useRef(null);
-  const stageRef                       = React.useRef(null);
-  const draggingRef                    = React.useRef(false);
-
-  // ── Before/after drag handlers ────────────────────────────────────────────
-  function getPosFromEvent(e, el) {
-    const rect = el.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    return Math.max(0, Math.min(100, pct));
-  }
-
-  function handleDividerMouseDown(e) {
-    e.preventDefault();
-    draggingRef.current = true;
-  }
-
-  function handleStageDrag(e) {
-    if (!draggingRef.current || !stageRef.current) return;
-    setBaPos(getPosFromEvent(e, stageRef.current));
-  }
-
-  function handleStageDragEnd() {
-    draggingRef.current = false;
-  }
-
-  // ── 3-stage ingest pipeline ───────────────────────────────────────────────
-  async function ingest(file) {
-    if (!file) return;
-    setLastFile(file);
-    setIngestState("removing");
-    setProgress(0);
-    try {
-      // Stage 1: HEIC → JPEG conversion (lazy-loads heic2any only when needed)
-      const ext  = (file.name || "").split(".").pop().toLowerCase();
-      const mime = file.type || "";
-      const isHeic = ext === "heic" || ext === "heif" ||
-                     mime === "image/heic" || mime === "image/heif";
-      let processFile = file;
-      if (isHeic) {
-        await loadHeic2Any();
-        const out = await window.heic2any({ blob: file, toType: "image/jpeg", quality: 0.92 });
-        processFile = Array.isArray(out) ? out[0] : out;
-      }
-
-      // Stage 2: pre-resize to 1920px via canvas → get resizedBlob + originalUrl
-      const { resizedBlob, dataUrl: origDataUrl } = await resizeToCap(processFile);
-
-      // Stage 3: remove background via /api/wrap-remove-bg (server-side @imgly)
-      const resultBlob = await removeBgViaApi(resizedBlob);
-      const cutoutDataUrl = await blobToDataUrl(resultBlob);
-
-      setIngestState("idle");
-      setProgress(100);
-      onIngest?.({ originalUrl: origDataUrl, carUrl: cutoutDataUrl });
-    } catch (err) {
-      console.error("[WrapStage] ingest error", err);
-      setErrorMsg(err?.message || String(err) || "Unknown error");
-      setIngestState("error");
+  // map a swatch -> background / blend treatment for the recolour layers
+  function fxFor(sw) {
+    if (!sw) return null;
+    const c = sw.hex, c2 = sw.hex2 || sw.hex;
+    switch (sw.finish) {
+      case 'gloss':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .98 },
+                 sheen: { opacity: .34 }, tone: { opacity: .12 } };
+      case 'satin':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .96 },
+                 sheen: { opacity: .16 }, tone: { opacity: .16 } };
+      case 'matte':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: 1 },
+                 sheen: { opacity: 0 }, tone: { opacity: .4 } };
+      case 'chrome':
+        return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
+                         mixBlendMode: 'hard-light', opacity: .95 }, anim: 'anim-chrome',
+                 sheen: { opacity: .5 }, tone: { opacity: .1 } };
+      case 'shift':
+        return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
+                         mixBlendMode: 'color', opacity: .96 }, anim: 'anim-shift',
+                 sheen: { opacity: .26 }, tone: { opacity: .14 } };
+      case 'ppf-clear':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .12 },
+                 sheen: { opacity: .42 }, tone: { opacity: 0 } };
+      case 'ppf-matte':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .18 },
+                 sheen: { opacity: 0 }, tone: { opacity: .34 } };
+      case 'metallic':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .95 },
+                 sheen: { opacity: .22 }, tone: { opacity: .18 }, noise: true };
+      case 'carbon':
+        return { tint: { background: c, mixBlendMode: 'color', opacity: 1 },
+                 sheen: { opacity: 0 }, tone: { opacity: .5 } };
+      default:
+        return { tint: { background: c, mixBlendMode: 'color', opacity: .96 }, sheen: { opacity: .2 }, tone: { opacity: .14 } };
     }
   }
 
-  // ── File input handlers ───────────────────────────────────────────────────
-  function handleFileChange(e) {
-    const file = e.target.files?.[0];
-    if (file) ingest(file);
-    e.target.value = "";
-  }
+  function Stage(props) {
+    const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, bg, light, mode, setMode, rendering, renderPct,
+            startRender, baActive, setBaActive, panels, panelColors, activePanel, setActivePanel,
+            showLabels, finishLabel, brandShort, demo } = props;
+    const stageRef = useRef(null);
+    const fileRef = useRef(null);
+    const [baPos, setBaPos] = useState(58);
+    const dragRef = useRef(false);
+    const [removing, setRemoving] = useState(false);
+    const [removeError, setRemoveError] = useState(null);
 
-  function handleDrop(e) {
-    e.preventDefault();
-    e.currentTarget.classList.remove("drag-over");
-    const file = e.dataTransfer.files?.[0];
-    if (file) ingest(file);
-  }
+    const fx = fxFor(swatch);
+    const colored = !!swatch;
 
-  function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add("drag-over"); }
-  function handleDragLeave(e) { e.currentTarget.classList.remove("drag-over"); }
-  function handleRetry() { if (lastFile) ingest(lastFile); }
+    // ── file ingest — calls bg removal API, stores both originalUrl + carUrl ──
+    const ingest = useCallback(async (file) => {
+      if (!file || !/^image\//.test(file.type)) return;
+      setRemoving(true);
+      setRemoveError(null);
+      try {
+        // Store original as dataURL (for before/after slider)
+        const origDataUrl = await new Promise((res, rej) => {
+          const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+        if (setOriginalUrl) setOriginalUrl(origDataUrl);
 
-  // ── Render: uploading / progress / error / stage ─────────────────────────
-  if (ingestState === "removing") {
-    return (
-      <div className="removal-progress">
-        <div className="removal-label">Removing background…</div>
-        <div className="removal-bar">
-          <div className="removal-bar-sweep" />
-        </div>
-        <div className="removal-pct">This takes 5–15 seconds</div>
-      </div>
+        // Send to server-side bg removal API
+        const fd = new FormData();
+        fd.append('image', file, file.name || 'photo.jpg');
+        const resp = await fetch('/api/wrap-remove-bg', { method: 'POST', body: fd });
+        if (!resp.ok) throw new Error(`Server error ${resp.status}`);
+        const resultBlob = await resp.blob();
+
+        // Convert result blob to dataURL for masking + storage
+        const cutoutDataUrl = await new Promise((res, rej) => {
+          const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej;
+          r.readAsDataURL(resultBlob);
+        });
+        setCarUrl(cutoutDataUrl);
+      } catch (err) {
+        console.error('[Stage] bg removal failed:', err);
+        setRemoveError(err.message || 'Background removal failed');
+      } finally {
+        setRemoving(false);
+      }
+    }, [setCarUrl, setOriginalUrl]);
+
+    // drag/drop
+    useEffect(() => {
+      const el = stageRef.current; if (!el) return;
+      let depth = 0;
+      const over = (e) => { e.preventDefault(); depth++; el.classList.add('dragging'); };
+      const leave = (e) => { e.preventDefault(); if (--depth <= 0) { depth = 0; el.classList.remove('dragging'); } };
+      const drop = (e) => { e.preventDefault(); depth = 0; el.classList.remove('dragging');
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) ingest(f); };
+      el.addEventListener('dragenter', over); el.addEventListener('dragover', (e) => e.preventDefault());
+      el.addEventListener('dragleave', leave); el.addEventListener('drop', drop);
+      return () => { el.removeEventListener('dragenter', over); el.removeEventListener('dragleave', leave); el.removeEventListener('drop', drop); };
+    }, [ingest]);
+
+    // before/after drag
+    useEffect(() => {
+      if (!baActive) return;
+      const move = (e) => {
+        if (!dragRef.current) return;
+        const el = stageRef.current; if (!el) return;
+        const r = el.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+        setBaPos(Math.max(4, Math.min(96, (x / r.width) * 100)));
+      };
+      const up = () => { dragRef.current = false; };
+      window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      window.addEventListener('touchmove', move, { passive: true }); window.addEventListener('touchend', up);
+      return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up);
+        window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up); };
+    }, [baActive]);
+
+    const clip = baActive ? { clipPath: `inset(0 ${100 - baPos}% 0 0)`, WebkitClipPath: `inset(0 ${100 - baPos}% 0 0)` } : null;
+    const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
+
+    // recolour layer (real photo) — tint + tone + sheen, all masked to the car
+    const fxLayers = (carUrl && fx) ? [
+      h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, ...clip, opacity: fx.tone.opacity, background: '#000' } }),
+      h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...clip, ...fx.tint } }),
+      h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, ...clip, opacity: fx.sheen.opacity,
+        background: 'linear-gradient(118deg, rgba(255,255,255,.9) 0%, transparent 26%, transparent 72%, rgba(255,255,255,.4) 100%)' } }),
+    ] : null;
+
+    const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
+
+    // DEMO-ONLY full-frame recolour layers (see demoFx note above)
+    const dfx = demo ? demoFx(swatch) : null;
+    const demoScene = demo ? h('div', { className: 'demo-scene' },
+      h('img', { className: 'demo-bg', src: carUrl, alt: 'Demo car' }),
+      swatch ? dfx.layers.map((L, i) => h('div', { key: i, className: 'demo-fx ' + (L.anim || ''),
+        style: { ...clip, background: L.bg, mixBlendMode: L.blend, opacity: L.op } })) : null,
+      swatch && dfx.sheen ? h('div', { className: 'demo-fx', style: { ...clip, opacity: dfx.sheen, mixBlendMode: 'soft-light',
+        background: 'linear-gradient(118deg, rgba(255,255,255,.95) 0%, transparent 30%, transparent 70%, rgba(255,255,255,.5) 100%)' } }) : null) : null;
+
+    return h('div', { className: 'stage-col' },
+      h('div', { className: 'stage', ref: stageRef, 'data-bg': bg, 'data-light': light,
+        'data-screen-label': 'Wrap Studio — Stage', style: { '--wrap-color': wrapColorVar } },
+        demo ? null : h('div', { className: 'bay-ceiling' }),
+        demo ? null : h('div', { className: 'bay-sign' }, 'M', h('span', { className: 'sl' }, '/'), 'C STUDIO'),
+        demo ? null : h('div', { className: 'bay-floor' }),
+
+        // car staging
+        demo ? demoScene : h('div', { className: 'car-wrap' },
+          h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
+            carUrl
+              ? h(React.Fragment, null,
+                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car' }),
+                  fxLayers)
+              : h('div', { className: 'car-ph' },
+                  h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
+                    style: { ...clip, background: fx ? fx.tint.background : '#3a3d42',
+                      opacity: colored ? (fx.tint.opacity > .5 ? .9 : fx.tint.opacity + .2) : 0 } }),
+                  h('div', { className: 'ph-upload' },
+                    h('button', {
+                      className: 'ph-upload-btn',
+                      onClick: (e) => { e.stopPropagation(); fileRef.current.click(); }
+                    }, h(I.Upload, { size: 16 }), 'Upload your car photo'),
+                    h('span', { className: 'ph-upload-hint' }, 'or drag & drop  ·  JPG  ·  PNG  ·  HEIC'),
+                    h('span', { className: 'ph-upload-tip' }, 'Best: ¾ front or side-on, in good light'))),
+          )
+        ),
+        h('div', { className: 'light-overlay' }),
+
+        // before/after
+        baActive && colored ? h(React.Fragment, null,
+          h('div', { className: 'ba-tag after' }, 'Wrapped'),
+          h('div', { className: 'ba-tag before' }, 'Original'),
+          h('div', { className: 'ba-divider', style: { left: baPos + '%' },
+            onMouseDown: () => { dragRef.current = true; }, onTouchStart: () => { dragRef.current = true; } },
+            h('div', { className: 'knob' }, h(I.Split, { size: 20 })))
+        ) : null,
+
+        // bg removal progress overlay
+        removing ? h('div', { className: 'render-veil on' },
+          h('div', { className: 'render-card' },
+            h('div', { className: 'rk' }, 'Background Removal'),
+            h('h3', null, 'Removing background…'),
+            h('p', null, 'This takes 5–15 seconds.'),
+            h('div', { className: 'removal-bar' }, h('div', { className: 'removal-bar-sweep' })),
+            removeError ? h('p', { style: { color: '#ff6b6b', marginTop: 8, fontSize: 12 } }, removeError) : null)) : null,
+
+        // drop veil
+        h('div', { className: 'drop-veil' }, h(I.Upload, { size: 22, style: { marginRight: 10 } }), 'Drop to place your car'),
+
+        // render veil
+        h('div', { className: 'render-veil' + (rendering ? ' on' : '') },
+          h('div', { className: 'render-card' },
+            h('div', { className: 'rk' }, 'Studio Render'),
+            h('h3', null, 'Compositing your wrap'),
+            h('p', null, 'Re-lighting the paint, reflections and material depth.'),
+            h('div', { className: 'render-bar' }, h('i', { style: { width: renderPct + '%' } })),
+            h('div', { className: 'render-pct' }, Math.round(renderPct) + '%  ·  ~12s'))),
+
+        // ── HUD ──
+        h('div', { className: 'stage-hud' },
+          // top-left: coverage chips
+          h('div', { className: 'hud-tl' },
+            showLabels ? h('div', { className: 'panel-chips' },
+              panels.map((p) => {
+                const cid = panelColors[p.key];
+                const cs = cid ? window.WRAP_CATALOGUE.find((s) => s.id === cid) : null;
+                return h('button', { key: p.key, className: 'pchip' + (activePanel === p.key ? ' on' : ''),
+                  onClick: () => setActivePanel(p.key) },
+                  cs ? h('span', { className: 'sw', style: { background: cs.hex } }) : null, p.label);
+              })) : null),
+
+          // top-right: studio background + render mode
+          h('div', { className: 'hud-tr' },
+            h('div', { className: 'seg' },
+              [['studio', 'Studio bay'], ['signage', 'Branded'], ['customer', 'My background']].map(([k, lbl]) =>
+                h('button', { key: k, className: bg === k ? 'on' : '', onClick: () => props.setBg(k) }, lbl))),
+            h('div', { className: 'seg' },
+              h('button', { className: 'on', onClick: () => { setMode('render'); startRender(); } },
+                h(I.Sparkle, { size: 13 }), 'Studio Render'))),
+
+          // bottom-left: caption
+          h('div', { className: 'hud-bl' },
+            demo ? h('div', { className: 'demo-chip' }, 'Demo car', h('span', null, '— drop yours to replace')) : null,
+            h('div', { className: 'cap' },
+              swatch ? h(React.Fragment, null,
+                h('b', null, brandShort), h('span', { className: 'sep' }, '/'),
+                finishLabel, h('span', { className: 'sep' }, '/'),
+                h('b', null, swatch.name)) : 'NO WRAP SELECTED',
+              swatch ? h(React.Fragment, null, h('span', { className: 'sep' }, '/'), swatch.code || codeFor(swatch)) : null)),
+
+          // bottom-center: lighting
+          h('div', { className: 'hud-bc' },
+            h('div', { className: 'seg light-seg' },
+              [['studio', 'Studio'], ['sun', 'Sun'], ['overcast', 'Overcast'], ['night', 'Night']].map(([k, lbl]) =>
+                h('button', { key: k, className: light === k ? 'on' : '', onClick: () => props.setLight(k) },
+                  h('span', { className: 'ld ' + k }), lbl)))),
+
+          // bottom-right: tools
+          h('div', { className: 'hud-br' },
+            carUrl ? h('button', { className: 'pill-btn', title: 'Replace car photo', onClick: () => fileRef.current.click() }, h(I.Refresh, { size: 16 })) : null,
+            h('button', { className: 'pill-btn' + (baActive ? ' on' : ''), title: 'Before / after', onClick: () => setBaActive(!baActive) }, h(I.Compare, { size: 16 })),
+            h('button', { className: 'pill-btn', title: 'Add your car photo', onClick: () => fileRef.current.click() }, h(I.Upload, { size: 16 })))
+        ),
+
+        h('input', { ref: fileRef, type: 'file', accept: 'image/*', style: { display: 'none' },
+          onChange: (e) => { const f = e.target.files[0]; if (f) ingest(f); e.target.value = ''; } })
+      )
     );
   }
 
-  if (ingestState === "error") {
-    return (
-      <div className="removal-error">
-        <div className="re-icon">⚠</div>
-        <div className="re-msg">Background removal failed.</div>
-        {errorMsg ? <div className="re-detail">{errorMsg}</div> : null}
-        <button className="re-retry" onClick={handleRetry}>Try again</button>
-      </div>
-    );
+  function codeFor(sw) {
+    return (sw.brand.split(' ')[0].slice(0, 3) + '·' + (sw.id.split('-').pop() || '').slice(0, 6)).toUpperCase();
   }
 
-  if (carUrl) {
-    const fx = fxFor(activeSwatch);
-    // Mask / clip: use the car image as a CSS mask so fx layers only paint the car silhouette
-    const maskStyle = {
-      position: "absolute", inset: 0,
-      WebkitMaskImage: `url(${carUrl})`,
-      maskImage: `url(${carUrl})`,
-      WebkitMaskSize: "contain",
-      maskSize: "contain",
-      WebkitMaskRepeat: "no-repeat",
-      maskRepeat: "no-repeat",
-      WebkitMaskPosition: "center",
-      maskPosition: "center",
-    };
-    // Clip: when BA slider is active, clamp layers to the right (wrapped) side
-    const clip = baActive
-      ? { clipPath: `inset(0 ${100 - baPos}% 0 0)` }
-      : {};
+  window.WrapStage = Stage;
+  window.fxFor = fxFor;
 
-    const colored = Boolean(activeSwatch && fx);
-
-    return (
-      <div
-        className="ws-stage"
-        ref={stageRef}
-        onMouseMove={handleStageDrag}
-        onMouseUp={handleStageDragEnd}
-        onMouseLeave={handleStageDragEnd}
-        onTouchMove={handleStageDrag}
-        onTouchEnd={handleStageDragEnd}
-      >
-        {/* SVG noise filter — hidden, referenced by metallic tint via url(#metallic-noise) */}
-        <svg style={{ position: "absolute", width: 0, height: 0 }} aria-hidden="true">
-          <defs>
-            <filter id="metallic-noise" x="0%" y="0%" width="100%" height="100%">
-              <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" seed="2" result="noise" />
-              <feColorMatrix type="saturate" values="0" in="noise" result="grey" />
-              <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended" />
-              <feComponentTransfer>
-                <feFuncA type="linear" slope="1" />
-              </feComponentTransfer>
-            </filter>
-          </defs>
-        </svg>
-
-        {/* Original photo — unclipped, z-index 0 — reveals on the "before" (left) side */}
-        {originalUrl && (
-          <img
-            className="car-base car-base--original"
-            src={originalUrl}
-            alt="Original car"
-          />
-        )}
-
-        {/* Cutout car image — clipped to wrapped (right) side when BA active */}
-        <img
-          className="car-base"
-          src={carUrl}
-          alt="Your car"
-          style={{
-            ...clip,
-            width: "100%", height: "100%", objectFit: "contain",
-            display: "block", position: "relative", zIndex: 1,
-          }}
-        />
-
-        {/* Recolour fx layers — painted over the car using CSS mask, clipped to right side when BA active */}
-        {fx && (
-          <>
-            {/* Tone layer — luminance base correction */}
-            <div
-              className="car-fx car-tone"
-              style={{
-                ...maskStyle,
-                ...clip,
-                background: "rgba(0,0,0,1)",
-                mixBlendMode: "luminosity",
-                ...fx.tone,
-                zIndex: 2,
-              }}
-            />
-            {/* Tint layer — colour blend; metallic uses SVG noise filter */}
-            <div
-              className="car-fx car-tint"
-              style={{
-                ...maskStyle,
-                ...clip,
-                ...fx.tint,
-                filter: fx.noise ? "url(#metallic-noise)" : undefined,
-                zIndex: 3,
-              }}
-            />
-            {/* Sheen layer — specular highlight */}
-            <div
-              className="car-fx car-sheen"
-              style={{
-                ...maskStyle,
-                ...clip,
-                background: "linear-gradient(135deg, rgba(255,255,255,.55) 0%, transparent 55%)",
-                mixBlendMode: "screen",
-                ...fx.sheen,
-                zIndex: 4,
-              }}
-            />
-          </>
-        )}
-
-        {/* Before/after divider + drag handle */}
-        {baActive && colored && (
-          <>
-            <div
-              className="ba-divider"
-              style={{ left: `${baPos}%` }}
-              onMouseDown={handleDividerMouseDown}
-              onTouchStart={handleDividerMouseDown}
-            >
-              <div className="ba-knob" />
-            </div>
-            <span className="ba-tag ba-tag--before" style={{ right: `${100 - baPos}%` }}>Original</span>
-            <span className="ba-tag ba-tag--after"  style={{ left: `${baPos}%` }}>Wrapped</span>
-          </>
-        )}
-
-        {/* HUD — bottom-right controls */}
-        <div className="stage-hud">
-          {/* Replace photo */}
-          <label className="pill-btn" title="Replace car photo" style={{ cursor: "pointer" }}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.heic,.heif"
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-            />
-            Replace
-          </label>
-          {/* Compare — disabled until originalUrl is set */}
-          <button
-            className={"pill-btn" + (baActive ? " on" : "")}
-            title="Before / after"
-            aria-label="Toggle before/after comparison"
-            style={originalUrl ? null : { opacity: 0.4, cursor: "default", pointerEvents: "none" }}
-            onClick={() => { if (originalUrl) setBaActive(!baActive); }}
-          >
-            Compare
-          </button>
-        </div>
-      </div>
-    );
+  // hex -> HSL (for deciding chromatic vs achromatic recolour in demo mode)
+  function hexHsl(hex) {
+    hex = (hex || '').replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+    const r = parseInt(hex.slice(0, 2), 16) / 255, g = parseInt(hex.slice(2, 4), 16) / 255, b = parseInt(hex.slice(4, 6), 16) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let hh = 0, s = 0; const l = (mx + mn) / 2;
+    if (d) {
+      s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) hh = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) hh = (b - r) / d + 2; else hh = (r - g) / d + 4;
+    }
+    return { h: hh * 60, s, l };
   }
 
-  // Idle upload zone
-  return (
-    <div
-      className="ph-upload"
-      onClick={() => fileInputRef.current?.click()}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.heic,.heif"
-        onChange={handleFileChange}
-      />
-      <div className="ph-upload-label">
-        <strong>Tap to upload</strong> or drag a photo here
-        <br />
-        JPEG · PNG · HEIC · up to any size
-      </div>
-    </div>
-  );
-}
-
-// Export for use from app.jsx
-window.WrapStage = WrapStage;
+  // ===========================================================================
+  //  demoFx — DEMO-ONLY recolour for the bundled full-background stock photo.
+  //  The production engine (fxFor + silhouette mask above) needs a
+  //  background-removed PNG. The demo photo keeps its scenery, so here we blend
+  //  over the WHOLE frame: 'hue' recolours the saturated car while leaving the
+  //  near-grey water/sky/asphalt untouched; achromatic targets use 'color' to
+  //  desaturate the car. Safe to delete alongside DEMO_CAR_SRC.
+  // ===========================================================================
+  function demoFx(sw) {
+    if (!sw) return null;
+    const c = sw.hex, c2 = sw.hex2 || sw.hex;
+    const achromatic = hexHsl(c).s < 0.18;
+    switch (sw.finish) {
+      case 'chrome':
+        return { layers: [{ bg: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`, blend: 'hard-light', op: .8, anim: 'anim-chrome' }], sheen: .32 };
+      case 'shift':
+        return { layers: [{ bg: `linear-gradient(115deg,${c} 0%,${c2} 40%,${c} 72%,${c2} 100%)`, blend: 'hue', op: .92, anim: 'anim-shift' }], sheen: .2 };
+      case 'ppf-clear':
+        return { layers: [{ bg: c, blend: 'soft-light', op: .12 }], sheen: .42 };
+      case 'ppf-matte':
+        return { layers: [{ bg: '#000', blend: 'soft-light', op: .16 }], sheen: 0 };
+      case 'matte':
+        return achromatic
+          ? { layers: [{ bg: c, blend: 'color', op: 1 }, { bg: c, blend: 'soft-light', op: .4 }], sheen: 0 }
+          : { layers: [{ bg: c, blend: 'hue', op: .96 }, { bg: '#000', blend: 'soft-light', op: .16 }], sheen: 0 };
+      case 'satin':
+        return achromatic
+          ? { layers: [{ bg: c, blend: 'color', op: .92 }, { bg: c, blend: 'soft-light', op: .42 }], sheen: .15 }
+          : { layers: [{ bg: c, blend: 'hue', op: .95 }], sheen: .15 };
+      default: // gloss
+        return achromatic
+          ? { layers: [{ bg: c, blend: 'color', op: .9 }, { bg: c, blend: 'soft-light', op: .45 }], sheen: .3 }
+          : { layers: [{ bg: c, blend: 'hue', op: .95 }], sheen: .3 };
+    }
+  }
+  window.codeFor = codeFor;
+})();
