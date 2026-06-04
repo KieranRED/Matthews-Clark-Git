@@ -22,9 +22,9 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 
 ### Car Upload & Background Removal
 - [x] **UPLOAD-01**: Customer can upload a car photo by drag-and-drop or file picker (JPG, PNG, HEIC)
-- [ ] **UPLOAD-02**: Background is removed from the uploaded photo in-browser using @imgly/background-removal WASM — no server round-trip for this step
-- [ ] **UPLOAD-03**: Background-removed PNG is used as a pixel mask for the recolour engine
-- [ ] **UPLOAD-04**: Customer sees a progress indicator while background removal runs
+- [x] **UPLOAD-02**: Background is removed from the uploaded photo via /api/wrap-remove-bg (server-side @imgly/background-removal-node — CDN WASM approach replaced due to webpack/ONNX constraint)
+- [x] **UPLOAD-03**: Background-removed PNG is used as a pixel mask for the recolour engine
+- [x] **UPLOAD-04**: Customer sees a progress indicator while background removal runs
 
 ### Recolour Engine (Fast Preview)
 - [x] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using the CSS blend-mode recolour engine (canvas HSL pixel transform deferred per CONTEXT.md)
