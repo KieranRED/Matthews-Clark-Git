@@ -21,20 +21,20 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [x] **CAT-06**: Swatch images load from the curated swatch library (375 cropped swatch PNGs)
 
 ### Car Upload & Background Removal
-- [ ] **UPLOAD-01**: Customer can upload a car photo by drag-and-drop or file picker (JPG, PNG, HEIC)
+- [x] **UPLOAD-01**: Customer can upload a car photo by drag-and-drop or file picker (JPG, PNG, HEIC)
 - [ ] **UPLOAD-02**: Background is removed from the uploaded photo in-browser using @imgly/background-removal WASM — no server round-trip for this step
 - [ ] **UPLOAD-03**: Background-removed PNG is used as a pixel mask for the recolour engine
 - [ ] **UPLOAD-04**: Customer sees a progress indicator while background removal runs
 
 ### Recolour Engine (Fast Preview)
-- [ ] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using the CSS blend-mode recolour engine (canvas HSL pixel transform deferred per CONTEXT.md)
-- [ ] **RCOL-02**: Gloss finish: preserves and amplifies specular highlights with a sheen layer
-- [ ] **RCOL-03**: Matte finish: applies flat diffuse — zero specularity
-- [ ] **RCOL-04**: Satin finish: preserves shadow/highlight structure, dampens specular by ~60%
-- [ ] **RCOL-05**: Chrome finish: applies animated gradient band sweep across the car surface
-- [ ] **RCOL-06**: Metallic finish: HSL transform + subtle grain noise layer to simulate flake depth
-- [ ] **RCOL-07**: Colour-shift finish: animated two-tone HSL gradient simulating angle-dependent flip
-- [ ] **RCOL-08**: PPF clear/matte: thin tint overlay only, preserving underlying paint character
+- [x] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using the CSS blend-mode recolour engine (canvas HSL pixel transform deferred per CONTEXT.md)
+- [x] **RCOL-02**: Gloss finish: preserves and amplifies specular highlights with a sheen layer
+- [x] **RCOL-03**: Matte finish: applies flat diffuse — zero specularity
+- [x] **RCOL-04**: Satin finish: preserves shadow/highlight structure, dampens specular by ~60%
+- [x] **RCOL-05**: Chrome finish: applies animated gradient band sweep across the car surface
+- [x] **RCOL-06**: Metallic finish: HSL transform + subtle grain noise layer to simulate flake depth
+- [x] **RCOL-07**: Colour-shift finish: animated two-tone HSL gradient simulating angle-dependent flip
+- [x] **RCOL-08**: PPF clear/matte: thin tint overlay only, preserving underlying paint character
 - [ ] **RCOL-09**: Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body)
 - [ ] **RCOL-10**: Before/after swipe slider shows original vs wrapped car
 
