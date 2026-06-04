@@ -124,7 +124,7 @@ for (let i = 0; i < ids.length; i++) {
   const blob = await put(
     `wrap-studio/swatches/${id}.png`,
     readFileSync(path),
-    { access: 'public', contentType: 'image/png', token }
+    { access: 'public', contentType: 'image/png', token, allowOverwrite: true }
   );
   swatchUrls[id] = blob.url;
   if (i < ids.length - 1) {
