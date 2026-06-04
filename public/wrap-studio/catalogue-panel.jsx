@@ -56,12 +56,8 @@
     const sel = selectedId ? all.find((s) => s.id === selectedId) : null;
     const finishLabel = (k) => (window.FINISHES.find((f) => f.key === k) || {}).label || k;
 
-    // tier across assigned panels (+ current selection)
+    // assigned panels (used for quote footer display)
     const assigned = Object.values(panelColors).map((id) => all.find((s) => s.id === id)).filter(Boolean);
-    const pool = assigned.length ? assigned : (sel ? [sel] : []);
-    const rank = { standard: 0, premium: 1, specialist: 2 };
-    const topTier = pool.reduce((t, s) => rank[s.tier] > rank[t] ? s.tier : t, 'standard');
-    const tierInfo = window.TIER_LABEL[topTier];
 
     const activePanelLabel = (panels.find((p) => p.key === activePanel) || {}).label || 'Full body';
     const assignedCount = assigned.length;
@@ -151,10 +147,7 @@
               sel ? h('span', { className: 'swdot', style: { background: chipBg(sel) } }) : null,
               sel ? sel.name : 'Pick a colour',
               h('span', { style: { color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 12 } }, ' · ' + activePanelLabel))),
-          h('div', { className: 'quote-tier' },
-            h('div', { className: 'tt' }, 'Price tier'),
-            h('div', { className: 'tv' + (topTier === 'specialist' ? ' specialist' : '') }, tierInfo.name))),
-        h('div', { className: 'quote-note' }, tierInfo.note + '. Real number comes back fast — we quote fixed, not "from".'),
+        ),
         h('button', { className: 'btn btn--primary', disabled: !sel, style: !sel ? { opacity: .5 } : null, onClick: onQuote },
           h(I.Send, { size: 15 }), 'Get a quote for this wrap')));
   }
