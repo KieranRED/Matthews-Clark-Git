@@ -43,7 +43,12 @@ Plans:
   2. Selecting a colour immediately updates the canvas with correct hue and finish treatment — gloss amplifies highlights, matte flattens specularity, satin dampens it ~60%, chrome sweeps a gradient band, metallic adds grain noise, colour-shift animates a two-tone flip, PPF applies thin tint only
   3. Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body) independently
   4. Customer can drag the before/after slider to compare original vs wrapped preview
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 06-01-PLAN.md — Core ingest: COOP/COEP headers, originalUrl state, bg-removal pipeline + progress/error UI
+- [ ] 06-02-PLAN.md — HEIC conversion + metallic/carbon finishes + SVG noise filter
+- [ ] 06-03-PLAN.md — Before/after slider wired to originalUrl + per-panel verification
+- [ ] 06-04-PLAN.md — UAT: verify 4 success criteria + 14 requirements
 **UI hint**: yes
 
 ### Phase 7: GPT-Image-2 Render
@@ -78,6 +83,6 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Integration & Catalogue | 4/4 | Complete    | 2026-06-04 |
-| 6. Upload & Recolour Engine | 0/TBD | Not started | - |
+| 6. Upload & Recolour Engine | 0/4 | Not started | - |
 | 7. GPT-Image-2 Render | 0/TBD | Not started | - |
 | 8. Quote & Distribution | 0/TBD | Not started | - |
