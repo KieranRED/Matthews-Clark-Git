@@ -31,6 +31,14 @@ shadcn gate: not applicable. This is a self-contained UMD design system served f
 
 ---
 
+## Focal Point Hierarchy
+
+Primary focal point: the swatch grid (`.cat-scroll`). The stage area is secondary. The panel is tertiary.
+
+All layout decisions — panel width, stage proportions, scrollable grid — reinforce this hierarchy. The swatch grid must receive the most visual real estate and the clearest contrast treatment.
+
+---
+
 ## Spacing Scale
 
 The prototype uses an 8-point grid throughout. Declared values from studio.css:
@@ -58,6 +66,8 @@ The prototype uses an 8-point grid throughout. Declared values from studio.css:
 
 All sizes from studio.css. Executor must not change these values.
 
+**Four declared sizes, two weights.** No fifth size or third weight may be introduced.
+
 | Role | Size | Weight | Line Height | Font | Usage |
 |------|------|--------|-------------|------|-------|
 | Body | 15px | 400 (regular) | 1.5 | Inter Tight | All prose, form inputs, detail card text |
@@ -65,9 +75,14 @@ All sizes from studio.css. Executor must not change these values.
 | Heading | 16px | 800 (extrabold) | 1.15 | Archivo | Panel title, detail card name, modal h3 |
 | Display | 21px | 400 (regular Anton) | 1 | Anton | Topbar wordmark "MATTHEWS&CLARK" — `letter-spacing: .10em; text-transform: uppercase` |
 
-**Swatch card specific (within .sw-meta):**
-- `.sw-name`: 12px, weight 600, line-height 1.25, 2-line clamp
-- `.sw-code`: 9px, weight 400, JetBrains Mono, color `rgba(255,255,255,.42)`
+**Swatch card micro-variants (contextual variants of the mono/label tier — not distinct sizes):**
+
+`.sw-name` and `.sw-code` are both contextual sub-variants of the label/mono tier rendered inside `.sw-meta`. They do not constitute additional declared sizes.
+
+- `.sw-name`: 12px, weight 600, line-height 1.25, 2-line clamp — treated as the upper bound of the mono tier, using the second weight (600)
+- `.sw-code`: 9px, weight 400, JetBrains Mono, color `rgba(255,255,255,.42)` — treated as the lower bound of the mono tier, used only in this one dense-chip context
+
+Both render in JetBrains Mono and fall within the label/mono tier's purpose (product identifiers in constrained chip real estate). Executor must not apply these sizes outside `.sw-meta`.
 
 **Do not introduce a fifth font size or a third weight.** The two weights in use are 400 and 600/700/800 (Archivo uses 700–800 for headings; treat as "heavy" = the second weight tier).
 
@@ -148,6 +163,18 @@ The following copy from the demo prototype is REMOVED from the production quote 
 The quote modal summary column (`.q-summary`) shows: colour selection(s) with swatch dots, panel assignments, and selected finish type. No tier name, no pricing language, no "standard / premium / specialist" labels.
 
 **Source:** CONTEXT.md "Quote Flow — IMPORTANT" decision.
+
+---
+
+## Accessibility
+
+### Icon-only buttons
+
+| Element | aria-label |
+|---------|-----------|
+| `.sw-fav` (save to favourites icon button on swatch card) | `aria-label="Save to favourites"` |
+
+All other interactive elements in Phase 5 have visible text labels. Only `.sw-fav` is icon-only and requires an explicit aria-label.
 
 ---
 
