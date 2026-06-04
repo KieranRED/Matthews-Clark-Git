@@ -2,7 +2,6 @@
    Wrap Visualisation Studio — layout & components
    Matthews & Clark · dark cinematic · single blue accent
    ========================================================================= */
-@import url("../colors_and_type.css");
 
 :root{
   --panel-w: 416px;
