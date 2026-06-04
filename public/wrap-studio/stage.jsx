@@ -33,7 +33,10 @@ function loadHeic2Any() {
 // The library is loaded in the HTML shell so import.meta.url resolves to the
 // CDN (not the page URL), fixing internal worker/model asset paths.
 async function loadImgly() {
-  if (window.__imglyError) throw window.__imglyError;
+  if (window.__imglyError) {
+    console.error("[imgly] module load error:", window.__imglyError);
+    throw window.__imglyError;
+  }
   if (window.__imglyRemoveBackground) return window.__imglyRemoveBackground;
   // Still loading — wait for the imgly-ready event (dispatched from index.html module)
   return new Promise((resolve, reject) => {
@@ -134,6 +137,7 @@ function fxFor(sw) {
 // ─── WrapStage component ────────────────────────────────────────────────────
 function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setBaActive }) {
   const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
+  const [errorMsg, setErrorMsg]       = React.useState("");
   const [progress, setProgress]       = React.useState(0);
   const [inferring, setInferring]     = React.useState(false); // true once real inference callbacks start
   const [lastFile, setLastFile]        = React.useState(null);
@@ -207,6 +211,7 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
       onIngest?.({ originalUrl: origDataUrl, carUrl: cutoutDataUrl });
     } catch (err) {
       console.error("[WrapStage] ingest error", err);
+      setErrorMsg(err?.message || String(err) || "Unknown error");
       setIngestState("error");
     }
   }
@@ -250,7 +255,8 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
     return (
       <div className="removal-error">
         <div className="re-icon">⚠</div>
-        <div className="re-msg">Background removal failed. Check your connection and try again.</div>
+        <div className="re-msg">Background removal failed.</div>
+        {errorMsg ? <div className="re-detail">{errorMsg}</div> : null}
         <button className="re-retry" onClick={handleRetry}>Try again</button>
       </div>
     );
