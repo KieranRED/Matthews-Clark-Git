@@ -136,30 +136,62 @@
         // BODY_LINE_RETAIN = 0.30 — keeps panel shapes, creases, shadow edges visible
         const BODY_LINE_RETAIN = 0.30;
 
-        // Build a paint mask first (flag each pixel), then use neighbor check to kill speckles
-        const paintMask = new Uint8Array(d.length / 4);
+        // ── BULLETPROOF PAINT MASK ──────────────────────────────────────────
+        //
+        // Step 1: Initial candidates — colour/luminance heuristics
+        // Step 2: Connected component analysis (BFS, O(n))
+        //         Paint body is the LARGEST contiguous region — trim, speckles,
+        //         glass flakes and chrome are small disconnected components and
+        //         get eliminated automatically regardless of car colour
+        // Step 3: Size threshold — components < 1% of candidates are discarded
+        // Step 4: Apply colour only to surviving paint pixels
+        //
+        // This approach is car-colour agnostic: black, white, silver, red, any.
+
+        const n = cw * ch;
+
+        // Step 1: initial candidate pass
+        const cands = new Uint8Array(n);
         for (let i = 0; i < d.length; i += 4) {
-          if (d[i+3] < 20) continue;
-          if (isPaintPixel(rgbToHSL(d[i], d[i+1], d[i+2]), carInfo)) paintMask[i/4] = 1;
+          if (d[i+3] < 25) continue;
+          if (isPaintPixel(rgbToHSL(d[i], d[i+1], d[i+2]), carInfo)) cands[i >> 2] = 1;
         }
 
-        // Anti-speckle: require at least 3 of 8 neighbours to also be paint
-        const paintFinal = new Uint8Array(paintMask.length);
-        for (let y = 1; y < ch-1; y++) {
-          for (let x = 1; x < cw-1; x++) {
-            const idx = y * cw + x;
-            if (!paintMask[idx]) continue;
-            let neighbours = 0;
-            for (let dy = -1; dy <= 1; dy++)
-              for (let dx = -1; dx <= 1; dx++)
-                if (dy !== 0 || dx !== 0) neighbours += paintMask[(y+dy)*cw+(x+dx)] || 0;
-            if (neighbours >= 3) paintFinal[idx] = 1;
+        // Step 2: BFS connected components with O(1) queue
+        const labels = new Int32Array(n).fill(-1);
+        const compSizes = [];
+        const bfsQ = new Int32Array(n); // pre-allocated queue — no Array.shift() O(n) cost
+        let nextLabel = 0;
+
+        for (let start = 0; start < n; start++) {
+          if (!cands[start] || labels[start] >= 0) continue;
+          const label = nextLabel++;
+          let head = 0, tail = 0;
+          bfsQ[tail++] = start;
+          labels[start] = label;
+          let size = 0;
+          while (head < tail) {
+            const cur = bfsQ[head++]; size++;
+            const cy = Math.floor(cur / cw), cx = cur % cw;
+            // 4-connected neighbours
+            if (cy > 0)    { const nb = cur - cw; if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
+            if (cy < ch-1) { const nb = cur + cw; if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
+            if (cx > 0)    { const nb = cur - 1;  if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
+            if (cx < cw-1) { const nb = cur + 1;  if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
           }
+          compSizes.push(size);
         }
 
-        // Apply colour to confirmed paint pixels
+        // Step 3: keep components >= 1% of all candidates (eliminates all isolated noise)
+        const totalCands = cands.reduce((a, b) => a + b, 0);
+        const minCompSize = Math.max(200, totalCands * 0.01);
+        const keepSet = new Uint8Array(nextLabel);
+        for (let l = 0; l < nextLabel; l++) { if (compSizes[l] >= minCompSize) keepSet[l] = 1; }
+
+        // Step 4: apply colour only to pixels whose component survived
         for (let i = 0; i < d.length; i += 4) {
-          if (!paintFinal[i/4]) continue;
+          const pix = i >> 2;
+          if (!cands[pix] || !keepSet[labels[pix]]) continue;
           const px = rgbToHSL(d[i], d[i+1], d[i+2]);
           const deviation = px.l - carInfo.avgL;
           let outL = tHSL.l + deviation * BODY_LINE_RETAIN;
