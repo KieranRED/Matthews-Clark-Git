@@ -106,16 +106,6 @@ export default function DashboardScreen({ index, onNewLead }) {
               </div>
               <div className="delta up">Profit · R{Math.round(pipelineProfit / 1000)}k</div>
             </div>
-            <div className="kpi">
-              <div className="lbl">Open quotes</div>
-              <div className="val">{quoted.length}</div>
-              <div className="delta">Waiting for client</div>
-            </div>
-            <div className="kpi">
-              <div className="lbl">New leads</div>
-              <div className="val">{jobs.filter((j) => j.stage === "new").length}</div>
-              <div className="delta">Needs first contact</div>
-            </div>
             <div className="kpi kpi--green">
               <div className="lbl">Collected revenue</div>
               <div className="val">
@@ -123,6 +113,16 @@ export default function DashboardScreen({ index, onNewLead }) {
                 {Math.round(collectedRevenue / 1000)}k
               </div>
               <div className="delta up">Profit · R{Math.round(collectedProfit / 1000)}k</div>
+            </div>
+            <div className="kpi">
+              <div className="lbl">New leads</div>
+              <div className="val">{jobs.filter((j) => j.stage === "new").length}</div>
+              <div className="delta">Needs first contact</div>
+            </div>
+            <div className="kpi">
+              <div className="lbl">Open quotes</div>
+              <div className="val">{quoted.length}</div>
+              <div className="delta">Waiting for client</div>
             </div>
           </>
         )}
