@@ -9,7 +9,7 @@ Four phases that take the existing design system prototype to a production wrap 
 **Phase Numbering:**
 Continuing from v1.0 which used Phases 1–4. v1.1 starts at Phase 5.
 
-- [ ] **Phase 5: Integration & Catalogue** - Next.js route live at /wrap-studio, design system prototype integrated, full 375-colour catalogue browsable with brand/finish/search filtering and real swatch images
+- [x] **Phase 5: Integration & Catalogue** - Next.js route live at /wrap-studio, design system prototype integrated, full 375-colour catalogue browsable with brand/finish/search filtering and real swatch images
 - [ ] **Phase 6: Upload & Recolour Engine** - Customer uploads car photo, background removed in-browser via WASM, selecting any colour applies a finish-accurate canvas preview instantly across all 7 panel zones
 - [ ] **Phase 7: GPT-Image-2 Render** - Customer triggers a studio render that sends pre-coloured car composite to GPT-Image-2 for scene integration into M&C bay, with before/after comparison
 - [ ] **Phase 8: Quote & Distribution** - Customer submits quote into CRM + Telegram, downloads watermarked PNG, generates shareable link
@@ -29,9 +29,9 @@ Continuing from v1.0 which used Phases 1–4. v1.1 starts at Phase 5.
 **Plans**: 4 plans
 Plans:
 - [x] 05-01-PLAN.md — Scaffold route handler + copy 7 prototype files to public/wrap-studio/, null demo car
-- [ ] 05-02-PLAN.md — Build catalogue script: map 375 real entries, upload 18 STEK swatches to Blob, generate catalogue.js
-- [ ] 05-03-PLAN.md — Swatch imagery + low-confidence indicator, strip tier/pricing UI, add wrapping-page CTA
-- [ ] 05-04-PLAN.md — UAT: verify all 9 requirements and 5 success criteria
+- [x] 05-02-PLAN.md — Build catalogue script: map 375 real entries, upload 18 STEK swatches to Blob, generate catalogue.js
+- [x] 05-03-PLAN.md — Swatch imagery + low-confidence indicator, strip tier/pricing UI, add wrapping-page CTA
+- [x] 05-04-PLAN.md — UAT: verify all 9 requirements and 5 success criteria
 **UI hint**: yes
 
 ### Phase 6: Upload & Recolour Engine
@@ -77,7 +77,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Integration & Catalogue | 1/4 | In Progress|  |
+| 5. Integration & Catalogue | 4/4 | Complete | 2026-06-04 |
 | 6. Upload & Recolour Engine | 0/TBD | Not started | - |
 | 7. GPT-Image-2 Render | 0/TBD | Not started | - |
 | 8. Quote & Distribution | 0/TBD | Not started | - |
