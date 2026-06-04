@@ -189,7 +189,10 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
 
       // Stage 3: lazy-load @imgly → removeBackground → carUrl dataURL
       const removeBackground = await loadImgly();
+      // publicPath overrides the broken default (staticimgly.com 404s)
+      // Models are served from unpkg with correct CORS headers
       const resultBlob = await removeBackground(resizedBlob, {
+        publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
         progress: (key, current, total) => {
           if (total > 0) {
             setInferring(true);
