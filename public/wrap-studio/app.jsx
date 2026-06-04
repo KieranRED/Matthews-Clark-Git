@@ -87,8 +87,15 @@
     }, []);
 
     const onSelect = useCallback((sw) => {
-      setSelectedId(sw.id);
-      setPanelColors((prev) => ({ ...prev, [activePanel]: sw.id }));
+      setSelectedId((prev) => {
+        if (prev === sw.id) {
+          // Deselect — remove from active panel
+          setPanelColors((p) => { const n = { ...p }; delete n[activePanel]; return n; });
+          return null;
+        }
+        setPanelColors((p) => ({ ...p, [activePanel]: sw.id }));
+        return sw.id;
+      });
     }, [activePanel]);
 
     const toggleFav = useCallback((sw) => {
@@ -127,12 +134,14 @@
           h('div', { className: 'tb-wm' }, 'MATTHEWS', h('span', { className: 'sl' }, '/'), 'CLARK'),
           h('div', { className: 'tb-tool' }, 'Wrap Visualisation Studio')),
         h('div', { className: 'tb-spacer' }),
-        h('div', { className: 'tb-session' },
-          h('span', { className: 'dot' }), 'Session saved · no login'),
         h('div', { className: 'tb-spacer' }),
         h('div', { className: 'tb-actions' },
-          h('button', { className: 'btn btn--ghost btn--sm', onClick: () => flash('Session saved to this device') },
-            h(I.Save, { size: 14 }), 'Save'),
+          h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
+            try { localStorage.removeItem(LS); } catch {}
+            setCarUrl(null); setSelectedId(null); setPanelColors({}); setActivePanel('full');
+            setFavs({}); setPins([]); setBg('studio'); setLight('studio');
+            flash('Session reset');
+          }}, h(I.Refresh, { size: 14 }), 'Reset'),
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => flash('Shareable link copied') },
             h(I.Share, { size: 14 }), 'Share'),
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => { if (carUrl) flash('Render downloaded (watermarked)'); else flash('Add your car photo first'); } },
