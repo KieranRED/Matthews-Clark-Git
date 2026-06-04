@@ -1,0 +1,302 @@
+/* ─── Wrap Studio — base styles ─── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0a0c;
+  --bg-2:      #111114;
+  --bg-3:      #1a1a1f;
+  --fg-1:      #f0f0f0;
+  --fg-2:      #a0a0a8;
+  --fg-3:      #666;
+  --bd-1:      rgba(255,255,255,.1);
+  --bd-2:      rgba(255,255,255,.06);
+  --mc-blue:   #1f4fff;
+  --mc-blue-a: rgba(31,79,255,.18);
+  --radius:    14px;
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", ui-monospace, monospace;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--fg-1); font-family: var(--font-sans); }
+
+/* ─── Layout shell ─── */
+#ws-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+  gap: 16px;
+}
+
+/* ─── Upload zone ─── */
+.ph-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 200px;
+  border: 2px dashed var(--bd-1);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  padding: 24px;
+  text-align: center;
+}
+
+.ph-upload:hover,
+.ph-upload.drag-over {
+  border-color: var(--mc-blue);
+  background: var(--mc-blue-a);
+}
+
+.ph-upload input[type="file"] { display: none; }
+
+.ph-upload-label {
+  font-size: 14px;
+  color: var(--fg-2);
+  pointer-events: none;
+}
+
+.ph-upload-label strong { color: var(--fg-1); }
+
+/* ─── Progress bar (shared .render-bar pattern) ─── */
+.render-bar,
+.removal-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bd-2);
+  overflow: hidden;
+}
+
+.render-bar-fill,
+.removal-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--mc-blue);
+  transition: width .15s ease;
+}
+
+/* ─── Background-removal progress ─── */
+.removal-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 200px;
+  border: 1px solid var(--bd-1);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  padding: 24px;
+}
+
+.removal-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: .1em;
+  color: var(--fg-2);
+}
+
+.removal-bar {
+  width: 100%;
+  max-width: 280px;
+}
+
+.removal-label {
+  font-size: 13px;
+  color: var(--fg-2);
+}
+
+/* ─── Background-removal error ─── */
+.removal-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 200px;
+  border: 1px solid rgba(255,60,60,.3);
+  border-radius: var(--radius);
+  background: rgba(255,30,30,.06);
+  padding: 24px;
+  text-align: center;
+}
+
+.re-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.re-msg {
+  font-size: 14px;
+  color: var(--fg-2);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.re-retry {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--bd-1);
+  background: var(--bg-3);
+  color: var(--fg-1);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.re-retry:hover {
+  border-color: var(--mc-blue);
+  background: var(--mc-blue-a);
+}
+
+/* ─── Stage canvas area ─── */
+.ws-stage {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--bd-2);
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ws-stage canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── Car base images ─── */
+/* Original photo — unclipped, sits behind clipped cutout + fxLayers */
+.car-base--original{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0}
+/* Cutout car base — z-index 1, receives clip when BA active */
+.car-base{z-index:1}
+
+/* ─── Before/after divider ─── */
+.ba-divider{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.7);z-index:10;cursor:ew-resize;transform:translateX(-50%)}
+.ba-knob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.ba-tag{position:absolute;bottom:14px;font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.7);padding:3px 8px;background:rgba(0,0,0,.4);border-radius:4px;z-index:10;user-select:none;pointer-events:none}
+.ba-tag--before{left:8px}
+.ba-tag--after{right:8px}
+
+/* ─── Stage HUD (bottom-right controls) ─── */
+.stage-hud{position:absolute;bottom:12px;right:12px;display:flex;gap:8px;z-index:10}
+.pill-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:12px;font-family:var(--font-sans);cursor:pointer;backdrop-filter:blur(8px);transition:border-color .15s,background .15s;display:flex;align-items:center;gap:6px}
+.pill-btn:hover{border-color:rgba(255,255,255,.4);background:rgba(0,0,0,.7)}
+.pill-btn.on{border-color:rgba(31,79,255,.5);color:var(--mc-blue)}
+
+/* ─── Recolour fx layers (tone / tint / sheen) ─── */
+.car-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Animation keyframes for chrome / colour-shift finishes */
+@keyframes anim-chrome {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes anim-shift {
+  0%   { filter: hue-rotate(0deg); }
+  50%  { filter: hue-rotate(30deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+.car-tint.anim-chrome { background-size: 200% 200%; animation: anim-chrome 4s ease infinite; }
+.car-tint.anim-shift  { animation: anim-shift 5s ease infinite; }
+
+/* ─── Controls strip ─── */
+.ws-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ws-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--bd-1);
+  background: var(--bg-3);
+  color: var(--fg-1);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  white-space: nowrap;
+}
+
+.ws-btn:hover {
+  border-color: var(--mc-blue);
+  background: var(--mc-blue-a);
+}
+
+.ws-btn--primary {
+  border-color: var(--mc-blue);
+  background: var(--mc-blue);
+  color: #fff;
+}
+
+.ws-btn--primary:hover {
+  background: #2a5aff;
+  border-color: #2a5aff;
+}
+
+.ws-btn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+/* ─── Colour swatch picker ─── */
+.ws-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--bd-2);
+}
+
+.ws-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color .15s, transform .1s;
+  flex-shrink: 0;
+}
+
+.ws-swatch:hover { transform: scale(1.08); }
+.ws-swatch.active { border-color: #fff; }
+
+/* ─── Section headings ─── */
+.ws-section { display: flex; flex-direction: column; gap: 8px; }
+.ws-section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  #ws-root { padding: 10px; gap: 12px; }
+  .ws-stage { aspect-ratio: 4 / 3; }
+}
