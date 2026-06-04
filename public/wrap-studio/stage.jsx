@@ -4,43 +4,151 @@
   const h = React.createElement;
   const I = window.Icon;
 
-  // map a swatch -> background / blend treatment for the recolour layers
+  // ─── Colour utilities ──────────────────────────────────────────────────────
+
+  function hexToRGB(hex) {
+    const n = hex.replace('#', '');
+    return { r: parseInt(n.slice(0,2),16), g: parseInt(n.slice(2,4),16), b: parseInt(n.slice(4,6),16) };
+  }
+
+  function rgbToHSL(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+      else if (max === g) h = ((b - r) / d + 2) / 6;
+      else h = ((r - g) / d + 4) / 6;
+    }
+    return { h: h * 360, s, l };
+  }
+
+  function hslToRGB(h, s, l) {
+    h /= 360;
+    if (s === 0) { const v = Math.round(l * 255); return { r: v, g: v, b: v }; }
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue2rgb = (t) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    return { r: Math.round(hue2rgb(h+1/3)*255), g: Math.round(hue2rgb(h)*255), b: Math.round(hue2rgb(h-1/3)*255) };
+  }
+
+  // ─── Paint pixel detection ─────────────────────────────────────────────────
+  // Identifies body-paint pixels vs glass, chrome, trim, tyres
+
+  function detectDominantPaint(data, w, h) {
+    const buckets = new Array(36).fill(0);
+    const satSum  = new Array(36).fill(0);
+    for (let y = Math.floor(h*0.15); y < h*0.85; y += 5) {
+      for (let x = Math.floor(w*0.1); x < w*0.9; x += 5) {
+        const i = (y * w + x) * 4;
+        if (data[i+3] < 80) continue;
+        const px = rgbToHSL(data[i], data[i+1], data[i+2]);
+        if (px.l < 0.08 || px.l > 0.92 || px.s < 0.07) continue;
+        const b = Math.floor(px.h / 10) % 36;
+        buckets[b]++; satSum[b] += px.s;
+      }
+    }
+    let maxB = 0, maxC = 0;
+    for (let i = 0; i < 36; i++) { if (buckets[i] > maxC) { maxC = buckets[i]; maxB = i; } }
+    if (maxC < 8) return { h: -1, s: 0 }; // no clear dominant — use saturation only
+    return { h: maxB * 10 + 5, s: maxC ? satSum[maxB] / maxC : 0 };
+  }
+
+  function isPaintPixel(px, dom) {
+    const { h, s, l } = px;
+    if (l < 0.05) return false;          // tyre / very deep shadow
+    if (l > 0.94) return false;          // specular highlight — preserve
+    if (s < 0.04 && l > 0.22) return false; // chrome / silver trim / glass
+    if (s < 0.03) return false;          // fully achromatic
+    if (s > 0.10) return true;           // clearly saturated = paint
+    if (dom.h < 0) return s > 0.07;     // no dominant found — saturation gate
+    const diff = Math.min(Math.abs(h - dom.h), 360 - Math.abs(h - dom.h));
+    return diff < 40;                    // hue-close to dominant paint
+  }
+
+  // ─── Canvas recolour engine ────────────────────────────────────────────────
+  // Replaces CSS blend modes. Only paints paint pixels, leaves glass/trim alone.
+
+  function recolourCanvas(carUrl, targetHex, finish) {
+    return new Promise((resolve) => {
+      if (!carUrl || !targetHex) return resolve(null);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const cw = img.naturalWidth, ch = img.naturalHeight;
+        const cv = document.createElement('canvas');
+        cv.width = cw; cv.height = ch;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        const id = ctx.getImageData(0, 0, cw, ch);
+        const d = id.data;
+
+        // PPF clear / PPF matte — just a very subtle tint, don't recolour
+        if (finish === 'ppf-clear' || finish === 'ppf-matte') {
+          const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
+          const strength = finish === 'ppf-matte' ? 0.12 : 0.06;
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i+3] < 20) continue;
+            d[i]   = Math.round(d[i]   * (1-strength) + tr * strength);
+            d[i+1] = Math.round(d[i+1] * (1-strength) + tg * strength);
+            d[i+2] = Math.round(d[i+2] * (1-strength) + tb * strength);
+          }
+          ctx.putImageData(id, 0, 0); return resolve(cv.toDataURL('image/png'));
+        }
+
+        const dom = detectDominantPaint(d, cw, ch);
+        const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
+        const tHSL = rgbToHSL(tr, tg, tb);
+
+        // Finish-specific saturation / sheen modifiers
+        const satMult   = finish === 'matte' ? 0.82 : finish === 'satin' ? 0.91 : 1.0;
+        // For metallic: add a subtle grain effect later via CSS, don't change the base
+        const addSheen  = (finish === 'gloss' || finish === 'metallic');
+
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i+3] < 20) continue;
+          const px = rgbToHSL(d[i], d[i+1], d[i+2]);
+          if (!isPaintPixel(px, dom)) continue;
+
+          // Luminance-preserving replacement: keep original L, use target H + S
+          let outS = tHSL.s * satMult;
+          let outL = px.l;
+
+          // Gloss/metallic: slightly brighten highlights for realism
+          if (addSheen && px.l > 0.7) outL = Math.min(0.96, px.l * 1.04);
+
+          const { r, g, b } = hslToRGB(tHSL.h, outS, outL);
+          d[i] = r; d[i+1] = g; d[i+2] = b;
+        }
+
+        ctx.putImageData(id, 0, 0);
+        resolve(cv.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(null);
+      img.src = carUrl;
+    });
+  }
+
+  // Chrome / shift kept as CSS overlays (these are special effects, not real colour)
   function fxFor(sw) {
     if (!sw) return null;
     const c = sw.hex, c2 = sw.hex2 || sw.hex;
-    switch (sw.finish) {
-      case 'gloss':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .98 },
-                 sheen: { opacity: .34 }, tone: { opacity: .12 } };
-      case 'satin':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .96 },
-                 sheen: { opacity: .16 }, tone: { opacity: .16 } };
-      case 'matte':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: 1 },
-                 sheen: { opacity: 0 }, tone: { opacity: .4 } };
-      case 'chrome':
-        return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
-                         mixBlendMode: 'hard-light', opacity: .95 }, anim: 'anim-chrome',
-                 sheen: { opacity: .5 }, tone: { opacity: .1 } };
-      case 'shift':
-        return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
-                         mixBlendMode: 'color', opacity: .96 }, anim: 'anim-shift',
-                 sheen: { opacity: .26 }, tone: { opacity: .14 } };
-      case 'ppf-clear':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .12 },
-                 sheen: { opacity: .42 }, tone: { opacity: 0 } };
-      case 'ppf-matte':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .18 },
-                 sheen: { opacity: 0 }, tone: { opacity: .34 } };
-      case 'metallic':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .95 },
-                 sheen: { opacity: .22 }, tone: { opacity: .18 }, noise: true };
-      case 'carbon':
-        return { tint: { background: c, mixBlendMode: 'color', opacity: 1 },
-                 sheen: { opacity: 0 }, tone: { opacity: .5 } };
-      default:
-        return { tint: { background: c, mixBlendMode: 'color', opacity: .96 }, sheen: { opacity: .2 }, tone: { opacity: .14 } };
-    }
+    if (sw.finish === 'chrome')
+      return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
+               mixBlendMode: 'hard-light', opacity: .92 }, anim: 'anim-chrome', sheen: { opacity: .5 }, tone: { opacity: .08 } };
+    if (sw.finish === 'shift')
+      return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
+               mixBlendMode: 'hue', opacity: .94 }, anim: 'anim-shift', sheen: { opacity: .22 }, tone: { opacity: .1 } };
+    return null; // all other finishes: handled by canvas recolour
   }
 
   function Stage(props) {
@@ -53,8 +161,26 @@
     const dragRef = useRef(false);
     const [removing, setRemoving] = useState(false);
     const [removeError, setRemoveError] = useState(null);
+    const [recolouredUrl, setRecolouredUrl] = useState(null);
+    const recolourAbort = useRef(null);
 
-    const fx = fxFor(swatch);
+    // ── Canvas recolour: runs whenever the car or swatch changes ──────────────
+    useEffect(() => {
+      if (!carUrl || !swatch) { setRecolouredUrl(null); return; }
+      const fx = fxFor(swatch); // chrome/shift get CSS overlay, not canvas
+      if (fx) { setRecolouredUrl(null); return; }
+
+      // Cancel any in-flight recolour
+      if (recolourAbort.current) recolourAbort.current = false;
+      const token = { alive: true };
+      recolourAbort.current = token;
+
+      recolourCanvas(carUrl, swatch.hex, swatch.finish).then((url) => {
+        if (token.alive) setRecolouredUrl(url);
+      });
+      return () => { token.alive = false; };
+    }, [carUrl, swatch ? swatch.id : null]);
+
     const colored = !!swatch;
 
     // ── file ingest — calls bg removal API, stores both originalUrl + carUrl ──
@@ -129,15 +255,19 @@
     const origClip  = baActive ? { clipPath: `inset(0 0 0 ${baPos}%)`,        WebkitClipPath: `inset(0 0 0 ${baPos}%)` }        : {};
     // Legacy clip variable kept for ph-color placeholder (no-upload state)
     const clip = wrapClip;
+    const fx = swatch ? fxFor(swatch) : null; // only chrome/shift get CSS overlays
     const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
 
-    // recolour layers — NO clip here, the parent car-wrap handles clipping
+    // CSS overlay layers — only used for chrome + shift (everything else uses canvas recolour)
     const fxLayers = (carUrl && fx) ? [
       h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, opacity: fx.tone.opacity, background: '#000' } }),
       h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...fx.tint } }),
       h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, opacity: fx.sheen.opacity,
         background: 'linear-gradient(118deg, rgba(255,255,255,.9) 0%, transparent 26%, transparent 72%, rgba(255,255,255,.4) 100%)' } }),
     ] : null;
+
+    // The displayed car: recolouredUrl (canvas engine) or carUrl (base/chrome/shift)
+    const displayUrl = recolouredUrl || carUrl;
 
     const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
 
@@ -164,7 +294,7 @@
           h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
             carUrl
               ? h(React.Fragment, null,
-                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car', draggable: 'false' }),
+                  h('img', { className: 'car-base', src: displayUrl, alt: 'Your car', draggable: 'false' }),
                   fxLayers)
               : h('div', { className: 'car-ph' },
                   h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
