@@ -79,7 +79,7 @@ export function TeamModal({ mode = "create", member, onClose, onSaved }) {
     try {
       const payload = {
         name: String(name).trim(),
-        username: String(username).trim(),
+        ...(!isEdit ? { username: String(username).trim() } : {}),
         role,
         phone: phone ? String(phone).trim() : null,
         email: email ? String(email).trim() : null,
