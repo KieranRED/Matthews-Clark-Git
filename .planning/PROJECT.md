@@ -23,19 +23,22 @@ A single platform that runs the business — no spreadsheets, no duct-taped SaaS
 - **Styling**: Custom CSS modules (dark, monospace-accented CRM aesthetic)
 - **Deployment**: Vercel (production at matthewsandclark.co.za)
 
-## Current Milestone: v1.0 Social Content Scheduler
+## Current Milestone: v1.1 Wrap Visualisation Studio
 
-**Goal:** Build a self-hosted content scheduling system that auto-posts Reels to Instagram and TikTok via platform APIs, checks video export quality on upload, pulls analytics back into the CRM dashboard, and exports post data to an Obsidian second brain for script intelligence.
+**Goal:** Ship a public-facing wrap visualisation tool at /wrap-studio where customers upload their car photo, choose from 375 real Avery/Hexis/STEK colours, see a mathematically-accurate colour + finish preview, and get a GPT-Image-2 studio render — then fire a quote straight into the M&C CRM.
 
 **Target features:**
-- Video upload UI with ffprobe-based quality checker (codec, resolution, bitrate, fps → Optimised ✓ or Check export ⚠ tag)
-- Instagram Graph API — schedule + auto-post Reels
-- TikTok Content API — schedule + auto-post (Direct Post with Inbox fallback)
-- Vercel Blob storage with 7-day auto-delete cron
-- Analytics pull (48hr cron) from both platform APIs
-- Content performance screen in admin CRM
-- UTM attribution linking social posts to M&C leads
-- Obsidian vault markdown export structured as a content intelligence second brain — tagging each post by: audience-growth signal, conversion signal, non-performer signal, enabling pattern analysis at volume
+- Next.js route /wrap-studio serving the design system prototype (React UMD + CSS blend-mode recolour engine)
+- Real 375-colour catalogue (Avery 152 + Hexis 197 + STEK 26) with swatch images from wrap-colours.json
+- In-browser background removal via @imgly/background-removal WASM → clean masked car PNG
+- Canvas pixel-level recolour: HSL transform to exact catalogue hex + finish-specific treatment (gloss/satin/matte/chrome/metallic/shift/PPF)
+- GPT-Image-2 render pass via /api/wrap-render — scene integration: blend car into M&C studio bay, match lighting, preserve exact colour and finish
+- Quote form → Telegram notification + KV lead store (wired to existing M&C CRM pipeline)
+- Watermarked download + Vercel Blob share link
+
+## Previous Milestone: v1.0 Social Content Scheduler (in progress)
+
+**Goal:** Build a self-hosted content scheduling system that auto-posts Reels to Instagram and TikTok via platform APIs, checks video export quality on upload, pulls analytics back into the CRM dashboard, and exports post data to an Obsidian second brain for script intelligence.
 
 ## Validated Requirements (existing system)
 
@@ -101,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-29 — Milestone v1.0 started*
+*Last updated: 2026-06-04 — Milestone v1.1 started*

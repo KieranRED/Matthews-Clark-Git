@@ -1,23 +1,14 @@
-# Roadmap: Matthews & Clark — v1.0 Social Content Scheduler
+# Roadmap: Matthews & Clark
 
-## Overview
+## Milestones
 
-Four phases that close the loop between content production and business outcomes. Phase 1 builds the complete upload-to-Instagram pipeline, validating every technical assumption (mediainfo.js on Vercel, cron scheduling, KV data model) before adding complexity. Phase 2 adds TikTok posting once the core scheduler is proven. Phase 3 pulls analytics back into the CRM and attributes leads to posts. Phase 4 exports intelligence to an Obsidian vault for long-term content pattern discovery.
+- 🚧 **v1.0 Social Content Scheduler** - Phases 1-4 (in progress)
+- 🚧 **v1.1 Wrap Visualisation Studio** - Phases 5-8 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [ ] **Phase 1: Foundation** - KV content model, video upload + quality check, post creation UI, Instagram auto-posting via cron, token refresh, Blob TTL cleanup
-- [ ] **Phase 2: TikTok** - Chunked FILE_UPLOAD posting, Inbox fallback, proactive token refresh, Direct Post feature flag
-- [ ] **Phase 3: Analytics & Intelligence** - 48hr metrics cron for both platforms, signal scoring, UTM attribution, content performance CRM screen
-- [ ] **Phase 4: Obsidian Vault** - Nightly GitHub export, per-post markdown, signal scores, PDF script, ZIP fallback, Dataview README
-
-## Phase Details
+<details>
+<summary>🚧 v1.0 Social Content Scheduler (Phases 1-4) — In Progress</summary>
 
 ### Phase 1: Foundation
 **Goal**: Users can upload a video, check its quality, create a scheduled post, and have it auto-posted to Instagram — with the full cron pipeline, token refresh, and Blob cleanup running reliably in production
@@ -76,14 +67,82 @@ Plans:
   4. A ZIP download endpoint in the admin CRM generates an archive of all post markdown files on demand as a manual import fallback
 **Plans**: TBD
 
+</details>
+
+---
+
+### 🚧 v1.1 Wrap Visualisation Studio (In Progress)
+
+**Milestone Goal:** A public-facing wrap visualisation tool at /wrap-studio where customers upload their car photo, choose from 375 real Avery/Hexis/STEK colours, see a mathematically accurate colour + finish preview, receive a GPT-Image-2 studio render, and fire a quote into the M&C CRM.
+
+- [ ] **Phase 5: Integration & Catalogue** - Next.js route live, prototype integrated, full 375-colour catalogue browsable with brand/finish/search filtering
+- [ ] **Phase 6: Upload & Recolour Engine** - Customer uploads car photo, background is removed in-browser, and selecting any colour applies a finish-accurate canvas preview instantly
+- [ ] **Phase 7: GPT-Image-2 Render** - Customer triggers a studio render that blends their pre-coloured car into the M&C bay scene via GPT-Image-2, with before/after comparison
+- [ ] **Phase 8: Quote & Distribution** - Customer submits a quote request that fires into the CRM and Telegram, and can download or share their visualisation
+
+## Phase Details (v1.1)
+
+### Phase 5: Integration & Catalogue
+**Goal**: The wrap studio is live at /wrap-studio, the design system prototype is integrated into the repo, and customers can browse, filter, and search all 375 real wrap colours with accurate swatch imagery
+**Depends on**: Phase 4
+**Requirements**: INT-01, INT-02, INT-03, CAT-01, CAT-02, CAT-03, CAT-04, CAT-05, CAT-06
+**Success Criteria** (what must be TRUE):
+  1. Customer can visit /wrap-studio on a phone or desktop without logging in and the studio loads within 3 seconds
+  2. Customer can see all 375 wrap films (Avery, Hexis, STEK) in the catalogue, each showing the real product code, series name, finish type, and swatch image
+  3. Customer can filter the catalogue by brand (All / Avery Dennison / Hexis / STEK) and by finish type (Gloss / Satin / Matte / Chrome / Colour-shift / Carbon / PPF) — results update immediately
+  4. Customer can type a colour name or product code into the search box and the catalogue narrows to matching results
+  5. The studio layout is usable on a phone screen — catalogue swatches, filters, and the main stage area are all accessible without horizontal scrolling
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 6: Upload & Recolour Engine
+**Goal**: Customers can upload a car photo, have its background removed entirely in-browser, and instantly see a finish-accurate colour preview on the masked car when they select any catalogue swatch — including per-panel colour assignment and a before/after comparison slider
+**Depends on**: Phase 5
+**Requirements**: UPLOAD-01, UPLOAD-02, UPLOAD-03, UPLOAD-04, RCOL-01, RCOL-02, RCOL-03, RCOL-04, RCOL-05, RCOL-06, RCOL-07, RCOL-08, RCOL-09, RCOL-10
+**Success Criteria** (what must be TRUE):
+  1. Customer can upload a JPG, PNG, or HEIC car photo by drag-and-drop or file picker, see a progress indicator while background removal runs, and receive a clean masked car image — all without any server round-trip
+  2. Selecting a colour from the catalogue immediately updates the car preview on the canvas with the correct hue and finish treatment — gloss amplifies highlights, matte flattens specularity, satin dampens it by ~60%, chrome sweeps a gradient band, metallic adds grain noise, colour-shift animates a two-tone flip, and PPF applies a thin tint only
+  3. Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body) and see each panel coloured independently
+  4. Customer can drag the before/after slider to compare the original uploaded photo against the wrapped preview
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 7: GPT-Image-2 Render
+**Goal**: Customers can trigger a studio render that sends their pre-coloured car composite to GPT-Image-2, which integrates it into the M&C studio bay scene — preserving the chosen colour and finish while matching studio lighting — and the result replaces the fast preview with a before/after comparison against the original
+**Depends on**: Phase 6
+**Requirements**: RENDER-01, RENDER-02, RENDER-03, RENDER-04, RENDER-05, RENDER-06
+**Success Criteria** (what must be TRUE):
+  1. Customer can click "Studio Render" and see a progress indicator for the 10–20 second render duration without the page becoming unresponsive
+  2. The rendered image shows the customer's car composited into the M&C studio bay with matched lighting — the chosen finish character (gloss sheen, matte flatness, chrome sweep, etc.) is visibly preserved in the output
+  3. After render completes, the stage shows the GPT-Image-2 output and the before/after slider compares the original uploaded car against the studio render
+  4. If the render API call fails, the customer sees a clear error message and the fast preview canvas remains visible so they are not left with a blank stage
+**Plans**: TBD
+
+### Phase 8: Quote & Distribution
+**Goal**: Customers can submit a quote request with their colour selection and panel breakdown pre-filled, which creates a CRM lead and fires a Telegram notification to M&C — and they can download a watermarked PNG or generate a shareable link to their visualisation
+**Depends on**: Phase 7
+**Requirements**: QUOTE-01, QUOTE-02, QUOTE-03, QUOTE-04, QUOTE-05, SHARE-01, SHARE-02
+**Success Criteria** (what must be TRUE):
+  1. Customer can open a quote modal with their selected colours and panel assignment already filled in, complete name, car details, and WhatsApp number, and receive a confirmation message on submission
+  2. Submitting the quote form creates a lead record in the M&C KV store with colour selection, panel breakdown, and price tier attached — visible in the CRM pipeline
+  3. M&C team receives a Telegram notification with the customer's details and colour selection immediately after submission
+  4. Customer can download the current visualisation as a watermarked PNG with M&C branding applied
+  5. Customer can generate a shareable link that opens the studio with their colour selection pre-loaded
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | 0/9 | Not started | - |
-| 2. TikTok | 0/TBD | Not started | - |
-| 3. Analytics & Intelligence | 0/TBD | Not started | - |
-| 4. Obsidian Vault | 0/TBD | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Foundation | v1.0 | 1/9 | In progress | - |
+| 2. TikTok | v1.0 | 0/TBD | Not started | - |
+| 3. Analytics & Intelligence | v1.0 | 0/TBD | Not started | - |
+| 4. Obsidian Vault | v1.0 | 0/TBD | Not started | - |
+| 5. Integration & Catalogue | v1.1 | 0/TBD | Not started | - |
+| 6. Upload & Recolour Engine | v1.1 | 0/TBD | Not started | - |
+| 7. GPT-Image-2 Render | v1.1 | 0/TBD | Not started | - |
+| 8. Quote & Distribution | v1.1 | 0/TBD | Not started | - |

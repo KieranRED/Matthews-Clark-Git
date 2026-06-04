@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-stopped_at: "Completed 01-02 Tasks 1-2; checkpoint:human-verify at Task 3 (Vercel /api/test-mediainfo)"
-last_updated: "2026-05-29T18:10:27.857Z"
-last_activity: 2026-05-29
+milestone: v1.1
+milestone_name: Wrap Visualisation Studio
+status: roadmap_created
+stopped_at: "Roadmap written for v1.1 (Phases 5-8). Ready to plan Phase 5."
+last_updated: "2026-06-04"
+last_activity: 2026-06-04
 progress:
-  total_phases: 4
+  total_phases: 8
   completed_phases: 0
   total_plans: 9
-  completed_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -18,25 +18,24 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-29)
+See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** A single platform that runs the business — no spreadsheets, no duct-taped SaaS stack
-**Current focus:** Phase 01 — Foundation
+**Current focus:** Phase 5 — Integration & Catalogue (v1.1 start)
 
 ## Current Position
 
-Phase: 01 (Foundation) — EXECUTING
-Plan: 2 of 9
-Status: Ready to execute
-Last activity: 2026-05-29
+Phase: 5 of 8 — READY TO PLAN
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-06-04 — v1.1 roadmap created (Phases 5-8)
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-
-- Total plans completed: 0
+- Total plans completed: 1
 - Average duration: —
 - Total execution time: —
 
@@ -47,12 +46,10 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
-
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
-| Phase 01-foundation P01 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -61,14 +58,11 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Pre-Phase 1]: mediainfo.js (WASM) chosen over ffprobe-static — ffprobe fails on Vercel due to __dirname bug. MUST validate on Vercel production runtime before committing upload architecture.
-- [Pre-Phase 1]: TikTok Direct Post audit must be submitted at Phase 1 start — 2–4 week review; Inbox fallback ships first so Phase 2 is not blocked.
-- [Pre-Phase 1]: Client-side Blob upload for videos (Vercel 4.5 MB server request limit); quality check fires on returned Blob URL.
-- [Pre-Phase 1]: Two-phase KV state machine for Instagram (container creation on cron N, poll+publish on cron N+1).
-- [Phase 01-foundation]: content:schedule is the single source of truth for cron pickup — only status=pending posts with valid scheduledAt are members
-- [Phase 01-foundation]: updatePost is the only safe status transition path — it atomically manages content:schedule membership
-- [Phase 01-foundation]: WASM glob './node_modules/mediainfo.js/dist/*.wasm' confirmed correct — MediaInfoModule.wasm is the exact filename in node_modules/mediainfo.js/dist/
-- [Phase 01-foundation]: /api/test-mediainfo endpoint is intentionally unauthenticated — no sensitive data, designed for curl smoke testing
+- [v1.1 Roadmap]: Studio served as standalone HTML shell from app/wrap-studio/page.tsx — JS/CSS loaded from public/wrap-studio/ (not a Next.js React component)
+- [v1.1 Roadmap]: 375-colour catalogue at /Users/kieranredpath/Downloads/Wrap colours/Extract/wrap-colours.json; swatch PNGs in swatches/ subdirectory — must be copied to public/ in Phase 5
+- [v1.1 Roadmap]: Background removal runs entirely in-browser via @imgly/background-removal WASM — no server round-trip for this step
+- [v1.1 Roadmap]: GPT-Image-2 render: pre-coloured canvas output is the input; GPT does scene integration only — colour/finish already applied before the API call
+- [v1.1 Roadmap]: Quote submission reuses existing lib/leadStore.js pattern
 
 ### Pending Todos
 
@@ -76,12 +70,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Confirm Vercel plan is Pro (Hobby cannot run per-minute cron — scheduling architecture differs)
-- Confirm M&C Instagram account is Business type (Creator accounts cannot use Graph API)
-- Submit TikTok Direct Post app audit before or at Phase 1 start
+- OPENAI_API_KEY env var must be set in Vercel before Phase 7 execution
+- Confirm design system prototype files are ready to hand off for Phase 5 copy-in
 
 ## Session Continuity
 
-Last session: 2026-05-29T18:10:23.049Z
-Stopped at: Completed 01-02 Tasks 1-2; checkpoint:human-verify at Task 3 (Vercel /api/test-mediainfo)
+Last session: 2026-06-04
+Stopped at: v1.1 roadmap created — Phases 5-8 written to ROADMAP.md
 Resume file: None

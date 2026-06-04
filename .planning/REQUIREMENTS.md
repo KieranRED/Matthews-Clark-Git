@@ -1,126 +1,88 @@
-# Requirements — Milestone v1.0 Social Content Scheduler
+# Requirements: Matthews & Clark — v1.1 Wrap Visualisation Studio
 
-## Overview
-
-Self-hosted content scheduler inside the M&C CRM. Auto-posts Reels to Instagram and TikTok via platform APIs. Checks video quality on upload. Pulls analytics back into the dashboard. Exports post data + scripts to an Obsidian second brain for content pattern intelligence.
+## Milestone Goal
+Ship a public-facing wrap visualisation tool at /wrap-studio where customers upload their car photo, choose from 375 real Avery/Hexis/STEK colours, see a mathematically accurate colour + finish preview, receive a GPT-Image-2 studio render, and fire a quote into the M&C CRM.
 
 ---
 
 ## Active Requirements
 
-### UPLOAD — Video & Script Intake
+### Integration & Routing
+- [ ] **INT-01**: Customer can access the wrap studio at `/wrap-studio` on the M&C site without logging in
+- [ ] **INT-02**: Studio loads within 3 seconds on first visit (CSS/JS served from Next.js public or route handler)
+- [ ] **INT-03**: Studio is mobile-responsive and usable on phone screen (customer takes photo on device and uses it immediately)
 
-- [ ] **UPLOAD-01**: User can upload a video file (drag/drop or file picker) from the content post creation screen
-- [ ] **UPLOAD-02**: Video is stored in Vercel Blob under a `social-videos/` prefix and the public URL is saved to the post record
-- [x] **UPLOAD-03**: After upload, the system runs a `mediainfo.js` quality check server-side and returns a result within 10 seconds
-- [ ] **UPLOAD-04**: Quality check evaluates: codec (H.264/MP4 required), resolution + aspect ratio (1080×1920 / 9:16), bitrate (4–50 Mbps sweet spot), frame rate (29.97 or 60fps acceptable)
-- [ ] **UPLOAD-05**: Quality result is displayed as a tag on the post — "Optimised ✓" (all checks pass) or "Check export ⚠" (any check fails) with a breakdown of which checks failed
-- [ ] **UPLOAD-06**: User can upload a PDF script file alongside the video
-- [ ] **UPLOAD-07**: System extracts text content from the uploaded PDF script and stores it in the post record
-- [ ] **UPLOAD-08**: Vercel Blob auto-delete cron runs daily and deletes video files older than 7 days (platform has already downloaded them by then)
+### Colour Catalogue
+- [ ] **CAT-01**: Customer can browse all 375 real wrap films (Avery 152, Hexis 197, STEK 26) in the catalogue
+- [ ] **CAT-02**: Customer can filter catalogue by brand (All / Avery Dennison / Hexis / STEK)
+- [ ] **CAT-03**: Customer can filter by finish type (Gloss / Satin / Matte / Chrome / Colour-shift / Carbon / PPF)
+- [ ] **CAT-04**: Customer can search catalogue by colour name or product code
+- [ ] **CAT-05**: Each swatch shows the real product code, series name, and finish type from the official catalogue
+- [ ] **CAT-06**: Swatch images load from the curated swatch library (375 cropped swatch PNGs)
 
-### SCHEDULE — Post Management UI
+### Car Upload & Background Removal
+- [ ] **UPLOAD-01**: Customer can upload a car photo by drag-and-drop or file picker (JPG, PNG, HEIC)
+- [ ] **UPLOAD-02**: Background is removed from the uploaded photo in-browser using @imgly/background-removal WASM — no server round-trip for this step
+- [ ] **UPLOAD-03**: Background-removed PNG is used as a pixel mask for the recolour engine
+- [ ] **UPLOAD-04**: Customer sees a progress indicator while background removal runs
 
-- [ ] **SCHEDULE-01**: User can create a new content post with: video upload, PDF script upload, caption, hashtags, platform toggles (Instagram / TikTok), and scheduled date/time
-- [x] **SCHEDULE-02**: Post record is saved to Upstash KV with status `pending` and `scheduledAt` timestamp
-- [ ] **SCHEDULE-03**: User can view all posts in a feed grouped by status: Scheduled, Processing, Published, Failed
-- [ ] **SCHEDULE-04**: Vercel Cron runs every 15 minutes and picks up posts where `scheduledAt ≤ now` and `status = pending`, advancing them to `processing`
-- [ ] **SCHEDULE-05**: Failed posts display the error reason and allow the user to retry
+### Recolour Engine (Fast Preview)
+- [ ] **RCOL-01**: Selecting a colour instantly applies a finish-accurate preview to the masked car using canvas HSL pixel transform
+- [ ] **RCOL-02**: Gloss finish: preserves and amplifies specular highlights with a sheen layer
+- [ ] **RCOL-03**: Matte finish: applies flat diffuse — zero specularity
+- [ ] **RCOL-04**: Satin finish: preserves shadow/highlight structure, dampens specular by ~60%
+- [ ] **RCOL-05**: Chrome finish: applies animated gradient band sweep across the car surface
+- [ ] **RCOL-06**: Metallic finish: HSL transform + subtle grain noise layer to simulate flake depth
+- [ ] **RCOL-07**: Colour-shift finish: animated two-tone HSL gradient simulating angle-dependent flip
+- [ ] **RCOL-08**: PPF clear/matte: thin tint overlay only, preserving underlying paint character
+- [ ] **RCOL-09**: Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body)
+- [ ] **RCOL-10**: Before/after swipe slider shows original vs wrapped car
 
-### PUBLISH — Instagram
+### GPT-Image-2 Studio Render
+- [ ] **RENDER-01**: Customer can trigger a "Studio Render" which calls `/api/wrap-render`
+- [ ] **RENDER-02**: The render endpoint sends the pre-coloured car composite (canvas output) to GPT-Image-2 — colour and finish are already applied; GPT's job is scene integration only
+- [ ] **RENDER-03**: GPT prompt is finish-aware — specifies gloss/matte/chrome/etc. so GPT preserves the material character while blending the car into the studio scene
+- [ ] **RENDER-04**: Render composites the car into the M&C studio bay background (studio lighting scene)
+- [ ] **RENDER-05**: Customer sees a progress indicator during render (~10–20s)
+- [ ] **RENDER-06**: Rendered result replaces the fast preview on the stage; before/after slider compares original car vs studio render
 
-- [ ] **PUBLISH-01**: System creates an Instagram media container via Graph API using the Vercel Blob video URL as `video_url` with `media_type = REELS`
-- [ ] **PUBLISH-02**: System polls the container status in subsequent cron runs until `status_code = FINISHED` (two-phase KV state machine — no blocking inline poll)
-- [ ] **PUBLISH-03**: System publishes the container via `/{IG_USER_ID}/media_publish` and stores the returned `ig_media_id` on the post record
-- [ ] **PUBLISH-04**: Long-lived Instagram access token is refreshed automatically every 50 days via a separate cron job (token expires at 60 days; no auto-refresh by Meta)
-- [ ] **PUBLISH-05**: Posting cron uses a Redis distributed lock (SET NX EX) to prevent duplicate publishes if cron double-fires
+### Quote & CRM Integration
+- [ ] **QUOTE-01**: Customer can open a quote request modal with their selected colour(s) and panel assignment pre-filled
+- [ ] **QUOTE-02**: Quote form captures: name, car (make/model/year), WhatsApp/phone, notes
+- [ ] **QUOTE-03**: Submitting the form creates a lead record in the M&C KV lead store with colour selection, panel breakdown, and price tier attached
+- [ ] **QUOTE-04**: Submission triggers a Telegram notification to the M&C group with the colour selection and customer details
+- [ ] **QUOTE-05**: Customer sees a confirmation message after successful submission
 
-### PUBLISH — TikTok
-
-- [ ] **PUBLISH-06**: System posts to TikTok using chunked `FILE_UPLOAD` (not `PULL_FROM_URL` which rejects Vercel Blob domains)
-- [ ] **PUBLISH-07**: TikTok posts in Inbox/draft mode (`UPLOAD_TO_INBOX`) as the default; `DIRECT_POST` activates automatically via a feature flag once app audit is approved
-- [ ] **PUBLISH-08**: TikTok access token (24hr expiry) is refreshed proactively before each posting cron run using the stored refresh token
-- [ ] **PUBLISH-09**: System stores the returned `tiktok_video_id` on the post record for later analytics fetching
-
-### ANALYTICS — Metrics Pull
-
-- [ ] **ANALYTICS-01**: Analytics cron runs daily and fetches metrics for all posts older than 48 hours that have a platform media ID but no metrics yet
-- [ ] **ANALYTICS-02**: Instagram metrics fetched: `views`, `reach`, `impressions`, `saved`, `shares`, `video_views`, `follows` (profile visits from post)
-- [ ] **ANALYTICS-03**: TikTok metrics fetched: `view_count`, `like_count`, `comment_count`, `share_count`, `average_time_watched`, `full_video_watched_rate`
-- [ ] **ANALYTICS-04**: Link-in-bio click count is tracked for Instagram posts that include a UTM-tagged campaign URL (fetched via Graph API `website_clicks` field if available)
-- [ ] **ANALYTICS-05**: Conversion attribution: post record stores count of M&C leads where `source = TIKTOK|INSTAGRAM` and `createdAt` falls within 7 days after `publishedAt` — computed at analytics pull time
-- [ ] **ANALYTICS-06**: Content performance screen in the CRM shows all published posts with their metrics, signal scores, quality tag, and platform status
-
-### VAULT — Obsidian Second Brain Export
-
-- [ ] **VAULT-01**: Nightly cron renders a Markdown file per published post with YAML frontmatter (date, platform, car type, service, metrics, signal scores) and sections: Hook, Script, Performance Notes
-- [ ] **VAULT-02**: Each post is scored 1–10 on three signals: `audience_score` (reach + profile visits + followers), `engagement_score` (saves + shares + completion rate), `conversion_score` (attributed leads + link clicks) — scores relative to the account median, not absolute thresholds
-- [ ] **VAULT-03**: Files are pushed to a private GitHub repository via Octokit `createOrUpdateFileContents` — the repo is set up as an Obsidian vault synced via the `obsidian-git` plugin
-- [ ] **VAULT-04**: A ZIP download endpoint in the admin CRM generates an archive of all post markdown files on demand (fallback / manual import)
-- [ ] **VAULT-05**: Extracted PDF script text is included in the Markdown file under a `## Script` section
-- [ ] **VAULT-06**: A README in the vault root contains a Dataview query template that lets M&C query high-scoring posts by signal type, service, car, and date range
+### Share & Download
+- [ ] **SHARE-01**: Customer can download the current render as a watermarked PNG (M&C branding applied)
+- [ ] **SHARE-02**: Customer can generate a shareable link that opens the studio with their colour selection pre-loaded
 
 ---
 
-## Future Requirements (deferred)
+## Future Requirements (next milestone)
 
-- AI-generated caption suggestions (too early — no established tone of voice data yet)
-- Multi-account support (M&C is one account on each platform)
-- Real-time analytics dashboard (48hr pull is sufficient at 1 post/day)
-- Hashtag performance tracking (needs 3+ months of data to be meaningful)
-- TikTok Direct Post (in scope as upgrade path post-audit, not a separate future req)
-- Competitor content tracking (different product category)
+- Studio backgrounds — M&C shoots a set of real bay photos at 3/4 front, side, 3/4 rear angles for compositing alignment
+- Comparison grid — pin up to 4 colours and view the car simultaneously
+- Lighting toggle — studio / sun / overcast / night
+- Analytics — which colours are most browsed and quoted, feed into CRM dashboard
 
 ---
 
-## Out of Scope
+## Out of Scope (v1.1)
 
-| Item | Reason |
-|---|---|
-| Buffer / Later / Metricool integration | Replaced entirely by direct platform APIs |
-| Video editing / trimming in browser | Out of scope — edit externally, upload finished file |
-| Instagram Stories / Carousel | Reels only for v1.0 |
-| TikTok Ads API | Organic posting only |
-| Cross-posting to Facebook / YouTube | Two platforms first; validate approach |
-| PULL_FROM_URL for TikTok | TikTok rejects Vercel Blob domains; FILE_UPLOAD used instead |
+- Server-side background removal (in-browser WASM removes latency + cost)
+- 3D model rendering (requires per-make/model 3D assets — not scalable for v1.1)
+- Video rendering or animated wraps
+- Customer login / saved sessions across devices (localStorage is sufficient for v1.1)
+- Admin catalogue management UI
 
 ---
 
 ## Traceability
 
-| REQ-ID | Phase |
-|---|---|
-| UPLOAD-01 | Phase 1 |
-| UPLOAD-02 | Phase 1 |
-| UPLOAD-03 | Phase 1 |
-| UPLOAD-04 | Phase 1 |
-| UPLOAD-05 | Phase 1 |
-| UPLOAD-06 | Phase 1 |
-| UPLOAD-07 | Phase 1 |
-| UPLOAD-08 | Phase 1 |
-| SCHEDULE-01 | Phase 1 |
-| SCHEDULE-02 | Phase 1 |
-| SCHEDULE-03 | Phase 1 |
-| SCHEDULE-04 | Phase 1 |
-| SCHEDULE-05 | Phase 1 |
-| PUBLISH-01 | Phase 1 |
-| PUBLISH-02 | Phase 1 |
-| PUBLISH-03 | Phase 1 |
-| PUBLISH-04 | Phase 1 |
-| PUBLISH-05 | Phase 1 |
-| PUBLISH-06 | Phase 2 |
-| PUBLISH-07 | Phase 2 |
-| PUBLISH-08 | Phase 2 |
-| PUBLISH-09 | Phase 2 |
-| ANALYTICS-01 | Phase 3 |
-| ANALYTICS-02 | Phase 3 |
-| ANALYTICS-03 | Phase 3 |
-| ANALYTICS-04 | Phase 3 |
-| ANALYTICS-05 | Phase 3 |
-| ANALYTICS-06 | Phase 3 |
-| VAULT-01 | Phase 4 |
-| VAULT-02 | Phase 4 |
-| VAULT-03 | Phase 4 |
-| VAULT-04 | Phase 4 |
-| VAULT-05 | Phase 4 |
-| VAULT-06 | Phase 4 |
+| Phase | Requirements |
+|-------|-------------|
+| Phase 5: Integration & Catalogue | INT-01, INT-02, INT-03, CAT-01, CAT-02, CAT-03, CAT-04, CAT-05, CAT-06 |
+| Phase 6: Upload & Recolour Engine | UPLOAD-01, UPLOAD-02, UPLOAD-03, UPLOAD-04, RCOL-01, RCOL-02, RCOL-03, RCOL-04, RCOL-05, RCOL-06, RCOL-07, RCOL-08, RCOL-09, RCOL-10 |
+| Phase 7: GPT-Image-2 Render | RENDER-01, RENDER-02, RENDER-03, RENDER-04, RENDER-05, RENDER-06 |
+| Phase 8: Quote & Distribution | QUOTE-01, QUOTE-02, QUOTE-03, QUOTE-04, QUOTE-05, SHARE-01, SHARE-02 |
