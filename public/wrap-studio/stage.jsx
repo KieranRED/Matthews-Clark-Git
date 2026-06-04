@@ -133,6 +133,7 @@ function fxFor(sw) {
 function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setBaActive }) {
   const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
   const [progress, setProgress]       = React.useState(0);
+  const [inferring, setInferring]     = React.useState(false); // true once real inference callbacks start
   const [lastFile, setLastFile]        = React.useState(null);
   const [baPos, setBaPos]              = React.useState(50); // 0–100 percent
   const fileInputRef                   = React.useRef(null);
@@ -167,6 +168,7 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
     setLastFile(file);
     setIngestState("removing");
     setProgress(0);
+    setInferring(false);
     try {
       // Stage 1: HEIC → JPEG conversion (lazy-loads heic2any only when needed)
       const ext  = (file.name || "").split(".").pop().toLowerCase();
@@ -187,7 +189,10 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
       const removeBackground = await loadImgly();
       const resultBlob = await removeBackground(resizedBlob, {
         progress: (key, current, total) => {
-          if (total > 0) setProgress(Math.round((current / total) * 100));
+          if (total > 0) {
+            setInferring(true);
+            setProgress(Math.round((current / total) * 100));
+          }
         },
       });
       const cutoutDataUrl = await blobToDataUrl(resultBlob);
@@ -223,11 +228,15 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
   if (ingestState === "removing") {
     return (
       <div className="removal-progress">
-        <div className="removal-label">Removing background…</div>
-        <div className="removal-bar">
-          <div className="removal-bar-fill" style={{ width: `${progress}%` }} />
+        <div className="removal-label">
+          {inferring ? "Removing background…" : "Loading model… (first run only)"}
         </div>
-        <div className="removal-pct">{progress}%</div>
+        <div className="removal-bar">
+          {inferring
+            ? <div className="removal-bar-fill" style={{ width: `${progress}%` }} />
+            : <div className="removal-bar-sweep" />}
+        </div>
+        <div className="removal-pct">{inferring ? `${progress}%` : "—"}</div>
       </div>
     );
   }

@@ -108,6 +108,19 @@ html, body { height: 100%; background: var(--bg); color: var(--fg-1); font-famil
   max-width: 280px;
 }
 
+/* indeterminate sweep — shown while ONNX model downloads */
+.removal-bar-sweep {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, var(--accent) 40%, var(--accent-bright) 60%, transparent 100%);
+  background-size: 200% 100%;
+  animation: removal-sweep 1.4s ease-in-out infinite;
+}
+@keyframes removal-sweep {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
 .removal-label {
   font-size: 13px;
   color: var(--fg-2);
