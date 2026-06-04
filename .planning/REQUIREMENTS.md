@@ -10,15 +10,15 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 ### Integration & Routing
 - [x] **INT-01**: Customer can access the wrap studio at `/wrap-studio` on the M&C site without logging in
 - [x] **INT-02**: Studio loads within 3 seconds on first visit (CSS/JS served from Next.js public or route handler)
-- [ ] **INT-03**: Studio is mobile-responsive and usable on phone screen (customer takes photo on device and uses it immediately)
+- [x] **INT-03**: Studio is mobile-responsive and usable on phone screen (customer takes photo on device and uses it immediately)
 
 ### Colour Catalogue
-- [ ] **CAT-01**: Customer can browse all 375 real wrap films (Avery 152, Hexis 197, STEK 26) in the catalogue
-- [ ] **CAT-02**: Customer can filter catalogue by brand (All / Avery Dennison / Hexis / STEK)
-- [ ] **CAT-03**: Customer can filter by finish type (Gloss / Satin / Matte / Chrome / Colour-shift / Carbon / PPF)
-- [ ] **CAT-04**: Customer can search catalogue by colour name or product code
-- [ ] **CAT-05**: Each swatch shows the real product code, series name, and finish type from the official catalogue
-- [ ] **CAT-06**: Swatch images load from the curated swatch library (375 cropped swatch PNGs)
+- [x] **CAT-01**: Customer can browse all 375 real wrap films (Avery 152, Hexis 197, STEK 26) in the catalogue
+- [x] **CAT-02**: Customer can filter catalogue by brand (All / Avery Dennison / Hexis / STEK)
+- [x] **CAT-03**: Customer can filter by finish type (Gloss / Satin / Matte / Chrome / Colour-shift / Carbon / PPF)
+- [x] **CAT-04**: Customer can search catalogue by colour name or product code
+- [x] **CAT-05**: Each swatch shows the real product code, series name, and finish type from the official catalogue
+- [x] **CAT-06**: Swatch images load from the curated swatch library (375 cropped swatch PNGs)
 
 ### Car Upload & Background Removal
 - [ ] **UPLOAD-01**: Customer can upload a car photo by drag-and-drop or file picker (JPG, PNG, HEIC)

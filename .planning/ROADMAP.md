@@ -77,7 +77,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Integration & Catalogue | 4/4 | Complete | 2026-06-04 |
+| 5. Integration & Catalogue | 4/4 | Complete    | 2026-06-04 |
 | 6. Upload & Recolour Engine | 0/TBD | Not started | - |
 | 7. GPT-Image-2 Render | 0/TBD | Not started | - |
 | 8. Quote & Distribution | 0/TBD | Not started | - |
