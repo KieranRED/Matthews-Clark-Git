@@ -19,20 +19,20 @@ This phase does NOT include:
 ## Implementation Decisions
 
 ### Route & URL
-- Route: `app/mc-site/wrap-studio/page.jsx` → URL `/mc-site/wrap-studio`
-- Page is a Next.js server component that renders an HTML shell and loads all studio JS/CSS as static files from `public/wrap-studio/`
-- Full-screen standalone layout — does NOT use the mc-site header/nav
+- Route: `app/mc-site/wrap-studio/route.js` (GET handler returning raw HTML Response) → URL `/mc-site/wrap-studio`
+- **Override from original decision**: route.js is used instead of page.jsx — the only reliable way to bypass mc-site layout nesting. page.jsx cannot escape parent layouts without an additional layout.jsx override that has caveats (confirmed in RESEARCH.md). User confirmed 2026-06-04.
+- Full-screen standalone — does NOT use the mc-site header/nav
 - Add a "Wrap Studio →" CTA link to `app/mc-site/wrapping/page.jsx`
 
 ### Serving the Design System
 - Copy all 7 prototype files from `/tmp/mc-wrap-studio/wrap-studio/` into `public/wrap-studio/`
   - app.jsx, catalogue-panel.jsx, catalogue.js, icons.jsx, stage.jsx, studio.css, tweaks-panel.jsx
-- page.jsx references them as `<script src="/wrap-studio/app.jsx">` etc
+- route.js GET handler returns the HTML shell with `<script src="/wrap-studio/app.jsx">` etc
 - The demo car image (`_DEMO-car-REMOVE-BEFORE-PROD.png`) is intentionally NOT copied — set DEMO_CAR_SRC = null in app.jsx
 - Babel standalone transforms the JSX files client-side (already wired in the HTML entry point)
 
 ### Catalogue Data
-- Write a Node.js script `scripts/build-catalogue.js` that:
+- Write a Node.js script `scripts/build-catalogue.mjs` (ESM — project has `"type": "module"`) that:
   1. Reads `/Users/kieranredpath/Downloads/Wrap\ colours/Extract/wrap-colours.json`
   2. Maps each entry to the prototype's schema (brand, series, name, code, hex, hex2, finish, tier, thickness, conform, warranty, proTip)
   3. Uploads each swatch PNG to Vercel Blob using `@vercel/blob` put()
@@ -47,9 +47,9 @@ Real data `finish` → prototype `finish`:
 - `matte` → `matte`
 - `chrome` → `chrome`
 - `colour-shift` → `shift`
-- `metallic` → `satin` (metallic goes in satin group visually — it's a finish variant)
+- `metallic` → `metallic` (kept as first-class finish key — UI-SPEC specifies a separate Metallic filter chip. Override confirmed 2026-06-04.)
 - `brushed` → `satin`
-- `carbon` → `matte`
+- `carbon` → `carbon` (kept as first-class finish key — UI-SPEC specifies a separate Carbon filter chip)
 - `ppf-colour`: check slug — if contains "matte" → `ppf-matte`, else → `ppf-clear`
 - `ppf-clear` → `ppf-clear`
 - `ppf-matte` → `ppf-matte`
@@ -95,9 +95,9 @@ Add finish-specific proTip strings for key real-data entries:
 - `next.config.js` uses `serverExternalPackages` for native modules
 
 ### Integration Points
-- New route: `app/mc-site/wrap-studio/page.jsx`
+- New route: `app/mc-site/wrap-studio/route.js` (GET handler)
 - New static assets: `public/wrap-studio/` (JS, CSS, catalogue.js)
-- Script to run: `scripts/build-catalogue.js`
+- Script to run: `scripts/build-catalogue.mjs`
 - Link added to: `app/mc-site/wrapping/page.jsx`
 
 </code_context>
