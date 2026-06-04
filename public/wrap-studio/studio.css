@@ -189,6 +189,27 @@ input{font:inherit}
 .car-box[data-colored="1"] .car-ph .ph-color{opacity:.88}
 .car-box[data-colored="1"] .car-ph .ph-label{color:rgba(255,255,255,.85);mix-blend-mode:difference}
 
+/* upload zone — clean sans-serif, overrides ph-label mono */
+.ph-upload{
+  position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.ph-upload-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--accent);color:#fff;border:none;border-radius:100px;cursor:pointer;
+  font-family:var(--f-ui);font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;
+  padding:11px 24px;transition:background .15s,transform .1s;
+}
+.ph-upload-btn:hover{background:var(--accent-bright);}
+.ph-upload-btn:active{transform:scale(.97);}
+.ph-upload-hint{
+  font-family:var(--f-ui);font-size:12px;letter-spacing:.02em;text-transform:none;
+  color:rgba(255,255,255,.38);
+}
+.ph-upload-tip{
+  font-family:var(--f-ui);font-size:11px;letter-spacing:.01em;text-transform:none;
+  color:rgba(255,255,255,.22);
+}
+
 /* drag-over state */
 .stage.dragging .drop-veil{opacity:1}
 .drop-veil{

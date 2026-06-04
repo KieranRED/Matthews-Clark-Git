@@ -127,14 +127,13 @@
                   h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
                     style: { ...clip, background: fx ? fx.tint.background : '#3a3d42',
                       opacity: colored ? (fx.tint.opacity > .5 ? .9 : fx.tint.opacity + .2) : 0 } }),
-                  h('div', { className: 'ph-label' },
+                  h('div', { className: 'ph-upload' },
                     h('button', {
-                      className: 'btn btn--primary',
-                      style: { marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 22px', fontSize: 14 },
+                      className: 'ph-upload-btn',
                       onClick: (e) => { e.stopPropagation(); fileRef.current.click(); }
-                    }, h(I.Upload, { size: 15 }), 'Upload your car photo'),
-                    h('span', { style: { opacity: .45, fontSize: 12 } }, 'or drag and drop · JPG · PNG · HEIC'),
-                    h('span', { className: 'hint' }, 'Best: 3⁄4 front or side-on, good light'))),
+                    }, h(I.Upload, { size: 16 }), 'Upload your car photo'),
+                    h('span', { className: 'ph-upload-hint' }, 'or drag & drop  ·  JPG  ·  PNG  ·  HEIC'),
+                    h('span', { className: 'ph-upload-tip' }, 'Best: ¾ front or side-on, in good light'))),
           )
         ),
         h('div', { className: 'light-overlay' }),
