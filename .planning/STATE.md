@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-06-04T15:38:54.991Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-06-04T15:55:57.665Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 4
+  total_plans: 0
   completed_plans: 1
   percent: 0
 ---
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 Phase: 5 (integration-catalogue) — EXECUTING
-Plan: 2 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-04
 
@@ -53,6 +53,8 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 05-integration-catalogue P01 | 5 | 2 tasks | 8 files |
+| Phase 05-integration-catalogue P02 | 8 | 2 tasks | 3 files |
+| Phase 05-integration-catalogue P03 | 12m | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +69,9 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: GPT-Image-2 render: pre-coloured canvas output is the input; GPT does scene integration only — colour/finish already applied before the API call
 - [v1.1 Roadmap]: Quote submission reuses existing lib/leadStore.js pattern
 - [Phase 05-integration-catalogue]: Route handler (route.js GET export) used instead of page.jsx to bypass mc-site layout nesting
+- [Phase 05-integration-catalogue]: allowOverwrite: true added to Vercel Blob put() for idempotent build re-runs
+- [Phase 05-integration-catalogue]: Swatch img position:absolute as first child of .sw-chip, hex background as fallback
+- [Phase 05-integration-catalogue]: Tier/pricing labels removed entirely from customer-facing quote UI — TIER_LABEL retained in window globals for internal use only
 
 ### Pending Todos
 
@@ -79,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04T15:38:54.987Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-06-04T15:55:49.532Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None

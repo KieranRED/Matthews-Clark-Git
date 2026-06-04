@@ -25,7 +25,9 @@
     return h('button', { className: 'swatch' + (on ? ' on' : ''), onClick: () => onSelect(sw),
       title: sw.name + ' · ' + sw.code },
       h('div', { className: 'sw-chip', style: { background: chipBg(sw) } },
+        sw.swatchUrl ? h('img', { src: sw.swatchUrl, alt: '', style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', position: 'absolute', top: 0, left: 0, borderRadius: 'inherit' } }) : null,
         chipInner(sw),
+        sw.hexConfidence === 'low' ? h('span', { className: 'sw-approx', title: 'Colour is approximate — ' + sw.finish + ' films shift with angle and light' }, '~') : null,
         h('span', { className: 'sw-tier' + (sw.tier === 'specialist' ? ' specialist' : '') }, sw.tier),
         h('span', { className: 'sw-fav' + (fav ? ' on' : ''), onClick: (e) => { e.stopPropagation(); onFav(sw); } },
           h(I.Heart, { size: 13, fill: fav ? 'currentColor' : 'none' }))),
@@ -54,12 +56,8 @@
     const sel = selectedId ? all.find((s) => s.id === selectedId) : null;
     const finishLabel = (k) => (window.FINISHES.find((f) => f.key === k) || {}).label || k;
 
-    // tier across assigned panels (+ current selection)
+    // assigned panels (used for quote footer display)
     const assigned = Object.values(panelColors).map((id) => all.find((s) => s.id === id)).filter(Boolean);
-    const pool = assigned.length ? assigned : (sel ? [sel] : []);
-    const rank = { standard: 0, premium: 1, specialist: 2 };
-    const topTier = pool.reduce((t, s) => rank[s.tier] > rank[t] ? s.tier : t, 'standard');
-    const tierInfo = window.TIER_LABEL[topTier];
 
     const activePanelLabel = (panels.find((p) => p.key === activePanel) || {}).label || 'Full body';
     const assignedCount = assigned.length;
@@ -149,10 +147,7 @@
               sel ? h('span', { className: 'swdot', style: { background: chipBg(sel) } }) : null,
               sel ? sel.name : 'Pick a colour',
               h('span', { style: { color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 12 } }, ' · ' + activePanelLabel))),
-          h('div', { className: 'quote-tier' },
-            h('div', { className: 'tt' }, 'Price tier'),
-            h('div', { className: 'tv' + (topTier === 'specialist' ? ' specialist' : '') }, tierInfo.name))),
-        h('div', { className: 'quote-note' }, tierInfo.note + '. Real number comes back fast — we quote fixed, not "from".'),
+        ),
         h('button', { className: 'btn btn--primary', disabled: !sel, style: !sel ? { opacity: .5 } : null, onClick: onQuote },
           h(I.Send, { size: 15 }), 'Get a quote for this wrap')));
   }

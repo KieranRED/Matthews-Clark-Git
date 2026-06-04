@@ -78,6 +78,7 @@ export default function WrappingPage() {
         <div className="container">
           <div className="label"><span className="num">02</span>What it is</div>
           <p>Matthews &amp; Clark coordinates vehicle wrapping in Cape Town through our partnership with Izimoto. You bring us the vision — we spec the job and manage it through Izimoto&apos;s experienced install team at their Woodstock workshop. Full colour change wraps, partial wraps, and accent wraps. Vinyl is applied over factory paint with no permanent change to your car&apos;s original finish. Available in gloss, matte, satin, and colour-shift finishes. Most full-car wraps take 5–10 working days.</p>
+          <a className="link-arrow" href="/mc-site/wrap-studio">Try the Wrap Studio →</a>
         </div>
       </section>
 
