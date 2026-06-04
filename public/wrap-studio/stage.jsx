@@ -121,7 +121,10 @@
         window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up); };
     }, [baActive]);
 
+    // clip for the WRAPPED (right) side — shows from 0 to baPos%
     const clip = baActive ? { clipPath: `inset(0 ${100 - baPos}% 0 0)`, WebkitClipPath: `inset(0 ${100 - baPos}% 0 0)` } : null;
+    // clip for the ORIGINAL (left reveal) side — shows from baPos% to 100%
+    const clipOrig = baActive ? { clipPath: `inset(0 0 0 ${baPos}%)`, WebkitClipPath: `inset(0 0 0 ${baPos}%)` } : null;
     const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
 
     // recolour layer (real photo) — tint + tone + sheen, all masked to the car
@@ -155,7 +158,10 @@
           h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
             carUrl
               ? h(React.Fragment, null,
-                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car' }),
+                  // original photo revealed on the RIGHT side of the slider
+                  baActive && originalUrl ? h('img', { className: 'car-base', src: originalUrl, alt: 'Original', style: { ...clipOrig } }) : null,
+                  // background-removed cutout on the LEFT (wrapped) side
+                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car', style: baActive ? { ...clip } : null }),
                   fxLayers)
               : h('div', { className: 'car-ph' },
                   h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
@@ -177,7 +183,8 @@
           h('div', { className: 'ba-tag after' }, 'Wrapped'),
           h('div', { className: 'ba-tag before' }, 'Original'),
           h('div', { className: 'ba-divider', style: { left: baPos + '%' },
-            onMouseDown: () => { dragRef.current = true; }, onTouchStart: () => { dragRef.current = true; } },
+            onMouseDown: (e) => { e.stopPropagation(); dragRef.current = true; },
+            onTouchStart: (e) => { e.stopPropagation(); dragRef.current = true; } },
             h('div', { className: 'knob' }, h(I.Split, { size: 20 })))
         ) : null,
 
