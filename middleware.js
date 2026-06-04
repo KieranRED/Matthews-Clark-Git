@@ -14,6 +14,8 @@ export function middleware(request) {
   if (host.includes("localhost") || host.includes("127.0.0.1")) {
     // Handle site.localhost subdomain in local dev
     if (host.startsWith("site.")) {
+      // Pass wrap-studio static assets directly to Next.js public/ serving
+      if (url.pathname.startsWith('/wrap-studio/')) return NextResponse.next();
       const pathname = url.pathname === "/" ? "/mc-site" : `/mc-site${url.pathname}`;
       const rewritten = url.clone();
       rewritten.pathname = pathname;
@@ -30,19 +32,12 @@ export function middleware(request) {
 
   // Detect site subdomain — rewrite to /mc-site route group
   if (host === SITE_HOST) {
+    // Pass wrap-studio static assets directly to Next.js public/ serving
+    if (url.pathname.startsWith('/wrap-studio/')) return NextResponse.next();
     const pathname = url.pathname === "/" ? "/mc-site" : `/mc-site${url.pathname}`;
     const rewritten = url.clone();
     rewritten.pathname = pathname;
     return NextResponse.rewrite(rewritten);
-  }
-
-  // Block direct access to /mc-site/* on the main domain
-  if (url.pathname.startsWith("/mc-site")) {
-    const next = url.clone();
-    next.protocol = "https:";
-    next.host = CANONICAL_HOST;
-    next.pathname = "/";
-    return NextResponse.redirect(next, 308);
   }
 
   // If we hit a non-canonical host, redirect to the live domain.
