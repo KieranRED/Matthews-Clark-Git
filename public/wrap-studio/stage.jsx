@@ -131,7 +131,12 @@
                     h(I.Image, { size: 26, style: { opacity: .5, marginBottom: 6 } }),
                     h('b', null, 'Drop your car photo'),
                     'JPG · PNG · HEIC',
-                    h('span', { className: 'hint' }, 'Best: 3⁄4 front or side-on, good light'))),
+                    h('span', { className: 'hint' }, 'Best: 3⁄4 front or side-on, good light'),
+                    h('button', {
+                      className: 'btn btn--primary',
+                      style: { marginTop: 16, width: '100%', maxWidth: 200 },
+                      onClick: (e) => { e.stopPropagation(); fileRef.current.click(); }
+                    }, h(I.Upload, { size: 15, style: { marginRight: 6 } }), 'Upload photo'))),
           )
         ),
         h('div', { className: 'light-overlay' }),
@@ -176,9 +181,7 @@
               [['studio', 'Studio bay'], ['signage', 'Branded'], ['customer', 'My background']].map(([k, lbl]) =>
                 h('button', { key: k, className: bg === k ? 'on' : '', onClick: () => props.setBg(k) }, lbl))),
             h('div', { className: 'seg' },
-              h('button', { className: mode === 'fast' ? 'on' : '', onClick: () => setMode('fast') },
-                h('span', { className: 'ic-blue' }, h(I.Bolt, { size: 13 })), 'Fast Preview'),
-              h('button', { className: mode === 'render' ? 'on' : '', onClick: () => { setMode('render'); startRender(); } },
+              h('button', { className: 'on', onClick: () => { setMode('render'); startRender(); } },
                 h(I.Sparkle, { size: 13 }), 'Studio Render'))),
 
           // bottom-left: caption
