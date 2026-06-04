@@ -177,6 +177,29 @@ html, body { height: 100%; background: var(--bg); color: var(--fg-1); font-famil
   display: block;
 }
 
+/* ─── Recolour fx layers (tone / tint / sheen) ─── */
+.car-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Animation keyframes for chrome / colour-shift finishes */
+@keyframes anim-chrome {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes anim-shift {
+  0%   { filter: hue-rotate(0deg); }
+  50%  { filter: hue-rotate(30deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+.car-tint.anim-chrome { background-size: 200% 200%; animation: anim-chrome 4s ease infinite; }
+.car-tint.anim-shift  { animation: anim-shift 5s ease infinite; }
+
 /* ─── Controls strip ─── */
 .ws-controls {
   display: flex;
