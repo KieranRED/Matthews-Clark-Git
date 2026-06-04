@@ -137,6 +137,8 @@
 
 /* ── MAIN ── */
 .ds-main{min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.ds-main > div::-webkit-scrollbar{display:none}
+.ds-main > div{scrollbar-width:none;-ms-overflow-style:none}
 
 .ds-top{
   position:sticky;top:0;z-index:30;height:var(--topbar-h);
