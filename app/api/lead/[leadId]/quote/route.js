@@ -32,7 +32,7 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-const SERVICE_IDS = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit"];
+const SERVICE_IDS = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit", "starlight", "interior"];
 
 function escapeHtml(input) {
   return String(input || "")
@@ -102,6 +102,34 @@ export async function POST(request, { params }) {
   if (!secret) return Response.json({ error: "Missing LEAD_LINK_SECRET" }, { status: 500 });
   if (!verifyToken({ secret, leadId, token })) return Response.json({ error: "Invalid link token" }, { status: 401 });
 
+  // Handle deferred pricing: Izimoto isn't ready to quote yet.
+  const isDeferred = form.get("deferred") === "1";
+  if (isDeferred) {
+    const lead = (await getLead(leadId)) || { id: leadId };
+    const now = new Date().toISOString();
+    await updateLead(leadId, {
+      status: "quoted",
+      vendorPricingDeferred: true,
+      vendorQuoteByServiceExVat: {},
+      vendorQuoteTotalExVat: 0,
+      vendorQuoteTotalIncVat: 0,
+      quotedAt: now,
+      quotedBy: null
+    });
+    const mcChatId = process.env.TELEGRAM_MC_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+    const mcToken = process.env.TELEGRAM_MC_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
+    if (mcChatId && mcToken) {
+      try {
+        await telegramSendMessage({
+          chatId: mcChatId,
+          token: mcToken,
+          text: `⏳ <b>PRICING DEFERRED</b>\n<b>Lead:</b> <code>${leadId}</code>\n<b>Car:</b> ${lead?.car || "—"}\n<b>Client:</b> ${lead?.name || "—"}\n\nIzimoto will confirm their pricing after the job.`
+        });
+      } catch { /* ignore */ }
+    }
+    return Response.json({ ok: true, deferred: true, leadId });
+  }
+
   // Collect per-service amounts (ex VAT).
   const vendorQuoteByServiceExVat = {};
   for (const [k, v] of form.entries()) {
@@ -133,7 +161,18 @@ export async function POST(request, { params }) {
       ? round2(legacyTotal)
       : null;
 
-  if (vendorQuoteTotalExVat == null || vendorQuoteTotalExVat <= 0) {
+  // Collect upsell request pricing (fields: upsell_req_[uuid])
+  const upsellReqPrices = {};
+  for (const [k, v] of form.entries()) {
+    if (!k.startsWith("upsell_req_")) continue;
+    const reqId = k.slice("upsell_req_".length);
+    const n = safeNum(v);
+    if (n != null && n > 0) upsellReqPrices[reqId] = round2(n);
+  }
+
+  const hasUpsellPrices = Object.keys(upsellReqPrices).length > 0;
+
+  if ((vendorQuoteTotalExVat == null || vendorQuoteTotalExVat <= 0) && !hasUpsellPrices) {
     return Response.json({ error: "Missing quote amount(s)" }, { status: 400 });
   }
 
@@ -141,26 +180,49 @@ export async function POST(request, { params }) {
 
   const vatRate = Number(process.env.VAT_RATE || 0.15);
   const safeVatRate = Number.isFinite(vatRate) && vatRate >= 0 ? vatRate : 0.15;
-  const vendorQuoteTotalIncVat = round2(vendorQuoteTotalExVat * (1 + safeVatRate));
-  const vendorVatAmount = round2(vendorQuoteTotalIncVat - vendorQuoteTotalExVat);
+  const safeVendorExVat = vendorQuoteTotalExVat ?? 0;
+  const vendorQuoteTotalIncVat = round2(safeVendorExVat * (1 + safeVatRate));
+  const vendorVatAmount = round2(vendorQuoteTotalIncVat - safeVendorExVat);
 
   const defaultCommissionPercent = Number(process.env.DEFAULT_COMMISSION_PERCENT || 0);
   const commissionPercent = Number.isFinite(defaultCommissionPercent) ? defaultCommissionPercent : 0;
-  // Client quote is shown ex VAT for now, but cost basis includes VAT so we don't underquote.
   const clientQuoteAmountExVat = round2(vendorQuoteTotalIncVat * (1 + commissionPercent / 100));
 
+  // Merge upsell request prices back into the lead's upsellRequests array
+  const existingUpsellRequests = Array.isArray(lead.upsellRequests) ? lead.upsellRequests : [];
+  const updatedUpsellRequests = existingUpsellRequests.map((req) => {
+    if (upsellReqPrices[req.id] != null) {
+      return { ...req, vendorExVat: upsellReqPrices[req.id], status: "priced" };
+    }
+    return req;
+  });
+
   const now = new Date().toISOString();
+
+  // Only overwrite vendor quote fields when a main-service quote was actually submitted.
+  // If Izimoto only submitted upsell prices (hasUpsellPrices && !usingByService && legacyTotal==null),
+  // preserve the existing vendor quote so we don't zero-out a previously saved Izimoto cost.
+  const vendorQuotePatch = (vendorQuoteTotalExVat != null && vendorQuoteTotalExVat > 0)
+    ? {
+        vendorQuoteByServiceExVat: usingByService ? vendorQuoteByServiceExVat : lead.vendorQuoteByServiceExVat,
+        vendorQuoteTotalExVat: safeVendorExVat,
+        vendorQuoteTotalIncVat,
+        vendorVatRate: safeVatRate,
+        vendorVatAmount,
+        commissionPercent,
+        clientQuoteAmountExVat,
+        quotedAt: now,
+        quotedBy: null,
+        status: "quoted",
+      }
+    : {
+        // Upsell-only submission: preserve existing vendor quote, just update upsell requests
+        upsellRequests: updatedUpsellRequests,
+      };
+
   const updated = await updateLead(leadId, {
-    status: "quoted",
-    vendorQuoteByServiceExVat: usingByService ? vendorQuoteByServiceExVat : null,
-    vendorQuoteTotalExVat,
-    vendorQuoteTotalIncVat,
-    vendorVatRate: safeVatRate,
-    vendorVatAmount,
-    commissionPercent,
-    clientQuoteAmountExVat,
-    quotedAt: now,
-    quotedBy: null
+    ...vendorQuotePatch,
+    upsellRequests: updatedUpsellRequests,
   });
 
   const baseUrl = getBaseUrl(request);
