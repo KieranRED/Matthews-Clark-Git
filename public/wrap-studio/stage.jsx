@@ -29,20 +29,22 @@ function loadHeic2Any() {
   return _heicReady;
 }
 
-// ─── helper: load @imgly lazily, store fn on window ─────────────────────────
+// ─── helper: await @imgly (pre-loaded via <script type="module"> in index.html) ──
+// The library is loaded in the HTML shell so import.meta.url resolves to the
+// CDN (not the page URL), fixing internal worker/model asset paths.
 async function loadImgly() {
+  if (window.__imglyError) throw window.__imglyError;
   if (window.__imglyRemoveBackground) return window.__imglyRemoveBackground;
+  // Still loading — wait for the imgly-ready event (dispatched from index.html module)
   return new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.type  = "module";
-    s.textContent = `
-      import { removeBackground } from "${IMGLY_CDN}";
-      window.__imglyRemoveBackground = removeBackground;
-      window.dispatchEvent(new Event("__imgly_ready"));
-    `;
-    window.addEventListener("__imgly_ready", () => resolve(window.__imglyRemoveBackground), { once: true });
-    s.onerror = reject;
-    document.head.appendChild(s);
+    const timeout = setTimeout(() => {
+      reject(new Error("@imgly background-removal failed to load within 60s. Check your connection."));
+    }, 60000);
+    window.addEventListener("imgly-ready", () => {
+      clearTimeout(timeout);
+      if (window.__imglyError) reject(window.__imglyError);
+      else resolve(window.__imglyRemoveBackground);
+    }, { once: true });
   });
 }
 

@@ -17,6 +17,25 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!--
+    @imgly/background-removal: pre-load via a proper <script type="module"> so
+    import.meta.url resolves to the CDN (not the page URL), which is required
+    for the library's internal worker/model asset resolution to work correctly.
+    Starts downloading while the user browses — ready by the time they upload.
+  -->
+  <script type="module">
+    import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/index.mjs")
+      .then(({ removeBackground }) => {
+        window.__imglyRemoveBackground = removeBackground;
+        window.dispatchEvent(new CustomEvent("imgly-ready"));
+      })
+      .catch((err) => {
+        console.warn("[WrapStudio] @imgly failed to load:", err);
+        window.__imglyError = err;
+        window.dispatchEvent(new CustomEvent("imgly-ready"));
+      });
+  </script>
+
   <!-- stage.jsx must load before app.jsx (exports window.WrapStage) -->
   <script type="text/babel" src="/wrap-studio/stage.jsx"></script>
   <script type="text/babel" src="/wrap-studio/app.jsx"></script>
