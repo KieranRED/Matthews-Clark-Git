@@ -66,7 +66,7 @@ Inherited unchanged from Phase 5. Four sizes, two weights. No new size or weight
 - Progress percentage: JetBrains Mono, 11px, weight 400, `letter-spacing: .10em` — same treatment as `.render-pct`
 - "Removing background…" eyebrow: JetBrains Mono, 10px, `letter-spacing: .22em`, `text-transform: uppercase`, `color: var(--accent)` — matches `.rk` pattern from `.render-card`
 - Error heading: Archivo, 16px, weight 800 — matches `.render-card h3` at reduced size (do NOT use 24px render-card heading size; error is inline, not full-overlay)
-- Error body: Inter Tight, 13px, weight 400, `color: rgba(255,255,255,.55)` — matches `.render-card p`
+- Error body: Inter Tight, 15px, weight 400, `color: rgba(255,255,255,.55)` — matches `.render-card p`
 
 ---
 
@@ -156,9 +156,9 @@ Structure:
 
 | Property | Value |
 |----------|-------|
-| `.removal-error` layout | `display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; width: min(300px, 76%)` |
+| `.removal-error` layout | `display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; width: min(300px, 76%)` |
 | Icon | `AlertCircle` from Lucide (window.Icon.AlertCircle), 18px, `color: rgba(255,255,255,.55)` |
-| `.re-msg` | Inter Tight, 13px, weight 400, `color: rgba(255,255,255,.55)`, line-height 1.5 |
+| `.re-msg` | Inter Tight, 15px, weight 400, `color: rgba(255,255,255,.55)`, line-height 1.5 |
 | "Try again" button | `.btn.btn--primary.btn--sm` — existing classes, no new styles needed |
 
 **Copy (see Copywriting Contract section).**
@@ -254,6 +254,8 @@ The clip path (`inset(0 ${100-baPos}% 0 0)`) is applied only to `.car-base` (z-i
 **Before/after tags** (inherited from Phase 5): "Before" label on the left; "Wrapped" label on the right. No copy change.
 
 **Activation:** The before/after toggle button (`.pill-btn` with `I.Compare` icon) is only enabled when `originalUrl` is set. When `originalUrl` is null, the button renders at `opacity: 0.4; cursor: default; pointer-events: none`.
+
+**Accessibility:** The `.pill-btn` Compare button must carry `aria-label="Toggle before/after comparison"`.
 
 ---
 
