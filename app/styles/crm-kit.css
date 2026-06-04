@@ -35,7 +35,7 @@
   font-size:14px;line-height:1.5;
   width:100%;
   margin:0;
-  padding-bottom:calc(var(--nav-h) + 24px);
+  padding-bottom:calc(var(--nav-h) + 24px + env(safe-area-inset-bottom, 0px));
   background:
     radial-gradient(circle at 100% 0%, rgba(31,79,255,.06), transparent 40%),
     radial-gradient(circle at 0% 100%, rgba(31,79,255,.03), transparent 50%),
@@ -51,9 +51,13 @@
 /* ───────── TOP BAR ───────── */
 .crm-root .crm-top{
   position:sticky;top:0;z-index:30;
-  height:var(--top-h);
+  min-height:var(--top-h);
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:0 var(--pad);
+  padding:env(safe-area-inset-top, 0px) var(--pad) 0;
+  padding-bottom:0;
+  /* Reserve space for status bar so time/wifi icons don't overlap content */
+  padding-top:max(env(safe-area-inset-top, 0px), 0px);
+  height:calc(var(--top-h) + env(safe-area-inset-top, 0px));
   background:rgba(10,10,10,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--bd-1);
 }
@@ -91,7 +95,7 @@
 
 /* ───────── BOTTOM NAV ───────── */
 .crm-root .crm-nav{
-  position:fixed;left:14px;right:14px;bottom:14px;
+  position:fixed;left:14px;right:14px;bottom:max(14px, calc(env(safe-area-inset-bottom, 0px) + 4px));
   width:auto;max-width:none;
   transform:none;
   z-index:40;
@@ -209,6 +213,8 @@
 .crm-root .kpi .delta.up{color:#27AE60}
 .crm-root .kpi .delta.dn{color:#EB5757}
 .crm-root .kpi--accent{background:linear-gradient(150deg, rgba(31,79,255,.18), rgba(31,79,255,0) 60%), var(--bg-2)}
+.crm-root .kpi--green{background:linear-gradient(150deg, rgba(39,174,96,.16), rgba(39,174,96,0) 60%), var(--bg-2)}
+.crm-root .kpi--green .acc{color:#27AE60!important}
 
 /* quick actions */
 .crm-root .quick{padding:16px var(--pad);display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -241,18 +247,19 @@
   background:linear-gradient(140deg,#1a1a1a,#0a0a0a);
 }
 .crm-root .bay-card .img::after{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 70% 50%, rgba(31,79,255,.18), transparent 60%);
+  content:'';position:absolute;inset:0;z-index:1;
+  background:radial-gradient(circle at 70% 50%, rgba(31,79,255,.12), transparent 60%),
+    linear-gradient(180deg,transparent 40%,rgba(0,0,0,.55));
 }
 .crm-root .bay-card .img .stage-pill{
-  position:absolute;top:10px;left:10px;
+  position:absolute;top:10px;left:10px;z-index:2;
   background:rgba(0,0,0,.7);backdrop-filter:blur(8px);
   padding:5px 9px;border-radius:999px;
   font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;
   display:flex;align-items:center;gap:6px;color:#fff;
 }
 .crm-root .bay-card .img .ph{
-  position:absolute;bottom:10px;left:10px;
+  position:absolute;bottom:10px;left:10px;z-index:2;
   font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;
   text-transform:uppercase;color:rgba(255,255,255,.5);
 }
@@ -417,10 +424,13 @@
   border-bottom:1px solid var(--bd-1);
 }
 .crm-root .detail-hero::after{
-  content:'';position:absolute;inset:0;
+  content:'';position:absolute;inset:0;z-index:1;
   background:
-    radial-gradient(circle at 70% 30%, rgba(31,79,255,.18), transparent 60%),
-    linear-gradient(180deg, transparent 60%, rgba(0,0,0,.7));
+    radial-gradient(circle at 70% 30%, rgba(31,79,255,.14), transparent 60%),
+    linear-gradient(180deg, transparent 40%, rgba(0,0,0,.75));
+}
+.crm-root .detail-hero-img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
 }
 .crm-root .detail-hero .ph{
   position:absolute;top:14px;left:14px;z-index:2;

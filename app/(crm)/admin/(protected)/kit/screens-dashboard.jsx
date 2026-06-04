@@ -34,6 +34,8 @@ export default function DashboardScreen({ index, onNewLead }) {
 
   const pipelineRevenue = Number(index?.KPIS?.pipelineRevenue || 0);
   const pipelineProfit = Number(index?.KPIS?.pipelineProfit || 0);
+  const collectedRevenue = Number(index?.KPIS?.collectedRevenue || 0);
+  const collectedProfit = Number(index?.KPIS?.collectedProfit || 0);
   const stageCounts = Array.isArray(index?.KPIS?.stageCounts) ? index.KPIS.stageCounts : [];
 
   const sources = Array.isArray(index?.SOURCES) ? index.SOURCES : [];
@@ -114,10 +116,13 @@ export default function DashboardScreen({ index, onNewLead }) {
               <div className="val">{jobs.filter((j) => j.stage === "new").length}</div>
               <div className="delta">Needs first contact</div>
             </div>
-            <div className="kpi">
-              <div className="lbl">Tasks</div>
-              <div className="val">{Number(index?.KPIS?.taskOpenCount || 0)}</div>
-              <div className="delta">Open</div>
+            <div className="kpi kpi--green">
+              <div className="lbl">Collected revenue</div>
+              <div className="val">
+                <span className="acc">R</span>
+                {Math.round(collectedRevenue / 1000)}k
+              </div>
+              <div className="delta up">Profit · R{Math.round(collectedProfit / 1000)}k</div>
             </div>
           </>
         )}
