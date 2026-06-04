@@ -152,7 +152,8 @@
 
     return h('div', { className: 'stage-col' },
       h('div', { className: 'stage', ref: stageRef, 'data-bg': bg, 'data-light': light,
-        'data-screen-label': 'Wrap Studio — Stage', style: { '--wrap-color': wrapColorVar },
+        'data-screen-label': 'Wrap Studio — Stage',
+        style: { '--wrap-color': wrapColorVar, userSelect: baActive ? 'none' : '', WebkitUserSelect: baActive ? 'none' : '' },
         onClick: (e) => { if (justDraggedRef.current) { justDraggedRef.current = false; e.stopPropagation(); } } },
         demo ? null : h('div', { className: 'bay-ceiling' }),
         demo ? null : h('div', { className: 'bay-sign' }, 'M', h('span', { className: 'sl' }, '/'), 'C STUDIO'),
@@ -163,7 +164,7 @@
           h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
             carUrl
               ? h(React.Fragment, null,
-                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car' }),
+                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car', draggable: 'false' }),
                   fxLayers)
               : h('div', { className: 'car-ph' },
                   h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
@@ -178,10 +179,10 @@
                     h('span', { className: 'ph-upload-tip' }, 'Best: ¾ front or side-on, in good light'))),
           )
         ),
-        // ORIGINAL side (right of slider) — sibling car-wrap, same coordinate space
-        baActive && originalUrl ? h('div', { className: 'car-wrap', style: origClip, 'data-layer': 'original' },
+        // BEFORE side (right of slider) — same cutout, no colour overlay
+        baActive && carUrl ? h('div', { className: 'car-wrap', style: origClip, 'data-layer': 'before' },
           h('div', { className: 'car-box' },
-            h('img', { className: 'car-base', src: originalUrl, alt: 'Original' })
+            h('img', { className: 'car-base', src: carUrl, alt: 'Before', draggable: 'false' })
           )
         ) : null,
         h('div', { className: 'light-overlay' }),
@@ -189,7 +190,7 @@
         // before/after
         baActive && colored ? h(React.Fragment, null,
           h('div', { className: 'ba-tag after' }, 'Wrapped'),
-          h('div', { className: 'ba-tag before' }, 'Original'),
+          h('div', { className: 'ba-tag before' }, 'No wrap'),
           h('div', { className: 'ba-divider', style: { left: baPos + '%' },
             onMouseDown: (e) => { e.stopPropagation(); dragRef.current = true; },
             onTouchStart: (e) => { e.stopPropagation(); dragRef.current = true; } },
