@@ -69,10 +69,13 @@
     if (l > 0.94) return false;          // specular highlight — preserve
     if (s < 0.04 && l > 0.22) return false; // chrome / silver trim / glass
     if (s < 0.03) return false;          // fully achromatic
-    if (s > 0.10) return true;           // clearly saturated = paint
-    if (dom.h < 0) return s > 0.07;     // no dominant found — saturation gate
+
+    // REQUIRE hue proximity to dominant paint — prevents interior fabrics/dashboard
+    // from being picked up just because they happen to be saturated
+    if (dom.h < 0) return s > 0.14;     // no dominant found — strict saturation gate
     const diff = Math.min(Math.abs(h - dom.h), 360 - Math.abs(h - dom.h));
-    return diff < 40;                    // hue-close to dominant paint
+    // Must be hue-close AND have some saturation (or be very hue-close)
+    return diff < 35 && s > 0.06;
   }
 
   // ─── Canvas recolour engine ────────────────────────────────────────────────
@@ -123,8 +126,13 @@
           let outS = tHSL.s * satMult;
           let outL = px.l;
 
-          // Gloss/metallic: slightly brighten highlights for realism
-          if (addSheen && px.l > 0.7) outL = Math.min(0.96, px.l * 1.04);
+          // Compress luminance toward mid-range (0.25–0.75) for GPT render accuracy.
+          // Preserves body line detail but reduces harsh light/shadow that confuses GPT.
+          // Formula: outL = 0.25 + (px.l * 0.50) — maps 0–1 → 0.25–0.75
+          outL = 0.25 + (px.l * 0.50);
+
+          // Gloss/metallic: slightly widen range back for realism on fast preview
+          if (addSheen) outL = Math.min(0.88, Math.max(0.10, px.l * 0.9 + 0.05));
 
           const { r, g, b } = hslToRGB(tHSL.h, outS, outL);
           d[i] = r; d[i+1] = g; d[i+2] = b;
