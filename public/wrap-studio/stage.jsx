@@ -41,41 +41,55 @@
     return { r: Math.round(hue2rgb(h+1/3)*255), g: Math.round(hue2rgb(h)*255), b: Math.round(hue2rgb(h-1/3)*255) };
   }
 
-  // ─── Paint pixel detection ─────────────────────────────────────────────────
-  // Identifies body-paint pixels vs glass, chrome, trim, tyres
+  // ─── Paint pixel detection (works on ALL car colours: black, white, silver, bright) ───
 
-  function detectDominantPaint(data, w, h) {
-    const buckets = new Array(36).fill(0);
-    const satSum  = new Array(36).fill(0);
-    for (let y = Math.floor(h*0.15); y < h*0.85; y += 5) {
-      for (let x = Math.floor(w*0.1); x < w*0.9; x += 5) {
+  function analyseCar(data, w, h) {
+    // Pass 1: collect visible pixels, detect if car is chromatic or achromatic
+    let totalL = 0, totalS = 0, count = 0;
+    const hueBuckets = new Array(36).fill(0);
+    for (let y = Math.floor(h*0.12); y < h*0.88; y += 4) {
+      for (let x = Math.floor(w*0.08); x < w*0.92; x += 4) {
         const i = (y * w + x) * 4;
-        if (data[i+3] < 80) continue;
+        if (data[i+3] < 60) continue;
         const px = rgbToHSL(data[i], data[i+1], data[i+2]);
-        if (px.l < 0.08 || px.l > 0.92 || px.s < 0.07) continue;
-        const b = Math.floor(px.h / 10) % 36;
-        buckets[b]++; satSum[b] += px.s;
+        if (px.l < 0.03 || px.l > 0.97) continue; // exclude pure black/white extremes
+        totalL += px.l; totalS += px.s; count++;
+        if (px.s > 0.06) hueBuckets[Math.floor(px.h / 10) % 36]++;
       }
     }
+    if (!count) return { achromatic: true, avgL: 0.5, domH: -1 };
+
+    const avgL = totalL / count;
+    const avgS = totalS / count;
+
+    // Find dominant hue (if car is chromatic)
     let maxB = 0, maxC = 0;
-    for (let i = 0; i < 36; i++) { if (buckets[i] > maxC) { maxC = buckets[i]; maxB = i; } }
-    if (maxC < 8) return { h: -1, s: 0 }; // no clear dominant — use saturation only
-    return { h: maxB * 10 + 5, s: maxC ? satSum[maxB] / maxC : 0 };
+    for (let i = 0; i < 36; i++) { if (hueBuckets[i] > maxC) { maxC = hueBuckets[i]; maxB = i; } }
+    const achromatic = avgS < 0.08 || maxC < count * 0.08;
+
+    return { achromatic, avgL, domH: achromatic ? -1 : maxB * 10 + 5 };
   }
 
-  function isPaintPixel(px, dom) {
+  function isPaintPixel(px, carInfo) {
     const { h, s, l } = px;
-    if (l < 0.05) return false;          // tyre / very deep shadow
-    if (l > 0.94) return false;          // specular highlight — preserve
-    if (s < 0.04 && l > 0.22) return false; // chrome / silver trim / glass
-    if (s < 0.03) return false;          // fully achromatic
+    // Universal exclusions — these are never paint
+    if (l < 0.04) return false;   // absolute black (tyres, deep shadow)
+    if (l > 0.97) return false;   // pure specular highlight
 
-    // REQUIRE hue proximity to dominant paint — prevents interior fabrics/dashboard
-    // from being picked up just because they happen to be saturated
-    if (dom.h < 0) return s > 0.14;     // no dominant found — strict saturation gate
-    const diff = Math.min(Math.abs(h - dom.h), 360 - Math.abs(h - dom.h));
-    // Must be hue-close AND have some saturation (or be very hue-close)
-    return diff < 35 && s > 0.06;
+    if (carInfo.achromatic) {
+      // White, silver, grey, black cars — detect by luminance proximity to car average
+      // Glass is usually darker with slight blue tint, chrome is near-white with no variation
+      const lDiff = Math.abs(l - carInfo.avgL);
+      if (lDiff > 0.40) return false;   // very different luminance = different material
+      if (s > 0.28) return false;       // suspiciously saturated for an achromatic car = interior/reflection
+      if (s < 0.04 && l > 0.80) return false; // near-white low-sat = chrome trim / glass highlight
+      return true;
+    } else {
+      // Chromatic car (red, blue, green etc.) — detect by hue proximity
+      if (s < 0.04) return false;       // achromatic pixel on a coloured car = chrome/glass/rubber
+      const diff = Math.min(Math.abs(h - carInfo.domH), 360 - Math.abs(h - carInfo.domH));
+      return diff < 40 || s > 0.18;    // hue-close to paint, or highly saturated
+    }
   }
 
   // ─── Canvas recolour engine ────────────────────────────────────────────────
@@ -108,33 +122,34 @@
           ctx.putImageData(id, 0, 0); return resolve(cv.toDataURL('image/png'));
         }
 
-        const dom = detectDominantPaint(d, cw, ch);
+        const carInfo = analyseCar(d, cw, ch);
         const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
         const tHSL = rgbToHSL(tr, tg, tb);
 
-        // Finish-specific saturation / sheen modifiers
-        const satMult   = finish === 'matte' ? 0.82 : finish === 'satin' ? 0.91 : 1.0;
-        // For metallic: add a subtle grain effect later via CSS, don't change the base
-        const addSheen  = (finish === 'gloss' || finish === 'metallic');
+        // Finish-specific saturation modifier
+        const satMult = finish === 'matte' ? 0.80 : finish === 'satin' ? 0.88 : 1.0;
+
+        // Lighting removal approach:
+        // We STRIP the car's lighting and replace with the target colour's flat luminance.
+        // Then we add back a tiny fraction of the original luminance variation (body lines).
+        // GPT then re-lights the whole scene from scratch.
+        //
+        // outL = targetL + (pixelL - carAvgL) * BODY_LINE_RETAIN
+        // BODY_LINE_RETAIN = 0.10 → only 10% of original lighting variation is kept
+        // This gives GPT the correct colour with just enough shape to understand the car form.
+        const BODY_LINE_RETAIN = 0.10;
 
         for (let i = 0; i < d.length; i += 4) {
           if (d[i+3] < 20) continue;
           const px = rgbToHSL(d[i], d[i+1], d[i+2]);
-          if (!isPaintPixel(px, dom)) continue;
+          if (!isPaintPixel(px, carInfo)) continue;
 
-          // Luminance-preserving replacement: keep original L, use target H + S
-          let outS = tHSL.s * satMult;
-          let outL = px.l;
+          // Strip lighting: output luminance = target's L + tiny body-line deviation
+          const deviation = px.l - carInfo.avgL;
+          let outL = tHSL.l + deviation * BODY_LINE_RETAIN;
+          outL = Math.max(0.02, Math.min(0.97, outL)); // clamp
 
-          // Compress luminance toward mid-range (0.25–0.75) for GPT render accuracy.
-          // Preserves body line detail but reduces harsh light/shadow that confuses GPT.
-          // Formula: outL = 0.25 + (px.l * 0.50) — maps 0–1 → 0.25–0.75
-          outL = 0.25 + (px.l * 0.50);
-
-          // Gloss/metallic: slightly widen range back for realism on fast preview
-          if (addSheen) outL = Math.min(0.88, Math.max(0.10, px.l * 0.9 + 0.05));
-
-          const { r, g, b } = hslToRGB(tHSL.h, outS, outL);
+          const { r, g, b } = hslToRGB(tHSL.h, tHSL.s * satMult, outL);
           d[i] = r; d[i+1] = g; d[i+2] = b;
         }
 
