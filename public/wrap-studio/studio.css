@@ -177,6 +177,25 @@ html, body { height: 100%; background: var(--bg); color: var(--fg-1); font-famil
   display: block;
 }
 
+/* ─── Car base images ─── */
+/* Original photo — unclipped, sits behind clipped cutout + fxLayers */
+.car-base--original{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:0}
+/* Cutout car base — z-index 1, receives clip when BA active */
+.car-base{z-index:1}
+
+/* ─── Before/after divider ─── */
+.ba-divider{position:absolute;top:0;bottom:0;width:2px;background:rgba(255,255,255,.7);z-index:10;cursor:ew-resize;transform:translateX(-50%)}
+.ba-knob{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.ba-tag{position:absolute;bottom:14px;font-family:var(--font-mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.7);padding:3px 8px;background:rgba(0,0,0,.4);border-radius:4px;z-index:10;user-select:none;pointer-events:none}
+.ba-tag--before{left:8px}
+.ba-tag--after{right:8px}
+
+/* ─── Stage HUD (bottom-right controls) ─── */
+.stage-hud{position:absolute;bottom:12px;right:12px;display:flex;gap:8px;z-index:10}
+.pill-btn{height:32px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;font-size:12px;font-family:var(--font-sans);cursor:pointer;backdrop-filter:blur(8px);transition:border-color .15s,background .15s;display:flex;align-items:center;gap:6px}
+.pill-btn:hover{border-color:rgba(255,255,255,.4);background:rgba(0,0,0,.7)}
+.pill-btn.on{border-color:rgba(31,79,255,.5);color:var(--mc-blue)}
+
 /* ─── Recolour fx layers (tone / tint / sheen) ─── */
 .car-fx {
   position: absolute;

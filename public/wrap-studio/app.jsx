@@ -49,6 +49,7 @@ function WrapStudioApp() {
   const [originalUrl,  setOriginalUrl]  = React.useState(persisted.originalUrl  ?? null);
   const [carUrl,       setCarUrl]       = React.useState(persisted.carUrl       ?? null);
   const [activeSwatch, setActiveSwatch] = React.useState(persisted.activeSwatch ?? SWATCHES[0]);
+  const [baActive,     setBaActive]     = React.useState(false);
 
   // ── Persist on state change ───────────────────────────────────────────────
   React.useEffect(() => {
@@ -91,6 +92,8 @@ function WrapStudioApp() {
         carUrl={carUrl}
         onIngest={handleIngest}
         activeSwatch={activeSwatch}
+        baActive={baActive}
+        setBaActive={setBaActive}
       />
 
       {/* Colour picker */}

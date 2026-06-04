@@ -6,6 +6,8 @@
  *   carUrl       {string|null}          dataURL of bg-removed cutout PNG
  *   onIngest     {function}             called with { originalUrl, carUrl } when pipeline finishes
  *   activeSwatch {string|object|null}   hex string OR swatch object { hex, hex2?, finish }
+ *   baActive     {boolean}              before/after slider active
+ *   setBaActive  {function}             toggle before/after slider
  */
 
 const IMGLY_CDN    = "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm";
@@ -128,11 +130,36 @@ function fxFor(sw) {
 }
 
 // ─── WrapStage component ────────────────────────────────────────────────────
-function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
+function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setBaActive }) {
   const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
   const [progress, setProgress]       = React.useState(0);
   const [lastFile, setLastFile]        = React.useState(null);
+  const [baPos, setBaPos]              = React.useState(50); // 0–100 percent
   const fileInputRef                   = React.useRef(null);
+  const stageRef                       = React.useRef(null);
+  const draggingRef                    = React.useRef(false);
+
+  // ── Before/after drag handlers ────────────────────────────────────────────
+  function getPosFromEvent(e, el) {
+    const rect = el.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const pct = ((clientX - rect.left) / rect.width) * 100;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  function handleDividerMouseDown(e) {
+    e.preventDefault();
+    draggingRef.current = true;
+  }
+
+  function handleStageDrag(e) {
+    if (!draggingRef.current || !stageRef.current) return;
+    setBaPos(getPosFromEvent(e, stageRef.current));
+  }
+
+  function handleStageDragEnd() {
+    draggingRef.current = false;
+  }
 
   // ── 3-stage ingest pipeline ───────────────────────────────────────────────
   async function ingest(file) {
@@ -229,10 +256,23 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
       WebkitMaskPosition: "center",
       maskPosition: "center",
     };
-    const clip = {};
+    // Clip: when BA slider is active, clamp layers to the right (wrapped) side
+    const clip = baActive
+      ? { clipPath: `inset(0 ${100 - baPos}% 0 0)` }
+      : {};
+
+    const colored = Boolean(activeSwatch && fx);
 
     return (
-      <div className="ws-stage">
+      <div
+        className="ws-stage"
+        ref={stageRef}
+        onMouseMove={handleStageDrag}
+        onMouseUp={handleStageDragEnd}
+        onMouseLeave={handleStageDragEnd}
+        onTouchMove={handleStageDrag}
+        onTouchEnd={handleStageDragEnd}
+      >
         {/* SVG noise filter — hidden, referenced by metallic tint via url(#metallic-noise) */}
         <svg style={{ position: "absolute", width: 0, height: 0 }} aria-hidden="true">
           <defs>
@@ -247,14 +287,28 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
           </defs>
         </svg>
 
-        {/* Base car image */}
+        {/* Original photo — unclipped, z-index 0 — reveals on the "before" (left) side */}
+        {originalUrl && (
+          <img
+            className="car-base car-base--original"
+            src={originalUrl}
+            alt="Original car"
+          />
+        )}
+
+        {/* Cutout car image — clipped to wrapped (right) side when BA active */}
         <img
+          className="car-base"
           src={carUrl}
-          alt=""
-          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", position: "relative", zIndex: 1 }}
+          alt="Your car"
+          style={{
+            ...clip,
+            width: "100%", height: "100%", objectFit: "contain",
+            display: "block", position: "relative", zIndex: 1,
+          }}
         />
 
-        {/* Recolour fx layers — painted over the car using CSS mask */}
+        {/* Recolour fx layers — painted over the car using CSS mask, clipped to right side when BA active */}
         {fx && (
           <>
             {/* Tone layer — luminance base correction */}
@@ -294,6 +348,47 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch }) {
             />
           </>
         )}
+
+        {/* Before/after divider + drag handle */}
+        {baActive && colored && (
+          <>
+            <div
+              className="ba-divider"
+              style={{ left: `${baPos}%` }}
+              onMouseDown={handleDividerMouseDown}
+              onTouchStart={handleDividerMouseDown}
+            >
+              <div className="ba-knob" />
+            </div>
+            <span className="ba-tag ba-tag--before" style={{ right: `${100 - baPos}%` }}>Original</span>
+            <span className="ba-tag ba-tag--after"  style={{ left: `${baPos}%` }}>Wrapped</span>
+          </>
+        )}
+
+        {/* HUD — bottom-right controls */}
+        <div className="stage-hud">
+          {/* Replace photo */}
+          <label className="pill-btn" title="Replace car photo" style={{ cursor: "pointer" }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.heic,.heif"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+            />
+            Replace
+          </label>
+          {/* Compare — disabled until originalUrl is set */}
+          <button
+            className={"pill-btn" + (baActive ? " on" : "")}
+            title="Before / after"
+            aria-label="Toggle before/after comparison"
+            style={originalUrl ? null : { opacity: 0.4, cursor: "default", pointerEvents: "none" }}
+            onClick={() => { if (originalUrl) setBaActive(!baActive); }}
+          >
+            Compare
+          </button>
+        </div>
       </div>
     );
   }
