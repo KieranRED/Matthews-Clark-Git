@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.1
-milestone_name: Wrap Visualisation Studio
-status: roadmap_created
-stopped_at: "Roadmap written for v1.1 (Phases 5-8). Ready to plan Phase 5."
-last_updated: "2026-06-04"
+milestone_name: milestone
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-06-04T15:38:54.991Z"
 last_activity: 2026-06-04
 progress:
-  total_phases: 8
+  total_phases: 4
   completed_phases: 0
-  total_plans: 9
+  total_plans: 4
   completed_plans: 1
   percent: 0
 ---
@@ -21,20 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** A single platform that runs the business — no spreadsheets, no duct-taped SaaS stack
-**Current focus:** Phase 5 — Integration & Catalogue (v1.1 start)
+**Current focus:** Phase 5 — integration-catalogue
 
 ## Current Position
 
-Phase: 5 of 8 — READY TO PLAN
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-06-04 — v1.1 roadmap created (Phases 5-8)
+Phase: 5 (integration-catalogue) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-06-04
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 1
 - Average duration: —
 - Total execution time: —
@@ -46,10 +47,12 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 05-integration-catalogue P01 | 5 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -63,6 +66,7 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: Background removal runs entirely in-browser via @imgly/background-removal WASM — no server round-trip for this step
 - [v1.1 Roadmap]: GPT-Image-2 render: pre-coloured canvas output is the input; GPT does scene integration only — colour/finish already applied before the API call
 - [v1.1 Roadmap]: Quote submission reuses existing lib/leadStore.js pattern
+- [Phase 05-integration-catalogue]: Route handler (route.js GET export) used instead of page.jsx to bypass mc-site layout nesting
 
 ### Pending Todos
 
@@ -75,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04
-Stopped at: v1.1 roadmap created — Phases 5-8 written to ROADMAP.md
+Last session: 2026-06-04T15:38:54.987Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None

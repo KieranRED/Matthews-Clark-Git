@@ -8,8 +8,8 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 ## Active Requirements
 
 ### Integration & Routing
-- [ ] **INT-01**: Customer can access the wrap studio at `/wrap-studio` on the M&C site without logging in
-- [ ] **INT-02**: Studio loads within 3 seconds on first visit (CSS/JS served from Next.js public or route handler)
+- [x] **INT-01**: Customer can access the wrap studio at `/wrap-studio` on the M&C site without logging in
+- [x] **INT-02**: Studio loads within 3 seconds on first visit (CSS/JS served from Next.js public or route handler)
 - [ ] **INT-03**: Studio is mobile-responsive and usable on phone screen (customer takes photo on device and uses it immediately)
 
 ### Colour Catalogue
