@@ -29,26 +29,17 @@ function loadHeic2Any() {
   return _heicReady;
 }
 
-// ─── helper: await @imgly (pre-loaded via <script type="module"> in index.html) ──
-// The library is loaded in the HTML shell so import.meta.url resolves to the
-// CDN (not the page URL), fixing internal worker/model asset paths.
-async function loadImgly() {
-  if (window.__imglyError) {
-    console.error("[imgly] module load error:", window.__imglyError);
-    throw window.__imglyError;
+// ─── helper: remove background via Next.js API route ────────────────────────
+// @imgly/background-removal-node runs server-side (avoids CDN module issues)
+async function removeBgViaApi(blob) {
+  const fd = new FormData();
+  fd.append("image", blob, "photo.jpg");
+  const res = await fetch("/api/wrap-remove-bg", { method: "POST", body: fd });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Remove-bg API ${res.status}: ${txt}`);
   }
-  if (window.__imglyRemoveBackground) return window.__imglyRemoveBackground;
-  // Still loading — wait for the imgly-ready event (dispatched from index.html module)
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("@imgly background-removal failed to load within 60s. Check your connection."));
-    }, 60000);
-    window.addEventListener("imgly-ready", () => {
-      clearTimeout(timeout);
-      if (window.__imglyError) reject(window.__imglyError);
-      else resolve(window.__imglyRemoveBackground);
-    }, { once: true });
-  });
+  return await res.blob(); // returns PNG with transparent background
 }
 
 // ─── helper: resize blob via canvas, return { resizedBlob, dataUrl } ────────
@@ -139,7 +130,6 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
   const [ingestState, setIngestState] = React.useState("idle"); // idle | removing | error
   const [errorMsg, setErrorMsg]       = React.useState("");
   const [progress, setProgress]       = React.useState(0);
-  const [inferring, setInferring]     = React.useState(false); // true once real inference callbacks start
   const [lastFile, setLastFile]        = React.useState(null);
   const [baPos, setBaPos]              = React.useState(50); // 0–100 percent
   const fileInputRef                   = React.useRef(null);
@@ -174,7 +164,6 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
     setLastFile(file);
     setIngestState("removing");
     setProgress(0);
-    setInferring(false);
     try {
       // Stage 1: HEIC → JPEG conversion (lazy-loads heic2any only when needed)
       const ext  = (file.name || "").split(".").pop().toLowerCase();
@@ -191,20 +180,8 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
       // Stage 2: pre-resize to 1920px via canvas → get resizedBlob + originalUrl
       const { resizedBlob, dataUrl: origDataUrl } = await resizeToCap(processFile);
 
-      // Stage 3: lazy-load @imgly → removeBackground → carUrl dataURL
-      const removeBackground = await loadImgly();
-      // publicPath overrides the broken default (staticimgly.com 404s)
-      // proxyToWorker:false avoids Worker creation issues with CDN-loaded onnxruntime
-      const resultBlob = await removeBackground(resizedBlob, {
-        publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
-        proxyToWorker: false,
-        progress: (key, current, total) => {
-          if (total > 0) {
-            setInferring(true);
-            setProgress(Math.round((current / total) * 100));
-          }
-        },
-      });
+      // Stage 3: remove background via /api/wrap-remove-bg (server-side @imgly)
+      const resultBlob = await removeBgViaApi(resizedBlob);
       const cutoutDataUrl = await blobToDataUrl(resultBlob);
 
       setIngestState("idle");
@@ -239,15 +216,11 @@ function WrapStage({ originalUrl, carUrl, onIngest, activeSwatch, baActive, setB
   if (ingestState === "removing") {
     return (
       <div className="removal-progress">
-        <div className="removal-label">
-          {inferring ? "Removing background…" : "Loading model… (first run only)"}
-        </div>
+        <div className="removal-label">Removing background…</div>
         <div className="removal-bar">
-          {inferring
-            ? <div className="removal-bar-fill" style={{ width: `${progress}%` }} />
-            : <div className="removal-bar-sweep" />}
+          <div className="removal-bar-sweep" />
         </div>
-        <div className="removal-pct">{inferring ? `${progress}%` : "—"}</div>
+        <div className="removal-pct">This takes 5–15 seconds</div>
       </div>
     );
   }

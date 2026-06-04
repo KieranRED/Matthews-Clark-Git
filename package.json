@@ -10,10 +10,20 @@
     "lint": "next lint"
   },
   "browserslist": {
-    "production": [">0.3%", "not dead", "not ie 11", "not op_mini all"],
-    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
+    "production": [
+      ">0.3%",
+      "not dead",
+      "not ie 11",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
   "dependencies": {
+    "@imgly/background-removal-node": "^1.4.5",
     "@vercel/blob": "^2.3.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
