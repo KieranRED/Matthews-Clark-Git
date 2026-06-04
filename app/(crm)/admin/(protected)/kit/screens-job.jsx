@@ -251,6 +251,8 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
   const upsellRequests = Array.isArray(lead?.upsellRequests) ? lead.upsellRequests : [];
   // Markup state for priced requests: { [requestId]: amountStr }
   const [upsellConfirmAmounts, setUpsellConfirmAmounts] = useState({});
+  // Manual Izimoto vendor cost entry for upsell requests: { [requestId]: amountStr }
+  const [upsellVendorAmounts, setUpsellVendorAmounts] = useState({});
   const UPSELL_OPTIONS = [
     ...Object.entries(SERVICE_LABELS).map(([id, label]) => ({ id, label })),
     { id: "custom", label: "Custom" }
@@ -842,6 +844,27 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
     }
   }
 
+  async function saveUpsellVendorCost(req) {
+    const vendorExVat = safeNum(upsellVendorAmounts[req.id]);
+    if (!vendorExVat || vendorExVat <= 0 || !lead?.id) return;
+    setActionStatus({ state: "loading", message: "Saving Izimoto cost…" });
+    try {
+      // PATCH the upsell request directly via the upsell-request endpoint
+      const res = await fetch(`/api/admin/leads/${encodeURIComponent(lead.id)}/upsell-request`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: req.id, vendorExVat, status: "priced" })
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error || "Failed to save cost.");
+      setUpsellVendorAmounts((p) => ({ ...p, [req.id]: "" }));
+      setActionStatus({ state: "success", message: "Izimoto cost saved." });
+      onRefresh?.();
+    } catch (err) {
+      setActionStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to save cost." });
+    }
+  }
+
   async function removeUpsellRequest(id) {
     if (!lead?.id) return;
     setActionStatus({ state: "loading", message: "Removing request…" });
@@ -1202,8 +1225,8 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
       {/* ── Accordion sections ───────────────────────────── */}
       <div style={{ padding: "0 18px", display: "grid", gap: 8 }}>
 
-        {/* QUOTING: shown to Izimoto (submit prices) or M&C when no vendor quote yet */}
-        {(isIzimoto || !vendorByService) ? (
+        {/* QUOTING: shown to Izimoto (submit prices) or M&C when no vendor quote yet / empty */}
+        {(isIzimoto || !vendorByService || Object.keys(vendorByService).length === 0) ? (
           <div className="card" style={{ overflow: "hidden" }}>
             <SecHdr skey="quoting" icon={<Icon.invoice />} label={isIzimoto ? "Submit pricing" : "Awaiting Izimoto quote"} />
             {openSection === "quoting" ? (
@@ -1303,8 +1326,8 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
           </div>
         ) : null}
 
-        {/* INVOICE: M&C only, when vendor quote exists */}
-        {!isIzimoto && vendorByService ? (
+        {/* INVOICE: M&C only, when vendor quote exists (even if empty — still show so cost can be corrected) */}
+        {!isIzimoto && vendorByService != null ? (
           <div className="card" style={{ overflow: "hidden" }}>
             <SecHdr
               skey="invoice"
@@ -1456,6 +1479,21 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
                               </div>
                               <button type="button" onClick={() => removeUpsellRequest(req.id)} disabled={actionStatus.state === "loading"} style={{ background: "none", border: "none", color: "var(--fg-3)", cursor: "pointer", padding: "2px 6px", fontSize: 16, lineHeight: 1, flexShrink: 0 }} title="Delete request">×</button>
                             </div>
+                            {/* Manually enter Izimoto's cost if not yet priced via form */}
+                            {!isPriced && (
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, marginBottom: 8 }}>
+                                <input
+                                  inputMode="decimal"
+                                  value={upsellVendorAmounts[req.id] ?? ""}
+                                  onChange={(e) => setUpsellVendorAmounts((p) => ({ ...p, [req.id]: e.target.value }))}
+                                  placeholder="Izimoto cost ex VAT (optional)"
+                                  style={{ ...inputStyle, fontSize: 12 }}
+                                />
+                                <button type="button" onClick={() => saveUpsellVendorCost(req)} disabled={!safeNum(upsellVendorAmounts[req.id]) || actionStatus.state === "loading"} style={{ ...inputStyle, background: "rgba(39,174,96,.12)", border: "1px solid rgba(39,174,96,.35)", color: "#27AE60", cursor: "pointer", whiteSpace: "nowrap", padding: "0 14px" }}>
+                                  Save cost
+                                </button>
+                              </div>
+                            )}
                             <div style={{ display: "grid", gap: 8 }}>
                               <input
                                 inputMode="decimal"
