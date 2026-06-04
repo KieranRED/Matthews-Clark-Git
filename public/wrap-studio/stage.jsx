@@ -129,26 +129,41 @@
         // Finish-specific saturation modifier
         const satMult = finish === 'matte' ? 0.80 : finish === 'satin' ? 0.88 : 1.0;
 
-        // Lighting removal approach:
-        // We STRIP the car's lighting and replace with the target colour's flat luminance.
-        // Then we add back a tiny fraction of the original luminance variation (body lines).
-        // GPT then re-lights the whole scene from scratch.
+        // Lighting-removal recolour:
+        // Strip original lighting → apply target colour → add back 30% of body-line variation
+        // GPT re-lights the scene properly. Finish overlays (CSS) add gloss/matte/metallic on top.
         //
-        // outL = targetL + (pixelL - carAvgL) * BODY_LINE_RETAIN
-        // BODY_LINE_RETAIN = 0.10 → only 10% of original lighting variation is kept
-        // This gives GPT the correct colour with just enough shape to understand the car form.
-        const BODY_LINE_RETAIN = 0.10;
+        // BODY_LINE_RETAIN = 0.30 — keeps panel shapes, creases, shadow edges visible
+        const BODY_LINE_RETAIN = 0.30;
 
+        // Build a paint mask first (flag each pixel), then use neighbor check to kill speckles
+        const paintMask = new Uint8Array(d.length / 4);
         for (let i = 0; i < d.length; i += 4) {
           if (d[i+3] < 20) continue;
-          const px = rgbToHSL(d[i], d[i+1], d[i+2]);
-          if (!isPaintPixel(px, carInfo)) continue;
+          if (isPaintPixel(rgbToHSL(d[i], d[i+1], d[i+2]), carInfo)) paintMask[i/4] = 1;
+        }
 
-          // Strip lighting: output luminance = target's L + tiny body-line deviation
+        // Anti-speckle: require at least 3 of 8 neighbours to also be paint
+        const paintFinal = new Uint8Array(paintMask.length);
+        for (let y = 1; y < ch-1; y++) {
+          for (let x = 1; x < cw-1; x++) {
+            const idx = y * cw + x;
+            if (!paintMask[idx]) continue;
+            let neighbours = 0;
+            for (let dy = -1; dy <= 1; dy++)
+              for (let dx = -1; dx <= 1; dx++)
+                if (dy !== 0 || dx !== 0) neighbours += paintMask[(y+dy)*cw+(x+dx)] || 0;
+            if (neighbours >= 3) paintFinal[idx] = 1;
+          }
+        }
+
+        // Apply colour to confirmed paint pixels
+        for (let i = 0; i < d.length; i += 4) {
+          if (!paintFinal[i/4]) continue;
+          const px = rgbToHSL(d[i], d[i+1], d[i+2]);
           const deviation = px.l - carInfo.avgL;
           let outL = tHSL.l + deviation * BODY_LINE_RETAIN;
-          outL = Math.max(0.02, Math.min(0.97, outL)); // clamp
-
+          outL = Math.max(0.02, Math.min(0.97, outL));
           const { r, g, b } = hslToRGB(tHSL.h, tHSL.s * satMult, outL);
           d[i] = r; d[i+1] = g; d[i+2] = b;
         }
@@ -161,17 +176,50 @@
     });
   }
 
-  // Chrome / shift kept as CSS overlays (these are special effects, not real colour)
+  // ─── Finish overlays ──────────────────────────────────────────────────────
+  // Applied ON TOP of the canvas-recoloured car.
+  // These affect reflectivity / sheen / texture only — never change the hue.
+  // Chrome and colour-shift are full CSS replacements (not canvas recolourable).
+
+  const SHEEN = 'linear-gradient(118deg, rgba(255,255,255,.55) 0%, transparent 28%, transparent 68%, rgba(255,255,255,.22) 100%)';
+  const SOFT_SHEEN = 'linear-gradient(118deg, rgba(255,255,255,.28) 0%, transparent 35%)';
+
   function fxFor(sw) {
     if (!sw) return null;
     const c = sw.hex, c2 = sw.hex2 || sw.hex;
-    if (sw.finish === 'chrome')
-      return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
-               mixBlendMode: 'hard-light', opacity: .92 }, anim: 'anim-chrome', sheen: { opacity: .5 }, tone: { opacity: .08 } };
-    if (sw.finish === 'shift')
-      return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
-               mixBlendMode: 'hue', opacity: .94 }, anim: 'anim-shift', sheen: { opacity: .22 }, tone: { opacity: .1 } };
-    return null; // all other finishes: handled by canvas recolour
+    switch (sw.finish) {
+      case 'chrome':
+        return { tint: { background: `linear-gradient(115deg,#fff 0%,${c} 22%,${c2} 48%,#fbfdff 64%,${c} 88%)`,
+                 mixBlendMode: 'hard-light', opacity: .92 }, anim: 'anim-chrome', sheen: { opacity: .5 }, tone: { opacity: .08 } };
+      case 'shift':
+        return { tint: { background: `linear-gradient(115deg,${c} 0%,${c2} 38%,${c} 70%,${c2} 100%)`,
+                 mixBlendMode: 'hue', opacity: .94 }, anim: 'anim-shift', sheen: { opacity: .22 }, tone: { opacity: .1 } };
+      // Finish overlays — overlay blend adds/removes lightness without touching hue
+      case 'gloss':
+        return { tint: { background: SHEEN, mixBlendMode: 'overlay', opacity: .65 },
+                 sheen: { opacity: .30 }, tone: { opacity: 0 } };
+      case 'satin':
+        return { tint: { background: SOFT_SHEEN, mixBlendMode: 'soft-light', opacity: .55 },
+                 sheen: { opacity: .14 }, tone: { opacity: 0 } };
+      case 'matte':
+        return { tint: { background: 'rgba(0,0,0,0.05)', mixBlendMode: 'multiply', opacity: 1 },
+                 sheen: { opacity: 0 }, tone: { opacity: .06 } };
+      case 'metallic':
+        return { tint: { background: SOFT_SHEEN, mixBlendMode: 'overlay', opacity: .45 },
+                 sheen: { opacity: .18 }, tone: { opacity: 0 }, noise: true };
+      case 'carbon':
+        return { tint: { background: 'rgba(0,0,0,0.10)', mixBlendMode: 'multiply', opacity: 1 },
+                 sheen: { opacity: 0 }, tone: { opacity: .10 } };
+      case 'ppf-clear':
+        return { tint: { background: SHEEN, mixBlendMode: 'overlay', opacity: .20 },
+                 sheen: { opacity: .38 }, tone: { opacity: 0 } };
+      case 'ppf-matte':
+        return { tint: { background: 'rgba(0,0,0,0.04)', mixBlendMode: 'multiply', opacity: 1 },
+                 sheen: { opacity: 0 }, tone: { opacity: .08 } };
+      default:
+        return { tint: { background: SHEEN, mixBlendMode: 'overlay', opacity: .50 },
+                 sheen: { opacity: .20 }, tone: { opacity: 0 } };
+    }
   }
 
   function Stage(props) {
@@ -190,8 +238,8 @@
     // ── Canvas recolour: runs whenever the car or swatch changes ──────────────
     useEffect(() => {
       if (!carUrl || !swatch) { setRecolouredUrl(null); return; }
-      const fx = fxFor(swatch); // chrome/shift get CSS overlay, not canvas
-      if (fx) { setRecolouredUrl(null); return; }
+      // Chrome + shift are full CSS replacements — canvas not needed
+      if (swatch.finish === 'chrome' || swatch.finish === 'shift') { setRecolouredUrl(null); return; }
 
       // Cancel any in-flight recolour
       if (recolourAbort.current) recolourAbort.current = false;
@@ -278,10 +326,11 @@
     const origClip  = baActive ? { clipPath: `inset(0 0 0 ${baPos}%)`,        WebkitClipPath: `inset(0 0 0 ${baPos}%)` }        : {};
     // Legacy clip variable kept for ph-color placeholder (no-upload state)
     const clip = wrapClip;
-    const fx = swatch ? fxFor(swatch) : null; // only chrome/shift get CSS overlays
+    const fx = swatch ? fxFor(swatch) : null;
+    // Always mask to the original cutout (carUrl) — even when showing recolouredUrl
     const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
 
-    // CSS overlay layers — only used for chrome + shift (everything else uses canvas recolour)
+    // Finish overlay layers — used for ALL finishes on top of the canvas-recoloured car
     const fxLayers = (carUrl && fx) ? [
       h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, opacity: fx.tone.opacity, background: '#000' } }),
       h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...fx.tint } }),
