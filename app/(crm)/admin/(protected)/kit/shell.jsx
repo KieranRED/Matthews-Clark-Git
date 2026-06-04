@@ -23,6 +23,7 @@ function parsePath(pathname) {
   if (slug[0] === "content" && slug[1] === "new") return { name: "content-new", params: {} };
   if (slug[0] === "content") return { name: "content", params: {} };
   if (slug[0] === "pricing") return { name: "pricing", params: {} };
+  if (slug[0] === "new-lead") return { name: "new-lead", params: {} };
   return { name: "dashboard", params: {} };
 }
 
@@ -86,6 +87,10 @@ export function TopBar({ route, index, onSearch, onBell, onSettings }) {
     title = "New Post";
     crumbs = "SOCIAL · NEW POST";
   }
+  if (route.name === "new-lead") {
+    title = "New Lead";
+    crumbs = "ADD MANUALLY";
+  }
 
   return (
     <div className="crm-top">
@@ -131,16 +136,25 @@ export function TopBar({ route, index, onSearch, onBell, onSettings }) {
 }
 
 export function BottomNav({ route, index }) {
-  const isIzimoto = String(index?.VIEWER?.role || "").startsWith("izimoto");
-  const items = isIzimoto
-    ? [
-        { id: "dashboard", label: "Overview", href: "/admin", ic: <Icon.home /> },
-        { id: "leads", label: "Quotes", href: "/admin/leads/to-quote", ic: <Icon.invoice /> },
-        { id: "clients", label: "Clients", href: "/admin/clients", ic: <Icon.clients /> },
-        { id: "calendar", label: "Calendar", href: "/admin/calendar", ic: <Icon.cal /> },
-        { id: "settings", label: "Settings", href: "/admin/settings", ic: <Icon.set /> }
-      ]
-    : [
+  const role = String(index?.VIEWER?.role || "");
+  const isIzimoto = role.startsWith("izimoto");
+  const isIziOwner = role === "izimoto_owner" || role === "izimoto_admin";
+  const isIziStaff = role === "izimoto_staff";
+
+  const iziStaffItems = [
+    { id: "dashboard", label: "In the Bay", href: "/admin", ic: <Icon.home /> },
+    { id: "settings", label: "Settings", href: "/admin/settings", ic: <Icon.set /> },
+  ];
+
+  const iziOwnerItems = [
+    { id: "dashboard", label: "Overview", href: "/admin", ic: <Icon.home /> },
+    { id: "leads", label: "Quotes", href: "/admin/leads/to-quote", ic: <Icon.invoice /> },
+    { id: "calendar", label: "Availability", href: "/admin/calendar", ic: <Icon.cal /> },
+    { id: "leads-all", label: "All Jobs", href: "/admin/leads", ic: <Icon.leads /> },
+    { id: "settings", label: "Settings", href: "/admin/settings", ic: <Icon.set /> },
+  ];
+
+  const items = isIziStaff ? iziStaffItems : isIziOwner ? iziOwnerItems : [
         { id: "dashboard", label: "Today", href: "/admin", ic: <Icon.home /> },
         { id: "leads", label: "Pipeline", href: "/admin/leads", ic: <Icon.leads /> },
         { id: "clients", label: "Clients", href: "/admin/clients", ic: <Icon.clients /> },
