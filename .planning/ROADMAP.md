@@ -17,7 +17,7 @@ Continuing from v1.0 which used Phases 1–4. v1.1 starts at Phase 5.
 ## Phase Details
 
 ### Phase 5: Integration & Catalogue
-**Goal**: The wrap studio is live at /wrap-studio, the design system prototype is integrated into the repo, and customers can browse, filter, and search all 375 real wrap colours with accurate swatch imagery
+**Goal**: The wrap studio is live at /mc-site/wrap-studio, the design system prototype is integrated into the repo, and customers can browse, filter, and search all 375 real wrap colours with accurate swatch imagery
 **Depends on**: Nothing (first phase of v1.1)
 **Requirements**: INT-01, INT-02, INT-03, CAT-01, CAT-02, CAT-03, CAT-04, CAT-05, CAT-06
 **Success Criteria** (what must be TRUE):
@@ -26,7 +26,12 @@ Continuing from v1.0 which used Phases 1–4. v1.1 starts at Phase 5.
   3. Customer can filter by brand (All / Avery Dennison / Hexis / STEK) and by finish type — results update immediately
   4. Customer can search by colour name or product code and catalogue narrows to matching results
   5. Studio layout is usable on a phone screen without horizontal scrolling
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 05-01-PLAN.md — Scaffold route handler + copy 7 prototype files to public/wrap-studio/, null demo car
+- [ ] 05-02-PLAN.md — Build catalogue script: map 375 real entries, upload 18 STEK swatches to Blob, generate catalogue.js
+- [ ] 05-03-PLAN.md — Swatch imagery + low-confidence indicator, strip tier/pricing UI, add wrapping-page CTA
+- [ ] 05-04-PLAN.md — UAT: verify all 9 requirements and 5 success criteria
 **UI hint**: yes
 
 ### Phase 6: Upload & Recolour Engine
@@ -72,7 +77,7 @@ Phases execute in numeric order: 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 5. Integration & Catalogue | 0/TBD | Not started | - |
+| 5. Integration & Catalogue | 0/4 | Planned | - |
 | 6. Upload & Recolour Engine | 0/TBD | Not started | - |
 | 7. GPT-Image-2 Render | 0/TBD | Not started | - |
 | 8. Quote & Distribution | 0/TBD | Not started | - |
