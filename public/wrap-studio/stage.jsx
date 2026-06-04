@@ -105,10 +105,12 @@
     }, [ingest]);
 
     // before/after drag
+    const justDraggedRef = useRef(false);
     useEffect(() => {
       if (!baActive) return;
       const move = (e) => {
         if (!dragRef.current) return;
+        justDraggedRef.current = true;
         const el = stageRef.current; if (!el) return;
         const r = el.getBoundingClientRect();
         const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
@@ -121,17 +123,19 @@
         window.removeEventListener('touchmove', move); window.removeEventListener('touchend', up); };
     }, [baActive]);
 
-    // clip for the WRAPPED (right) side — shows from 0 to baPos%
-    const clip = baActive ? { clipPath: `inset(0 ${100 - baPos}% 0 0)`, WebkitClipPath: `inset(0 ${100 - baPos}% 0 0)` } : null;
-    // clip for the ORIGINAL (left reveal) side — shows from baPos% to 100%
-    const clipOrig = baActive ? { clipPath: `inset(0 0 0 ${baPos}%)`, WebkitClipPath: `inset(0 0 0 ${baPos}%)` } : null;
+    // Clips applied at car-wrap level (same coordinate space as stage → baPos% is exact)
+    // DO NOT apply clip to individual images/layers — that causes lag due to padding offsets
+    const wrapClip  = baActive ? { clipPath: `inset(0 ${100 - baPos}% 0 0)`, WebkitClipPath: `inset(0 ${100 - baPos}% 0 0)` } : {};
+    const origClip  = baActive ? { clipPath: `inset(0 0 0 ${baPos}%)`,        WebkitClipPath: `inset(0 0 0 ${baPos}%)` }        : {};
+    // Legacy clip variable kept for ph-color placeholder (no-upload state)
+    const clip = wrapClip;
     const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
 
-    // recolour layer (real photo) — tint + tone + sheen, all masked to the car
+    // recolour layers — NO clip here, the parent car-wrap handles clipping
     const fxLayers = (carUrl && fx) ? [
-      h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, ...clip, opacity: fx.tone.opacity, background: '#000' } }),
-      h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...clip, ...fx.tint } }),
-      h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, ...clip, opacity: fx.sheen.opacity,
+      h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, opacity: fx.tone.opacity, background: '#000' } }),
+      h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...fx.tint } }),
+      h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, opacity: fx.sheen.opacity,
         background: 'linear-gradient(118deg, rgba(255,255,255,.9) 0%, transparent 26%, transparent 72%, rgba(255,255,255,.4) 100%)' } }),
     ] : null;
 
@@ -148,20 +152,18 @@
 
     return h('div', { className: 'stage-col' },
       h('div', { className: 'stage', ref: stageRef, 'data-bg': bg, 'data-light': light,
-        'data-screen-label': 'Wrap Studio — Stage', style: { '--wrap-color': wrapColorVar } },
+        'data-screen-label': 'Wrap Studio — Stage', style: { '--wrap-color': wrapColorVar },
+        onClick: (e) => { if (justDraggedRef.current) { justDraggedRef.current = false; e.stopPropagation(); } } },
         demo ? null : h('div', { className: 'bay-ceiling' }),
         demo ? null : h('div', { className: 'bay-sign' }, 'M', h('span', { className: 'sl' }, '/'), 'C STUDIO'),
         demo ? null : h('div', { className: 'bay-floor' }),
 
-        // car staging
-        demo ? demoScene : h('div', { className: 'car-wrap' },
+        // car staging — WRAPPED side (left of slider), clipped at car-wrap level
+        demo ? demoScene : h('div', { className: 'car-wrap', style: baActive ? wrapClip : {} },
           h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
             carUrl
               ? h(React.Fragment, null,
-                  // original photo revealed on the RIGHT side of the slider
-                  baActive && originalUrl ? h('img', { className: 'car-base', src: originalUrl, alt: 'Original', style: { ...clipOrig } }) : null,
-                  // background-removed cutout on the LEFT (wrapped) side
-                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car', style: baActive ? { ...clip } : null }),
+                  h('img', { className: 'car-base', src: carUrl, alt: 'Your car' }),
                   fxLayers)
               : h('div', { className: 'car-ph' },
                   h('div', { className: 'ph-color ' + (fx && fx.anim ? fx.anim : ''),
@@ -176,6 +178,12 @@
                     h('span', { className: 'ph-upload-tip' }, 'Best: ¾ front or side-on, in good light'))),
           )
         ),
+        // ORIGINAL side (right of slider) — sibling car-wrap, same coordinate space
+        baActive && originalUrl ? h('div', { className: 'car-wrap', style: origClip, 'data-layer': 'original' },
+          h('div', { className: 'car-box' },
+            h('img', { className: 'car-base', src: originalUrl, alt: 'Original' })
+          )
+        ) : null,
         h('div', { className: 'light-overlay' }),
 
         // before/after
