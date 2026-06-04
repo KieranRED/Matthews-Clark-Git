@@ -134,7 +134,7 @@ export default function AdminCrmKitApp() {
             onSearch={() => setOverlay("search")}
             onBell={() => setOverlay("activity")}
           />
-          <div style={{ flex: 1, overflow: "auto" }}>
+          <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
             {content}
           </div>
         </div>
