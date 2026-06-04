@@ -45,7 +45,7 @@
     // Bundled demo photo carries its own background, so it composites best in the
     // "My background" scene rather than the studio bay. A real (uploaded) car uses
     // the studio pipeline. isDemo also flips the recolour engine to full-frame mode.
-    const isDemo = carUrl === DEMO_CAR_SRC;
+    const isDemo = DEMO_CAR_SRC !== null && carUrl === DEMO_CAR_SRC;
     const [selectedId, setSelectedId] = useState(saved.selectedId || null);
     const [panelColors, setPanelColors] = useState(saved.panelColors || {});
     const [activePanel, setActivePanel] = useState(saved.activePanel || 'full');
