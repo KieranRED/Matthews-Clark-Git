@@ -1184,14 +1184,27 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
             <div style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "-.01em", lineHeight: 1 }}>{moneyZAR(j.revenue || 0)}</div>
           </div>
           <div style={{ background: "var(--bg-2)", padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".16em", color: "var(--fg-3)", textTransform: "uppercase" }}>Izimoto cost</div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "-.01em", lineHeight: 1, color: "var(--fg-2)" }}>{moneyZAR(j.izimotoCost || 0)}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".16em", color: j.vendorCostMissing ? "#F59E0B" : "var(--fg-3)", textTransform: "uppercase" }}>
+              Izimoto cost{j.vendorCostMissing ? " ⚠" : ""}
+            </div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "-.01em", lineHeight: 1, color: j.vendorCostMissing ? "#F59E0B" : "var(--fg-2)" }}>
+              {j.vendorCostMissing ? "Not set" : moneyZAR(j.izimotoCost || 0)}
+            </div>
           </div>
           <div style={{ background: "var(--bg-2)", padding: 12, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".16em", color: "var(--fg-3)", textTransform: "uppercase" }}>Profit · M&amp;C</div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "-.01em", lineHeight: 1, color: "var(--mc-blue)" }}>{moneyZAR(j.commission || 0)}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".16em", color: j.vendorCostMissing ? "#F59E0B" : "var(--fg-3)", textTransform: "uppercase" }}>
+              Profit · M&amp;C{j.vendorCostMissing ? " ⚠" : ""}
+            </div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "-.01em", lineHeight: 1, color: j.vendorCostMissing ? "#F59E0B" : "var(--mc-blue)" }}>
+              {j.vendorCostMissing ? "Overstated" : moneyZAR(j.commission || 0)}
+            </div>
           </div>
         </div>
+        {j.vendorCostMissing && (
+          <div style={{ marginTop: 8, padding: "10px 12px", borderRadius: 8, background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.3)", fontSize: 11, color: "rgba(245,158,11,.9)", lineHeight: 1.5 }}>
+            ⚠ Izimoto's cost hasn't been entered for this job — open the <b>Awaiting Izimoto quote</b> section and use "Set vendor pricing manually" to fix the profit figure.
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: ".14em", color: "var(--fg-3)", textTransform: "uppercase" }}>
           <span>{depositPaid ? "✓ Deposit paid" : `Deposit · ${moneyZAR(j.deposit || 0)}`}</span>
           <span style={{ color: invoicePaid ? "#27AE60" : j.balance > 0 ? "#F2C94C" : "var(--fg-3)" }}>
