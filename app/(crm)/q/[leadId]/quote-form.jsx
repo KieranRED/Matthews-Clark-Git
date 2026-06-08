@@ -115,6 +115,7 @@ function fmtR(n) {
 export default function QuoteForm({ leadId, token, lead }) {
   const [status, setStatus] = useState({ state: "idle", message: "" });
   const [amounts, setAmounts] = useState({});
+  const [upsellAmounts, setUpsellAmounts] = useState({});
 
   const onAmountChange = (sid, val) => {
     setAmounts((prev) => ({ ...prev, [sid]: val }));
@@ -133,6 +134,7 @@ export default function QuoteForm({ leadId, token, lead }) {
       setStatus({ state: "success", message: "Quote sent to Matthews & Clark." });
       formEl?.reset?.();
       setAmounts({});
+      setUpsellAmounts({});
     } catch (err) {
       setStatus({ state: "error", message: err instanceof Error ? err.message : "Failed to submit quote." });
     }
@@ -140,6 +142,12 @@ export default function QuoteForm({ leadId, token, lead }) {
 
   const services = Array.isArray(lead?.services) ? lead.services.filter((s) => s && s !== "unsure") : [];
   const hasServices = services.length > 0;
+
+  // Upsell-only mode: when there are pending upsell requests, show ONLY those
+  const pendingUpsells = Array.isArray(lead?.upsellRequests)
+    ? lead.upsellRequests.filter((r) => r.status === "pending")
+    : [];
+  const upsellOnlyMode = pendingUpsells.length > 0;
 
   // Totals
   const parsedAmounts = services.map((sid) => parseAmount(amounts[sid]));
@@ -151,7 +159,49 @@ export default function QuoteForm({ leadId, token, lead }) {
   return (
     <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-      {!hasServices ? (
+      {/* ── Upsell-only mode: only show pending upsell requests ── */}
+      {upsellOnlyMode ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(245,158,11,.1)", border: "1px solid rgba(245,158,11,.3)", fontSize: 12, color: "rgba(245,158,11,.9)", lineHeight: 1.5 }}>
+            ⚡ Extra services added to this job — enter your price for each below.
+          </div>
+          {pendingUpsells.map((req) => {
+            const label = req.label || humanService(req.service);
+            const val = parseAmount(upsellAmounts[req.id]);
+            const incVal = val !== null ? val * (1 + VAT) : null;
+            return (
+              <div key={req.id} style={{ borderRadius: 14, border: "1px solid rgba(245,158,11,.25)", background: "rgba(245,158,11,.06)", overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid rgba(245,158,11,.15)", background: "rgba(245,158,11,.1)" }}>
+                  <span style={{ fontWeight: 800, fontSize: 15, color: "#fff" }}>{label}</span>
+                </div>
+                {req.notes && (
+                  <div style={{ padding: "10px 16px", fontSize: 12, color: "rgba(255,255,255,.6)", lineHeight: 1.5 }}>{req.notes}</div>
+                )}
+                <div style={{ padding: "0 16px 16px" }}>
+                  <div style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)", fontSize: 9, letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 8, marginTop: 12 }}>
+                    Your price — R (ex VAT)
+                  </div>
+                  <input
+                    name={`upsell_req_${req.id}`}
+                    inputMode="decimal"
+                    placeholder="e.g. 4 500 ex VAT"
+                    required
+                    value={upsellAmounts[req.id] ?? ""}
+                    onChange={(e) => setUpsellAmounts((p) => ({ ...p, [req.id]: e.target.value }))}
+                    style={INPUT_STYLE}
+                  />
+                  {incVal !== null && (
+                    <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,.12)", border: "1px solid rgba(245,158,11,.25)", display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)", fontSize: 9, letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>Inc. 15% VAT</span>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: "#F59E0B" }}>{fmtR(incVal)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : !hasServices ? (
         <div style={{ fontSize: 12, color: "rgba(255,255,255,.65)", lineHeight: 1.45 }}>
           No service breakdown captured. Enter one total below.
           <input name="amount_total" inputMode="decimal" placeholder="e.g. 9500 ex VAT" required style={{ ...INPUT_STYLE, marginTop: 10 }} />
