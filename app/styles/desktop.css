@@ -34,6 +34,16 @@
   --topbar-h:72px;
   --ease:cubic-bezier(.2,.8,.2,1);
   --radius:14px;
+  /* Aliases for mobile CRM kit variables used in shared components/modals */
+  --bg-1:#0A0A0A;
+  --bg-2:#101012;
+  --bg-3:#151517;
+  --bd-1:rgba(255,255,255,.08);
+  --bd-2:rgba(255,255,255,.12);
+  --fg-1:#fff;
+  --fg-2:rgba(255,255,255,.68);
+  --fg-3:rgba(255,255,255,.42);
+  --mc-blue:#1F4FFF;
 }
 
 @keyframes ds-pulse{0%,100%{opacity:1}50%{opacity:.35}}
