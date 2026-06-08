@@ -5,6 +5,8 @@
 // CSS bundle from the marketing site's critical path.
 
 import { Anton, Archivo, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import "./globals.css";
+import "./styles/lead-flow.css";
 
 const fontSans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const fontMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });

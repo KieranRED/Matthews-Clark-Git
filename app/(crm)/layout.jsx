@@ -15,8 +15,6 @@ const fontMono    = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono"
 const fontDisplay = Anton({ subsets: ["latin"], variable: "--font-display", weight: "400", display: "swap" });
 const fontUi      = Archivo({ subsets: ["latin"], variable: "--font-ui",      display: "swap" });
 
-import "../globals.css";
-import "../styles/lead-flow.css";
 import "../styles/crm-kit.css";
 import "../styles/desktop.css";
 import "../styles/invoice.css";
