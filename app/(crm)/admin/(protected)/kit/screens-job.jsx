@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 
 import { Icon } from "./icons";
@@ -1969,8 +1970,8 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
         </div>
       </div>
 
-      {/* ── Upsell detail modal ───────────────────────────── */}
-      {upsellModal && (
+      {/* ── Upsell detail modal — portalled to body so no containing-block issues ── */}
+      {upsellModal && typeof document !== "undefined" && createPortal(
         <div
           onClick={(e) => { if (e.target === e.currentTarget) setUpsellModal(null); }}
           style={{
@@ -1982,22 +1983,24 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
         >
           <div style={{
             width: "min(480px, 100%)",
-            background: "var(--bg-1)",
-            border: "1px solid var(--bd-1)",
+            background: "#0f0f0f",
+            border: "1px solid rgba(255,255,255,.14)",
             borderRadius: "18px 18px 0 0",
             padding: "0 0 24px",
             maxHeight: "88svh",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
+            fontFamily: "'Inter Tight', system-ui, sans-serif",
+            color: "#fff",
           }}>
             {/* Modal header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px 14px", borderBottom: "1px solid var(--bd-1)", position: "sticky", top: 0, background: "var(--bg-1)", zIndex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 18px 14px", borderBottom: "1px solid rgba(255,255,255,.1)", position: "sticky", top: 0, background: "#0f0f0f", zIndex: 1 }}>
               <div>
-                <div style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: ".2em", color: "var(--fg-3)", textTransform: "uppercase", marginBottom: 3 }}>Upsell Request</div>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: ".03em", textTransform: "uppercase", color: "var(--fg-1)" }}>{upsellModal.label}</div>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, letterSpacing: ".2em", color: "rgba(255,255,255,.45)", textTransform: "uppercase", marginBottom: 3 }}>Upsell Request</div>
+                <div style={{ fontFamily: "'Anton', Impact, sans-serif", fontSize: 22, letterSpacing: ".03em", textTransform: "uppercase", color: "#fff" }}>{upsellModal.label}</div>
               </div>
-              <button type="button" onClick={() => setUpsellModal(null)} style={{ background: "var(--bg-2)", border: "1px solid var(--bd-1)", borderRadius: 999, width: 32, height: 32, display: "grid", placeItems: "center", cursor: "pointer", color: "var(--fg-2)", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
+              <button type="button" onClick={() => setUpsellModal(null)} style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 999, width: 32, height: 32, display: "grid", placeItems: "center", cursor: "pointer", color: "rgba(255,255,255,.7)", fontSize: 16, lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
 
             {/* Service-specific detail form */}
@@ -2095,7 +2098,8 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
