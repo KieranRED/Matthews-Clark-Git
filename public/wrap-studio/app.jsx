@@ -171,7 +171,12 @@
         })),
 
       compareOpen ? h(CompareModal, { pins, carUrl, light, onClose: () => setCompareOpen(false), onPick: (sw) => { onSelect(sw); setCompareOpen(false); } }) : null,
-      quoteOpen ? h(QuoteModal, { sel, panelColors, panels: PANELS, carUrl, onClose: () => setQuoteOpen(false), onSent: () => { setQuoteOpen(false); flash('Sent to Matthews & Clark — we\'ll come back fast'); } }) : null,
+      quoteOpen ? h(QuoteModal, { sel, panelColors, panels: PANELS, carUrl,
+        onClose: () => setQuoteOpen(false),
+        onSent: (ok, msg) => {
+          if (ok) { setQuoteOpen(false); flash('Sent to Matthews & Clark — we\'ll come back fast'); }
+          else { flash(msg || 'Could not send — try again'); }
+        } }) : null,
 
       // toast
       h('div', { className: 'toast' + (toast ? ' show' : '') }, toast ? h(I.Check, { size: 16 }) : null, toast || ''),
@@ -236,6 +241,38 @@
     const rank = { standard: 0, premium: 1, specialist: 2 };
     const top = list.reduce((t, x) => rank[x.sw.tier] > rank[t] ? x.sw.tier : t, 'standard');
     const tier = window.TIER_LABEL[top];
+    const priceTier = top;
+    const [name, setName] = useState('');
+    const [car, setCar] = useState('');
+    const [phone, setPhone] = useState('');
+    const [notes, setNotes] = useState('');
+    const [busy, setBusy] = useState(false);
+    const submit = async () => {
+      if (busy) return;
+      if (!name.trim() || !car.trim() || phone.trim().length < 8) {
+        onSent && onSent(false, 'Add your name, car and phone first');
+        return;
+      }
+      setBusy(true);
+      const wrapSelection = list.map(({ p, sw }) => ({
+        panel: p.label, swatchId: sw.id, name: sw.name, code: sw.code || '',
+        brand: sw.brand || '', finish: sw.finish || '', tier: sw.tier || 'standard',
+      }));
+      try {
+        const res = await fetch('/api/wrap-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, car, phone, notes, priceTier, wrapSelection }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) onSent && onSent(true);
+        else onSent && onSent(false, 'Something went wrong — try again');
+      } catch {
+        onSent && onSent(false, 'Network error — try again');
+      } finally {
+        setBusy(false);
+      }
+    };
     return h('div', { className: 'modal-veil', onClick: onClose },
       h('div', { className: 'modal modal--quote', onClick: (e) => e.stopPropagation() },
         h('div', { className: 'modal-head' },
@@ -252,12 +289,12 @@
               h('span', { className: 'ql-code' }, sw.code))) : h('div', { className: 'q-line' }, 'No colour selected yet.'),
             h('div', { className: 'q-note' }, "We'll confirm availability and come back with a fixed price — usually same day.")),
           h('div', { className: 'q-form' },
-            h('label', null, 'Name', h('input', { defaultValue: '', placeholder: 'First & last' })),
-            h('label', null, 'Car', h('input', { defaultValue: '', placeholder: 'e.g. 2024 BMW M3 Competition' })),
-            h('label', null, 'WhatsApp / phone', h('input', { defaultValue: '', placeholder: '+27 …' })),
-            h('label', null, 'Anything we should know', h('textarea', { rows: 2, placeholder: 'Timeline, partial vs full, plans for PPF…' })),
-            h('button', { className: 'btn btn--primary', style: { width: '100%', height: 48, marginTop: 4 }, onClick: onSent },
-              h(I.Send, { size: 15 }), 'Send to Matthews & Clark'),
+            h('label', null, 'Name', h('input', { value: name, onChange: (e) => setName(e.target.value), placeholder: 'First & last' })),
+            h('label', null, 'Car', h('input', { value: car, onChange: (e) => setCar(e.target.value), placeholder: 'e.g. 2024 BMW M3 Competition' })),
+            h('label', null, 'WhatsApp / phone', h('input', { value: phone, onChange: (e) => setPhone(e.target.value), placeholder: '+27 …' })),
+            h('label', null, 'Anything we should know', h('textarea', { rows: 2, value: notes, onChange: (e) => setNotes(e.target.value), placeholder: 'Timeline, partial vs full, plans for PPF…' })),
+            h('button', { className: 'btn btn--primary', style: { width: '100%', height: 48, marginTop: 4 }, onClick: submit, disabled: busy },
+              h(I.Send, { size: 15 }), busy ? 'Sending…' : 'Send to Matthews & Clark'),
             h('div', { className: 'q-fine' }, carUrl ? 'Your photo + render are attached automatically.' : 'Add your car photo for a render with the request.')))));
   }
 
