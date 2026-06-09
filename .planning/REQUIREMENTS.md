@@ -49,8 +49,8 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 ### Quote & CRM Integration
 - [ ] **QUOTE-01**: Customer can open a quote request modal with their selected colour(s) and panel assignment pre-filled
 - [ ] **QUOTE-02**: Quote form captures: name, car (make/model/year), WhatsApp/phone, notes
-- [ ] **QUOTE-03**: Submitting the form creates a lead record in the M&C KV lead store with colour selection, panel breakdown, and price tier attached
-- [ ] **QUOTE-04**: Submission triggers a Telegram notification to the M&C group with the colour selection and customer details
+- [x] **QUOTE-03**: Submitting the form creates a lead record in the M&C KV lead store with colour selection, panel breakdown, and price tier attached
+- [x] **QUOTE-04**: Submission triggers a Telegram notification to the M&C group with the colour selection and customer details
 - [ ] **QUOTE-05**: Customer sees a confirmation message after successful submission
 
 ### Share & Download

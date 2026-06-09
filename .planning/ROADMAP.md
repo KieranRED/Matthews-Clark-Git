@@ -10,7 +10,7 @@
 **Plans:** 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — /api/wrap-quote route: persist wrap lead + Telegram notification (QUOTE-03, QUOTE-04)
+- [x] 07-01-PLAN.md — /api/wrap-quote route: persist wrap lead + Telegram notification (QUOTE-03, QUOTE-04)
 - [ ] 07-02-PLAN.md — Wire QuoteModal to API; controlled form + panel breakdown (RCOL-09, QUOTE-01/02/05)
 - [ ] 07-03-PLAN.md — Watermarked download + shareable colour link (SHARE-01, SHARE-02)
 
