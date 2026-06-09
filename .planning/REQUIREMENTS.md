@@ -35,7 +35,7 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [x] **RCOL-06**: Metallic finish: HSL transform + subtle grain noise layer to simulate flake depth
 - [x] **RCOL-07**: Colour-shift finish: animated two-tone HSL gradient simulating angle-dependent flip
 - [x] **RCOL-08**: PPF clear/matte: thin tint overlay only, preserving underlying paint character
-- [ ] **RCOL-09**: Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body)
+- [x] **RCOL-09**: Customer can assign different colours to individual panels (bonnet, roof, mirrors, pillars, boot, accents, full body)
 - [x] **RCOL-10**: Before/after swipe slider shows original vs wrapped car
 
 ### GPT-Image-2 Studio Render
@@ -47,11 +47,11 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [ ] **RENDER-06**: Rendered result replaces the fast preview on the stage; before/after slider compares original car vs studio render
 
 ### Quote & CRM Integration
-- [ ] **QUOTE-01**: Customer can open a quote request modal with their selected colour(s) and panel assignment pre-filled
-- [ ] **QUOTE-02**: Quote form captures: name, car (make/model/year), WhatsApp/phone, notes
+- [x] **QUOTE-01**: Customer can open a quote request modal with their selected colour(s) and panel assignment pre-filled
+- [x] **QUOTE-02**: Quote form captures: name, car (make/model/year), WhatsApp/phone, notes
 - [x] **QUOTE-03**: Submitting the form creates a lead record in the M&C KV lead store with colour selection, panel breakdown, and price tier attached
 - [x] **QUOTE-04**: Submission triggers a Telegram notification to the M&C group with the colour selection and customer details
-- [ ] **QUOTE-05**: Customer sees a confirmation message after successful submission
+- [x] **QUOTE-05**: Customer sees a confirmation message after successful submission
 
 ### Share & Download
 - [ ] **SHARE-01**: Customer can download the current render as a watermarked PNG (M&C branding applied)
