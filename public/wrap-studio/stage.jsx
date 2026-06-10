@@ -373,6 +373,36 @@
     // The displayed car: recolouredUrl (canvas engine) or carUrl (base/chrome/shift)
     const displayUrl = recolouredUrl || carUrl;
 
+    useEffect(() => {
+      window.__wrapDownload = async () => {
+        if (!displayUrl) return false;
+        const img = new Image();
+        img.src = displayUrl;
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth || 1200;
+        cv.height = img.naturalHeight || 800;
+        const ctx = cv.getContext('2d');
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        const pad = Math.round(cv.width * 0.02);
+        const fontSize = Math.max(14, Math.round(cv.width * 0.025));
+        ctx.font = 'bold ' + fontSize + 'px sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('MATTHEWS / CLARK', cv.width - pad, cv.height - pad);
+        await new Promise((res) => cv.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'mc-wrap-preview.png'; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          res();
+        }, 'image/png'));
+        return true;
+      };
+      return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
+    }, [displayUrl]);
+
     const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
 
     // DEMO-ONLY full-frame recolour layers (see demoFx note above)
