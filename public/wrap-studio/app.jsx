@@ -14,6 +14,23 @@
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
   const saved = load();
 
+  function encodeSelection(panelColors) {
+    try {
+      return btoa(JSON.stringify(panelColors)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    } catch { return ''; }
+  }
+  function decodeSelection(encoded) {
+    try {
+      const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      const obj = JSON.parse(atob(b64));
+      return (obj && typeof obj === 'object') ? obj : null;
+    } catch { return null; }
+  }
+  const shareParam = (() => {
+    try { return new URL(window.location.href).searchParams.get('s'); } catch { return null; }
+  })();
+  const sharedColors = shareParam ? decodeSelection(shareParam) : null;
+
   // ===========================================================================
   //  DEMO ONLY — REMOVE BEFORE PRODUCTION
   //  ---------------------------------------------------------------------------
@@ -47,8 +64,10 @@
     // "My background" scene rather than the studio bay. A real (uploaded) car uses
     // the studio pipeline. isDemo also flips the recolour engine to full-frame mode.
     const isDemo = DEMO_CAR_SRC !== null && carUrl === DEMO_CAR_SRC;
-    const [selectedId, setSelectedId] = useState(saved.selectedId || null);
-    const [panelColors, setPanelColors] = useState(saved.panelColors || {});
+    const [selectedId, setSelectedId] = useState(
+      sharedColors ? (sharedColors.full || Object.values(sharedColors)[0] || null) : (saved.selectedId || null)
+    );
+    const [panelColors, setPanelColors] = useState(sharedColors || saved.panelColors || {});
     const [activePanel, setActivePanel] = useState(saved.activePanel || 'full');
     const [query, setQuery] = useState('');
     const [brandTab, setBrandTab] = useState('All');
@@ -148,9 +167,24 @@
             setFavs({}); setPins([]); setBg('studio'); setLight('studio');
             flash('Session reset');
           }}, h(I.Refresh, { size: 14 }), 'Reset'),
-          h('button', { className: 'btn btn--ghost btn--sm', onClick: () => flash('Shareable link copied') },
+          h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
+            try {
+              const url = new URL(window.location.href);
+              const enc = encodeSelection(panelColors);
+              if (!enc || Object.keys(panelColors).length === 0) { flash('Pick a colour first'); return; }
+              url.searchParams.set('s', enc);
+              navigator.clipboard.writeText(url.toString())
+                .then(() => flash('Shareable link copied'))
+                .catch(() => flash('Could not copy link'));
+            } catch { flash('Could not copy link'); }
+          }},
             h(I.Share, { size: 14 }), 'Share'),
-          h('button', { className: 'btn btn--ghost btn--sm', onClick: () => { if (carUrl) flash('Render downloaded (watermarked)'); else flash('Add your car photo first'); } },
+          h('button', { className: 'btn btn--ghost btn--sm', onClick: async () => {
+            if (!carUrl) { flash('Add your car photo first'); return; }
+            if (typeof window.__wrapDownload !== 'function') { flash('Render not ready yet'); return; }
+            const ok = await window.__wrapDownload();
+            flash(ok ? 'Render downloaded (watermarked)' : 'Nothing to download yet');
+          }},
             h(I.Download, { size: 14 }), 'Download'),
           h('button', { className: 'btn btn--primary btn--sm', onClick: () => setQuoteOpen(true) },
             'Send to M&C', h('span', { className: 'arr' }, h(I.Send, { size: 13 }))))),
