@@ -54,8 +54,8 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 - [x] **QUOTE-05**: Customer sees a confirmation message after successful submission
 
 ### Share & Download
-- [ ] **SHARE-01**: Customer can download the current render as a watermarked PNG (M&C branding applied)
-- [ ] **SHARE-02**: Customer can generate a shareable link that opens the studio with their colour selection pre-loaded
+- [x] **SHARE-01**: Customer can download the current render as a watermarked PNG (M&C branding applied)
+- [x] **SHARE-02**: Customer can generate a shareable link that opens the studio with their colour selection pre-loaded
 
 ---
 
