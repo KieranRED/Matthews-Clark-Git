@@ -16,6 +16,9 @@ Plans:
 
 | Plan | Name | Status | Plans | Summaries |
 |------|------|--------|-------|-----------|
+| 01 | /api/wrap-quote route + Telegram notification | Complete | 1 | 1 |
+| 02 | QuoteModal controlled form + panel breakdown | Complete | 1 | 1 |
+| 03 | Watermarked download + shareable colour link | Complete | 1 | 1 |
 
 ## Phase 08: GPT-Image-2 Studio Render
 **Goal:** Add the AI studio render pass — send the canvas composite to GPT-Image-2, integrate the car into the M&C studio bay scene, and surface the result with a before/after comparison.

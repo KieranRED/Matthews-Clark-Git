@@ -62,6 +62,10 @@ None — plan executed exactly as written.
 
 None. Both SHARE-01 and SHARE-02 are fully wired.
 
+## Checkpoint Verification
+
+**Task 3 — human-verify:** Approved by user on 2026-06-11. Download and Share features confirmed working in browser.
+
 ## Self-Check: PASSED
 
 - `public/wrap-studio/stage.jsx` — modified, contains `window.__wrapDownload`, `MATTHEWS / CLARK`, `mc-wrap-preview.png`
