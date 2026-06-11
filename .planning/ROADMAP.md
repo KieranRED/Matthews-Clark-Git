@@ -21,14 +21,26 @@ Plans:
 | 03 | Watermarked download + shareable colour link | Complete | 1 | 1 |
 
 ## Phase 08: GPT-Image-2 Studio Render
-**Goal:** Add the AI studio render pass — send the canvas composite to GPT-Image-2, integrate the car into the M&C studio bay scene, and surface the result with a before/after comparison.
+**Goal:** Add the AI studio render pass — send the canvas composite to GPT-Image-1 (images.edit), integrate the car into the M&C studio bay scene, and surface the result with a before/after comparison.
 
 **Requirements:** RENDER-01, RENDER-02, RENDER-03, RENDER-04, RENDER-05, RENDER-06
 
 **UI hint:** yes
 
+**Plans:** 4 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Wave 0 infra: install openai, OPENAI_API_KEY, kvExpire helper, studio bay asset
+- [ ] 08-02-PLAN.md — /api/wrap-render route: gpt-image-1 images.edit + per-IP rate limit (RENDER-02/03/04)
+- [ ] 08-03-PLAN.md — Canvas helper + renderUrl state + real startRender fetch + BA slider (RENDER-01/05/06)
+- [ ] 08-04-PLAN.md — Human-verify live studio render end-to-end (RENDER-04/06)
+
 | Plan | Name | Status | Plans | Summaries |
 |------|------|--------|-------|-----------|
+| 01 | Wave 0 infra (openai + env + kvExpire + asset) | Planned | 1 | 0 |
+| 02 | /api/wrap-render route + rate limit | Planned | 1 | 0 |
+| 03 | Canvas helper + renderUrl wiring | Planned | 1 | 0 |
+| 04 | Human-verify live render | Planned | 1 | 0 |
 
 ## Phase 06: Upload + Recolour Engine
 
