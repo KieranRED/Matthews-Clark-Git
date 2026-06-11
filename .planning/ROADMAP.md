@@ -7,7 +7,7 @@
 
 **UI hint:** yes
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 07-01-PLAN.md — /api/wrap-quote route: persist wrap lead + Telegram notification (QUOTE-03, QUOTE-04)
