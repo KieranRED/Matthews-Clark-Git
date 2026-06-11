@@ -53,6 +53,16 @@ A single platform that runs the business — no spreadsheets, no duct-taped SaaS
 - [x] **QUOTE-03**: Quote submission triggers Telegram notification to M&C with full service breakdown
 - [x] **QUOTE-04**: System supports starlight and interior service types in quotes
 
+### Wrap Studio (Validated in Phase 07: Quote, CRM Integration & Share/Download)
+- [x] **RCOL-09**: Per-panel colour assignment wired into quote breakdown (canvas segmentation deferred to future phase)
+- [x] **QUOTE-01 (wrap)**: Customer can open a quote request modal with colour selection pre-filled
+- [x] **QUOTE-02 (wrap)**: Quote form captures name, car, WhatsApp/phone, notes
+- [x] **QUOTE-03 (wrap)**: Submission creates lead in KV store with colour selection and panel breakdown
+- [x] **QUOTE-04 (wrap)**: Telegram notification fires to M&C group with colour selection and customer details
+- [x] **QUOTE-05 (wrap)**: Customer sees confirmation toast after successful submission
+- [x] **SHARE-01**: Customer can download watermarked PNG (M&C branding applied client-side)
+- [x] **SHARE-02**: Customer can generate shareable link that reopens studio with colour selection pre-loaded
+
 ### Admin CRM
 - [x] **CRM-01**: M&C team can view all leads in a pipeline with stage tracking
 - [x] **CRM-02**: Admin can manage leads, jobs, clients, calendar, and settings from mobile CRM
@@ -104,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 — Milestone v1.1 started*
+*Last updated: 2026-06-11 — Phase 07 complete (Quote, CRM Integration & Share/Download)*
