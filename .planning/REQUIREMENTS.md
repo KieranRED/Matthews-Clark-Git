@@ -40,9 +40,9 @@ Ship a public-facing wrap visualisation tool at /wrap-studio where customers upl
 
 ### GPT-Image-2 Studio Render
 - [ ] **RENDER-01**: Customer can trigger a "Studio Render" which calls `/api/wrap-render`
-- [ ] **RENDER-02**: The render endpoint sends the pre-coloured car composite (canvas output) to GPT-Image-2 — colour and finish are already applied; GPT's job is scene integration only
-- [ ] **RENDER-03**: GPT prompt is finish-aware — specifies gloss/matte/chrome/etc. so GPT preserves the material character while blending the car into the studio scene
-- [ ] **RENDER-04**: Render composites the car into the M&C studio bay background (studio lighting scene)
+- [x] **RENDER-02**: The render endpoint sends the pre-coloured car composite (canvas output) to GPT-Image-2 — colour and finish are already applied; GPT's job is scene integration only
+- [x] **RENDER-03**: GPT prompt is finish-aware — specifies gloss/matte/chrome/etc. so GPT preserves the material character while blending the car into the studio scene
+- [x] **RENDER-04**: Render composites the car into the M&C studio bay background (studio lighting scene)
 - [ ] **RENDER-05**: Customer sees a progress indicator during render (~10–20s)
 - [ ] **RENDER-06**: Rendered result replaces the fast preview on the stage; before/after slider compares original car vs studio render
 
