@@ -81,6 +81,8 @@
     const [baActive, setBaActive] = useState(false);
     const [rendering, setRendering] = useState(false);
     const [renderPct, setRenderPct] = useState(0);
+    const [renderUrl, setRenderUrl] = useState(null);
+    const [sessionRenderCount, setSessionRenderCount] = useState(0);
     const [compareOpen, setCompareOpen] = useState(false);
     const [quoteOpen, setQuoteOpen] = useState(false);
     const [toast, setToast] = useState(null);
@@ -134,18 +136,46 @@
       });
     }, [flash]);
 
-    const startRender = useCallback(() => {
+    const startRender = useCallback(async () => {
+      if (!carUrl) { flash('Upload your car photo first'); return; }
+      if (sessionRenderCount >= 3) { flash('Too many renders — try again shortly'); return; }
+      if (typeof window.__wrapRenderCanvas !== 'function') { flash('Render not ready yet'); return; }
+
       setRendering(true); setRenderPct(0);
-      const dur = Math.max(4, t.renderSeconds || 14) * 1000;
-      const t0 = performance.now();
+      const CREEP = 45000; const t0 = performance.now(); let raf;
       const tick = (now) => {
-        const p = Math.min(100, ((now - t0) / dur) * 100);
+        const p = Math.min(90, ((now - t0) / CREEP) * 90);
         setRenderPct(p);
-        if (p < 100) requestAnimationFrame(tick);
-        else setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 250);
+        if (p < 90) raf = requestAnimationFrame(tick);
       };
-      requestAnimationFrame(tick);
-    }, [t.renderSeconds, flash]);
+      raf = requestAnimationFrame(tick);
+
+      try {
+        const blob = await window.__wrapRenderCanvas();
+        if (!blob) throw new Error('canvas-null');
+        const fd = new FormData();
+        fd.append('image', blob, 'composite.png');
+        fd.append('finish', (sel && sel.finish) || 'gloss');
+        fd.append('colourName', (sel && sel.name) || 'wrap');
+
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 55000);
+        const resp = await fetch('/api/wrap-render', { method: 'POST', body: fd, signal: ctrl.signal });
+        clearTimeout(to);
+        cancelAnimationFrame(raf); setRenderPct(100);
+
+        if (resp.status === 429) { setRendering(false); setRenderPct(0); flash('Too many renders — try again shortly'); return; }
+        if (!resp.ok) throw new Error('api-' + resp.status);
+
+        const data = await resp.json();
+        setRenderUrl(data.renderUrl);
+        setSessionRenderCount((c) => c + 1);
+        setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 300);
+      } catch (err) {
+        cancelAnimationFrame(raf); setRendering(false); setRenderPct(0);
+        flash(err && err.name === 'AbortError' ? 'Render failed — try again' : 'Render failed — try again');
+      }
+    }, [carUrl, sel, flash, sessionRenderCount]);
 
     const finishLabel = sel ? ((window.FINISHES.find((f) => f.key === sel.finish) || {}).label || '') : '';
     const brandShort = sel ? (sel.brand === 'Avery Dennison' ? 'AVERY' : sel.brand.toUpperCase()) : '';
@@ -164,7 +194,7 @@
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
             try { localStorage.removeItem(LS); } catch {}
             setCarUrl(null); setOriginalUrl(null); setSelectedId(null); setPanelColors({}); setActivePanel('full');
-            setFavs({}); setPins([]); setBg('studio'); setLight('studio');
+            setFavs({}); setPins([]); setBg('studio'); setLight('studio'); setRenderUrl(null);
             flash('Session reset');
           }}, h(I.Refresh, { size: 14 }), 'Reset'),
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
@@ -195,7 +225,7 @@
           swatch: sel, carUrl, setCarUrl, originalUrl, setOriginalUrl, bg, setBg, light, setLight, mode, setMode,
           rendering, renderPct, startRender, baActive, setBaActive,
           panels: PANELS, panelColors, activePanel, setActivePanel,
-          showLabels: t.panelMode, finishLabel, brandShort, demo: isDemo,
+          showLabels: t.panelMode, finishLabel, brandShort, demo: isDemo, renderUrl,
         }),
         h(window.CataloguePanel, {
           query, setQuery, brandTab, setBrandTab, finish, setFinish, favOnly, setFavOnly,
