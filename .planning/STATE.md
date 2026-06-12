@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: 2
 status: executing
-stopped_at: Completed 08-02-PLAN.md — ready for 08-03
-last_updated: "2026-06-12T16:39:40.576Z"
+stopped_at: Completed 08-03-PLAN.md — ready for 08-04
+last_updated: "2026-06-12T16:44:59.420Z"
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Project State
@@ -18,7 +18,7 @@ progress:
 ## Current Position
 
 Phase: 08 (gpt-image-2-studio-render) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 
 - **Phase:** 08
 - **Current Plan:** 2
@@ -49,6 +49,8 @@ Plan: 3 of 4
 - [Phase 07-quote-crm-share]: base64url encoding for ?s= share param — safe for URL embedding without percent-encoding
 - [Phase 08-gpt-image-2-studio-render]: model is gpt-image-1 (exact string) — images.edit() not images.generate()
 - [Phase 08-gpt-image-2-studio-render]: Rate cap is per-IP daily via kvIncr+kvExpire(90000s) — KV failure is non-fatal
+- [Phase 08]: renderUrl is separate state from displayUrl/carUrl — CSS preview untouched on failure, never overwritten
+- [Phase 08]: Client session render cap of 3 (sessionRenderCount) as first-line defence before per-IP KV cap
 
 ## Performance Metrics
 
@@ -63,8 +65,9 @@ Plan: 3 of 4
 | Phase 07-quote-crm-share P03 | 10min | 2 tasks | 2 files |
 | 08-gpt-image-2-studio-render | 01 | 10min | 3 | 5 |
 | Phase 08-gpt-image-2-studio-render P02 | 5min | 1 tasks | 1 files |
+| Phase 08 P03 | 8min | 2 tasks | 2 files |
 
 ## Session
 
-- **Last session:** 2026-06-12T16:39:40.573Z
-- **Stopped at:** Completed 08-02-PLAN.md — ready for 08-03
+- **Last session:** 2026-06-12T16:44:59.417Z
+- **Stopped at:** Completed 08-03-PLAN.md — ready for 08-04

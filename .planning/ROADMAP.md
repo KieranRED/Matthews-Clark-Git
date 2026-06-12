@@ -32,7 +32,7 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Wave 0 infra: install openai, OPENAI_API_KEY, kvExpire helper, studio bay asset
 - [x] 08-02-PLAN.md — /api/wrap-render route: gpt-image-1 images.edit + per-IP rate limit (RENDER-02/03/04)
-- [ ] 08-03-PLAN.md — Canvas helper + renderUrl state + real startRender fetch + BA slider (RENDER-01/05/06)
+- [x] 08-03-PLAN.md — Canvas helper + renderUrl state + real startRender fetch + BA slider (RENDER-01/05/06)
 - [ ] 08-04-PLAN.md — Human-verify live studio render end-to-end (RENDER-04/06)
 
 | Plan | Name | Status | Plans | Summaries |
