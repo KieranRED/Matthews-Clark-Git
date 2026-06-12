@@ -299,12 +299,13 @@
         });
         if (setOriginalUrl) setOriginalUrl(origDataUrl);
 
-        // Send to server-side bg removal API
-        const fd = new FormData();
-        fd.append('image', file, file.name || 'photo.jpg');
-        const resp = await fetch('/api/wrap-remove-bg', { method: 'POST', body: fd });
-        if (!resp.ok) throw new Error(`Server error ${resp.status}`);
-        const resultBlob = await resp.blob();
+        // Dynamic import via new Function bypasses Babel's import() transformation.
+        // Browser caches the module after first load so subsequent calls are instant.
+        // esm.sh rewrites bare specifiers (lodash, etc.) so the package works as a browser ESM.
+        // esm.sh rewrites bare specifiers; publicPath uses package default (staticimgly.com CDN).
+        const CDN = 'https://esm.sh/@imgly/background-removal@1.4.5';
+        const { removeBackground } = await new Function('u', 'return import(u)')(CDN);
+        const resultBlob = await removeBackground(file, { device: 'gpu' });
 
         // Convert result blob to dataURL for masking + storage
         const cutoutDataUrl = await new Promise((res, rej) => {
@@ -362,8 +363,10 @@
     // Always mask to the original cutout (carUrl) — even when showing recolouredUrl
     const maskStyle = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
 
-    // Finish overlay layers — used for ALL finishes on top of the canvas-recoloured car
-    const fxLayers = (carUrl && fx) ? [
+    // Finish overlay layers — used for ALL finishes on top of the canvas-recoloured car.
+    // Skipped when a studio render is showing: the render is a finished full-scene
+    // photograph, so silhouette-masked sheen layers would misalign on top of it.
+    const fxLayers = (carUrl && fx && !props.renderUrl) ? [
       h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, opacity: fx.tone.opacity, background: '#000' } }),
       h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...fx.tint } }),
       h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, opacity: fx.sheen.opacity,
@@ -403,24 +406,116 @@
       return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
     }, [displayUrl]);
 
-    // Expose canvas PNG blob for studio render upload — captures CSS-composite (recolouredUrl||carUrl)
-    // at capture time renderUrl is null so displayUrl === recolouredUrl||carUrl, which is correct
+    // Expose composite + mask + colour-reference for the studio render upload.
+    // - composite: car pre-placed in the studio bay with a drawn contact shadow,
+    //   so gpt-image-2 receives a fully positioned scene, not a floating car.
+    // - mask: alpha mask, transparent ONLY over the (dilated) car silhouette and a
+    //   reflection band beneath it — the bay itself is locked from edits.
+    // - swatch: small solid PNG of the exact wrap colour, sent as a reference image.
+    // IMPORTANT: composites from the ORIGINAL cutout (carUrl), NOT the canvas
+    // recolour — the recolour is patchy on hard photos and destroys the identity
+    // cues (grille, badges, trim) the model needs to keep it the same car. The
+    // wrap colour is communicated via the swatch reference + exact hex in the
+    // prompt instead. Never composites renderUrl — a finished render must not
+    // feed back into the next composite as the "car".
     useEffect(() => {
+      const srcUrl = carUrl;
       window.__wrapRenderCanvas = async () => {
-        if (!displayUrl) return null;
+        if (!srcUrl) return null;
         try {
-          const img = new Image();
-          img.src = displayUrl;
-          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+          const loadImg = (src) => new Promise((res, rej) => {
+            const i = new Image(); i.crossOrigin = 'anonymous';
+            i.onload = () => res(i); i.onerror = rej; i.src = src;
+          });
+          const [carImg, bayImg] = await Promise.all([
+            loadImg(srcUrl),
+            loadImg('/wrap-studio/studio-bay.PNG'),
+          ]);
+
+          // Output matches GPT request size: 1536×1024
+          const W = 1536, H = 1024;
           const cv = document.createElement('canvas');
-          cv.width = img.naturalWidth || 1200;
-          cv.height = img.naturalHeight || 800;
-          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-          return await new Promise((res) => cv.toBlob(res, 'image/png'));
+          cv.width = W; cv.height = H;
+          const ctx = cv.getContext('2d');
+
+          // Studio bay — scale to cover canvas, center
+          const bayScale = Math.max(W / bayImg.naturalWidth, H / bayImg.naturalHeight);
+          const bayW = bayImg.naturalWidth * bayScale;
+          const bayH = bayImg.naturalHeight * bayScale;
+          ctx.drawImage(bayImg, (W - bayW) / 2, (H - bayH) / 2, bayW, bayH);
+
+          // Car — 65% canvas width, seated on the floor
+          const carScale = (W * 0.65) / carImg.naturalWidth;
+          const carW = carImg.naturalWidth * carScale;
+          const carH = carImg.naturalHeight * carScale;
+          const carX = (W - carW) / 2;
+          const carY = H - carH - 56;
+
+          // Soft contact shadow under the car — anchors it to the floor and gives
+          // the model an existing shadow to refine rather than invent
+          ctx.save();
+          ctx.filter = 'blur(18px)';
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
+          ctx.beginPath();
+          ctx.ellipse(W / 2, carY + carH - 6, carW * 0.46, carH * 0.07, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.drawImage(carImg, carX, carY, carW, carH);
+
+          // ── Edit mask: opaque = locked, transparent = model may edit ──
+          // Editable region = car silhouette dilated ~10px + reflection zone below.
+          const mk = document.createElement('canvas');
+          mk.width = W; mk.height = H;
+          const mctx = mk.getContext('2d');
+          mctx.fillStyle = '#000';
+          mctx.fillRect(0, 0, W, H);
+          mctx.globalCompositeOperation = 'destination-out';
+          mctx.filter = 'blur(4px)';
+          // dilate by stamping the silhouette at 8 offsets (only alpha matters here)
+          // — kept tight (6px) so the blend seam around the car stays invisible
+          for (let a = 0; a < 8; a++) {
+            const dx = Math.cos(a * Math.PI / 4) * 6, dy = Math.sin(a * Math.PI / 4) * 6;
+            mctx.drawImage(carImg, carX + dx, carY + dy, carW, carH);
+          }
+          mctx.drawImage(carImg, carX, carY, carW, carH);
+          // shadow + floor-reflection zone under the car
+          mctx.filter = 'blur(14px)';
+          mctx.beginPath();
+          mctx.ellipse(W / 2, carY + carH - 6, carW * 0.55, carH * 0.30, 0, 0, Math.PI * 2);
+          mctx.fill();
+          mctx.filter = 'none';
+          mctx.globalCompositeOperation = 'source-over';
+
+          // ── Exact-colour reference swatch ──
+          let swatchBlob = null;
+          if (swatch && swatch.hex) {
+            const sc = document.createElement('canvas');
+            sc.width = 512; sc.height = 512;
+            const sctx = sc.getContext('2d');
+            if (swatch.hex2) {
+              const g = sctx.createLinearGradient(0, 0, 512, 512);
+              g.addColorStop(0, swatch.hex); g.addColorStop(1, swatch.hex2);
+              sctx.fillStyle = g;
+            } else {
+              sctx.fillStyle = swatch.hex;
+            }
+            sctx.fillRect(0, 0, 512, 512);
+            swatchBlob = await new Promise((res) => sc.toBlob(res, 'image/png'));
+          }
+
+          const toBlob = (c) => new Promise((res) => c.toBlob(res, 'image/png'));
+          return {
+            blob: await toBlob(cv),
+            maskBlob: await toBlob(mk),
+            swatchBlob,
+            compositeUrl: cv.toDataURL('image/png'),
+            maskUrl: mk.toDataURL('image/png'),
+          };
         } catch { return null; }
       };
       return () => { if (window.__wrapRenderCanvas) delete window.__wrapRenderCanvas; };
-    }, [displayUrl]);
+    }, [carUrl, swatch ? swatch.id : null]);
 
     const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
 
@@ -444,7 +539,10 @@
 
         // car staging — WRAPPED side (left of slider), clipped at car-wrap level
         demo ? demoScene : h('div', { className: 'car-wrap', style: baActive ? wrapClip : {} },
-          h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
+          props.renderUrl
+            // Studio render — full-scene photograph, shown full-bleed
+            ? h('img', { className: 'render-scene', src: props.renderUrl, alt: 'Studio render', draggable: 'false' })
+            : h('div', { className: 'car-box', 'data-colored': colored ? '1' : '0' },
             carUrl
               ? h(React.Fragment, null,
                   h('img', { className: 'car-base', src: displayUrl, alt: 'Your car', draggable: 'false' }),
@@ -480,14 +578,21 @@
             h('div', { className: 'knob' }, h(I.Split, { size: 20 })))
         ) : null,
 
-        // bg removal progress overlay
-        removing ? h('div', { className: 'render-veil on' },
+        // bg removal progress overlay — stays visible on error so the user can see what went wrong
+        (removing || removeError) ? h('div', { className: 'render-veil on' },
           h('div', { className: 'render-card' },
             h('div', { className: 'rk' }, 'Background Removal'),
-            h('h3', null, 'Removing background…'),
-            h('p', null, 'This takes 5–15 seconds.'),
-            h('div', { className: 'removal-bar' }, h('div', { className: 'removal-bar-sweep' })),
-            removeError ? h('p', { style: { color: '#ff6b6b', marginTop: 8, fontSize: 12 } }, removeError) : null)) : null,
+            removeError
+              ? h('h3', { style: { color: '#ff6b6b' } }, 'Background removal failed')
+              : h('h3', null, 'Removing background…'),
+            removeError
+              ? h('p', null, removeError)
+              : h('p', null, 'This takes 5–15 seconds.'),
+            !removeError ? h('div', { className: 'removal-bar' }, h('div', { className: 'removal-bar-sweep' })) : null,
+            removeError ? h('button', {
+              style: { marginTop: 12, padding: '8px 20px', background: '#ff6b6b', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 },
+              onClick: () => setRemoveError(null)
+            }, 'Dismiss') : null)) : null,
 
         // drop veil
         h('div', { className: 'drop-veil' }, h(I.Upload, { size: 22, style: { marginRight: 10 } }), 'Drop to place your car'),
@@ -497,7 +602,7 @@
           h('div', { className: 'render-card' },
             h('div', { className: 'rk' }, 'Studio Render'),
             h('h3', null, 'Rendering studio shot…'),
-            h('p', null, 'Compositing into the M&C studio bay — usually 15–30 seconds.'),
+            h('p', null, 'Compositing into the M&C studio bay — usually 1–2 minutes for full quality.'),
             h('div', { className: 'render-bar' }, h('i', { style: { width: renderPct + '%' } })),
             h('div', { className: 'render-pct' }, Math.round(renderPct) + '%'))),
 
@@ -559,6 +664,38 @@
 
   window.WrapStage = Stage;
   window.fxFor = fxFor;
+
+  // ── Exact-background guarantee ─────────────────────────────────────────────
+  // gpt-image-2 honours the edit mask well, but to make the studio bay
+  // pixel-perfect we re-composite: original bay everywhere the mask is opaque,
+  // model output only inside the editable (car + reflection) region. Soft mask
+  // edges blend the two seamlessly.
+  window.__wrapFinaliseRender = async (renderUrl, compositeUrl, maskUrl) => {
+    try {
+      const loadImg = (src) => new Promise((res, rej) => {
+        const i = new Image(); i.crossOrigin = 'anonymous';
+        i.onload = () => res(i); i.onerror = rej; i.src = src;
+      });
+      const [render, composite, mask] = await Promise.all([
+        loadImg(renderUrl), loadImg(compositeUrl), loadImg(maskUrl),
+      ]);
+      const W = 1536, H = 1024;
+      // restrict the model's output to the editable region
+      const top = document.createElement('canvas');
+      top.width = W; top.height = H;
+      const tctx = top.getContext('2d');
+      tctx.drawImage(render, 0, 0, W, H);
+      tctx.globalCompositeOperation = 'destination-out';
+      tctx.drawImage(mask, 0, 0, W, H); // removes output wherever the mask is opaque (locked)
+      // exact bay + pre-composited car underneath
+      const out = document.createElement('canvas');
+      out.width = W; out.height = H;
+      const octx = out.getContext('2d');
+      octx.drawImage(composite, 0, 0, W, H);
+      octx.drawImage(top, 0, 0);
+      return out.toDataURL('image/png');
+    } catch { return null; }
+  };
 
   // hex -> HSL (for deciding chromatic vs achromatic recolour in demo mode)
   function hexHsl(hex) {

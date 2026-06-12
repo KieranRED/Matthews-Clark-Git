@@ -160,6 +160,9 @@ input{font:inherit}
 /* base photo (real upload) */
 .car-base{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1}
 
+/* finished studio render — full-scene photograph, fills the stage */
+.render-scene{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
+
 /* recolour layers (masked to the car png) */
 .car-fx{position:absolute;inset:0;z-index:2;pointer-events:none;
   -webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;

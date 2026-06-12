@@ -138,11 +138,12 @@
 
     const startRender = useCallback(async () => {
       if (!carUrl) { flash('Upload your car photo first'); return; }
-      if (sessionRenderCount >= 3) { flash('Too many renders — try again shortly'); return; }
+      // session cap disabled — re-enable before public launch
+      // if (sessionRenderCount >= 3) { flash('Too many renders — try again shortly'); return; }
       if (typeof window.__wrapRenderCanvas !== 'function') { flash('Render not ready yet'); return; }
 
       setRendering(true); setRenderPct(0);
-      const CREEP = 45000; const t0 = performance.now(); let raf;
+      const CREEP = 110000; const t0 = performance.now(); let raf;  // gpt-image-2 quality:high takes 60-120s
       const tick = (now) => {
         const p = Math.min(90, ((now - t0) / CREEP) * 90);
         setRenderPct(p);
@@ -151,31 +152,46 @@
       raf = requestAnimationFrame(tick);
 
       try {
-        const blob = await window.__wrapRenderCanvas();
-        if (!blob) throw new Error('canvas-null');
+        const pack = await window.__wrapRenderCanvas();
+        if (!pack || !pack.blob) throw new Error('canvas-null');
         const fd = new FormData();
-        fd.append('image', blob, 'composite.png');
+        // The mask is NOT sent to the API — a masked edit regenerates the car blind
+        // and substitutes a different vehicle. It is only used client-side after the
+        // render to re-composite the exact studio bay around the car.
+        fd.append('image', pack.blob, 'composite.png');
+        if (pack.swatchBlob) fd.append('swatch', pack.swatchBlob, 'swatch.png');
         fd.append('finish', (sel && sel.finish) || 'gloss');
         fd.append('colourName', (sel && sel.name) || 'wrap');
+        fd.append('colourHex', (sel && sel.hex) || '');
 
         const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), 55000);
+        const to = setTimeout(() => ctrl.abort(), 170000);
         const resp = await fetch('/api/wrap-render', { method: 'POST', body: fd, signal: ctrl.signal });
         clearTimeout(to);
         cancelAnimationFrame(raf); setRenderPct(100);
 
         if (resp.status === 429) { setRendering(false); setRenderPct(0); flash('Too many renders — try again shortly'); return; }
-        if (!resp.ok) throw new Error('api-' + resp.status);
-
         const data = await resp.json();
-        setRenderUrl(data.renderUrl);
+        if (!resp.ok) throw new Error(data.detail || 'api-' + resp.status);
+
+        // Lock the studio bay: re-composite original background outside the edit mask
+        let finalUrl = data.renderUrl;
+        if (typeof window.__wrapFinaliseRender === 'function' && pack.compositeUrl && pack.maskUrl) {
+          const composed = await window.__wrapFinaliseRender(data.renderUrl, pack.compositeUrl, pack.maskUrl);
+          if (composed) finalUrl = composed;
+        }
+        setRenderUrl(finalUrl);
         setSessionRenderCount((c) => c + 1);
         setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 300);
       } catch (err) {
         cancelAnimationFrame(raf); setRendering(false); setRenderPct(0);
-        flash(err && err.name === 'AbortError' ? 'Render failed — try again' : 'Render failed — try again');
+        flash(err && err.name === 'AbortError' ? 'Render timed out — try again' : (err.message || 'Render failed — try again'));
       }
     }, [carUrl, sel, flash, sessionRenderCount]);
+
+    // A studio render belongs to one photo + colour combination — clear it the
+    // moment either changes so a stale render never masks the live preview
+    useEffect(() => { setRenderUrl(null); }, [carUrl, selectedId]);
 
     const finishLabel = sel ? ((window.FINISHES.find((f) => f.key === sel.finish) || {}).label || '') : '';
     const brandShort = sel ? (sel.brand === 'Avery Dennison' ? 'AVERY' : sel.brand.toUpperCase()) : '';
