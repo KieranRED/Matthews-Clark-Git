@@ -1,10 +1,10 @@
-/* Wrap Studio — Catalogue panel: search · brand tabs · finish filter · grid · detail · quote */
+/* Wrap Studio — Film library: search · brand tabs · finish filter · grid · specimen · quote */
 (function () {
   const { useMemo } = React;
   const h = React.createElement;
   const I = window.Icon;
 
-  // mini chip preview for a swatch (gloss sweep / matte / chrome bands)
+  // finish-true chip preview (gloss sweep / matte / chrome bands / shift gradient)
   function chipInner(sw) {
     if (sw.finish === 'chrome') {
       return h('span', { className: 'chrome', style: { '--c1': sw.hex, '--c2': sw.hex2 || sw.hex } });
@@ -39,7 +39,7 @@
   function CataloguePanel(props) {
     const { query, setQuery, brandTab, setBrandTab, finish, setFinish, favOnly, setFavOnly,
             selectedId, onSelect, favs, toggleFav, pins, togglePin, openCompare,
-            panelColors, activePanel, panels, onQuote, placement } = props;
+            panelColors, activePanel, panels, onQuote } = props;
 
     const all = window.WRAP_CATALOGUE;
     const filtered = useMemo(() => {
@@ -54,19 +54,18 @@
     }, [all, brandTab, finish, favOnly, query, favs]);
 
     const sel = selectedId ? all.find((s) => s.id === selectedId) : null;
-    const finishLabel = (k) => (window.FINISHES.find((f) => f.key === k) || {}).label || k;
 
     // assigned panels (used for quote footer display)
     const assigned = Object.values(panelColors).map((id) => all.find((s) => s.id === id)).filter(Boolean);
-
     const activePanelLabel = (panels.find((p) => p.key === activePanel) || {}).label || 'Full body';
     const assignedCount = assigned.length;
 
-    return h('aside', { className: 'panel', 'data-screen-label': 'Catalogue panel' },
+    return h('aside', { className: 'panel' },
       // head + search
       h('div', { className: 'panel-head' },
+        h('div', { className: 'panel-kicker' }, 'Film library'),
         h('div', { className: 'panel-title' },
-          h('div', { className: 't' }, 'Colour & Material'),
+          h('div', { className: 't' }, 'Choose your film'),
           h('div', { className: 'ct' }, filtered.length + ' / ' + all.length)),
         h('div', { className: 'search' },
           h(I.Search, null),
@@ -74,7 +73,7 @@
             onChange: (e) => setQuery(e.target.value) }),
           query ? h('button', { className: 'clr', onClick: () => setQuery('') }, h(I.X, { size: 14 })) : null)),
 
-      // brand tabs
+      // brand segmented control
       h('div', { className: 'brand-tabs' },
         ['All'].concat(window.BRANDS).map((b) =>
           h('button', { key: b, className: brandTab === b ? 'on' : '', onClick: () => setBrandTab(b) },
@@ -88,7 +87,7 @@
           h('button', { key: f.key, className: 'fchip' + (finish === f.key ? ' on' : ''),
             onClick: () => setFinish(f.key) }, f.label)),
         h('button', { className: 'fchip' + (favOnly ? ' on' : ''), onClick: () => setFavOnly(!favOnly) },
-          '♥ Favourites')),
+          '♥ Saved')),
 
       // grid
       h('div', { className: 'cat-scroll' },
@@ -98,9 +97,29 @@
                 fav: !!favs[sw.id], onSelect, onFav: toggleFav })))
           : h('div', { className: 'cat-empty' }, 'No films match. Try another brand or finish.')),
 
-      // pins + detail + quote (stacked footer)
-      h('div', { style: { display: placement === 'bottom' ? 'none' : 'block' } },
-        // pins
+      // specimen detail + compare + quote
+      h('div', { className: 'panel-foot' },
+        sel ? h('div', { className: 'detail show' },
+          h('div', { className: 'd-top' },
+            h('div', { className: 'd-chip', style: { background: chipBg(sel) } }, chipInner(sel)),
+            h('div', { style: { minWidth: 0, flex: 1 } },
+              h('div', { className: 'd-name' }, sel.name),
+              h('div', { className: 'd-series' }, sel.brand + ' · ' + sel.series + ' · ' + sel.code),
+              h('div', { className: 'd-actions' },
+                h('button', { className: 'btn btn--sm btn--ghost', onClick: () => toggleFav(sel) },
+                  h(I.Heart, { size: 12, fill: favs[sel.id] ? 'currentColor' : 'none' }), favs[sel.id] ? 'Saved' : 'Save'),
+                h('button', { className: 'btn btn--sm btn--ghost', onClick: () => togglePin(sel),
+                  disabled: !pins.includes(sel.id) && pins.filter(Boolean).length >= 4 },
+                  h(I.Plus, { size: 12 }), pins.includes(sel.id) ? 'Pinned' : 'Pin')))),
+          h('div', { className: 'd-specs' },
+            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Thickness'), h('div', { className: 'v' }, sel.thickness)),
+            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Conform.'), h('div', { className: 'v' }, sel.conform)),
+            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Warranty'), h('div', { className: 'v' }, sel.warranty))),
+          sel.proTip ? h('div', { className: 'd-tip' },
+            h(I.Info, { size: 15 }),
+            h('p', null, h('b', null, 'Pro tip: '), sel.proTip)) : null) : null,
+
+        // compare pins
         h('div', { className: 'pins' },
           h('span', { className: 'pl' }, 'Compare'),
           h('div', { className: 'pin-list' },
@@ -116,40 +135,17 @@
             style: pins.filter(Boolean).length < 2 ? { opacity: .4, cursor: 'default' } : null,
             onClick: openCompare }, h(I.Compare, { size: 13 }), 'View 2×2')),
 
-        // detail
-        sel ? h('div', { className: 'detail show' },
-          h('div', { className: 'd-top' },
-            h('div', { className: 'd-chip', style: { background: chipBg(sel) } }, chipInner(sel)),
-            h('div', { style: { minWidth: 0 } },
-              h('div', { className: 'd-name' }, sel.name),
-              h('div', { className: 'd-series' }, sel.brand + ' · ' + sel.series + ' · ' + sel.code),
-              h('div', { style: { marginTop: 8, display: 'flex', gap: 6 } },
-                h('button', { className: 'btn btn--sm btn--ghost', onClick: () => toggleFav(sel) },
-                  h(I.Heart, { size: 12, fill: favs[sel.id] ? 'currentColor' : 'none' }), favs[sel.id] ? 'Saved' : 'Favourite'),
-                h('button', { className: 'btn btn--sm btn--ghost', onClick: () => togglePin(sel),
-                  disabled: !pins.includes(sel.id) && pins.filter(Boolean).length >= 4 },
-                  h(I.Plus, { size: 12 }), pins.includes(sel.id) ? 'Pinned' : 'Pin')))),
-          h('div', { className: 'd-specs' },
-            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Thickness'), h('div', { className: 'v' }, sel.thickness)),
-            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Conform.'), h('div', { className: 'v' }, sel.conform)),
-            h('div', { className: 'd-spec' }, h('div', { className: 'k' }, 'Warranty'), h('div', { className: 'v' }, sel.warranty))),
-          sel.proTip ? h('div', { className: 'd-tip' },
-            h(I.Info, { size: 15 }),
-            h('p', null, h('b', null, 'Pro tip — '), sel.proTip)) : null)
-          : null),
-
-      // quote footer
-      h('div', { className: 'quote' },
-        h('div', { className: 'quote-row' },
-          h('div', { className: 'quote-sel' },
-            h('div', { className: 'ql' }, assignedCount > 1 ? assignedCount + ' panels assigned' : 'Applying to'),
-            h('div', { className: 'qv' },
-              sel ? h('span', { className: 'swdot', style: { background: chipBg(sel) } }) : null,
-              sel ? sel.name : 'Pick a colour',
-              h('span', { style: { color: 'rgba(255,255,255,.45)', fontWeight: 400, fontSize: 12 } }, ' · ' + activePanelLabel))),
-        ),
-        h('button', { className: 'btn btn--primary', disabled: !sel, style: !sel ? { opacity: .5 } : null, onClick: onQuote },
-          h(I.Send, { size: 15 }), 'Get a quote for this wrap')));
+        // quote footer
+        h('div', { className: 'quote' },
+          h('div', { className: 'quote-row' },
+            h('div', { className: 'quote-sel' },
+              h('div', { className: 'ql' }, assignedCount > 1 ? assignedCount + ' panels assigned' : 'Applying to'),
+              h('div', { className: 'qv' },
+                sel ? h('span', { className: 'swdot', style: { background: chipBg(sel) } }) : null,
+                sel ? sel.name : 'Pick a film',
+                h('span', { className: 'pn' }, ' · ' + activePanelLabel)))),
+          h('button', { className: 'btn btn--primary', disabled: !sel, onClick: onQuote },
+            h(I.Send, { size: 15 }), 'Get a quote for this wrap'))));
   }
 
   window.CataloguePanel = CataloguePanel;

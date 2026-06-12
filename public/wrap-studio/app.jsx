@@ -1,4 +1,4 @@
-/* Wrap Studio — App: layout, state, persistence, compare + quote, tweaks */
+/* Wrap Studio — App: layout, state, persistence, journey, compare + quote */
 (function () {
   const { useState, useEffect, useRef, useCallback } = React;
   const h = React.createElement;
@@ -31,39 +31,9 @@
   })();
   const sharedColors = shareParam ? decodeSelection(shareParam) : null;
 
-  // ===========================================================================
-  //  DEMO ONLY — REMOVE BEFORE PRODUCTION
-  //  ---------------------------------------------------------------------------
-  //  This stock Toyota GR86 photo (with its own waterfront background) is bundled
-  //  purely so the studio shows a real car on first load. It is NOT a Matthews &
-  //  Clark asset and must not ship. To remove for production:
-  //    1. delete wrap-studio/_DEMO-car-REMOVE-BEFORE-PROD.png
-  //    2. set DEMO_CAR_SRC = null below
-  //  With DEMO_CAR_SRC = null the tool falls back to the "Drop your car photo"
-  //  empty state and the proper background-removed-PNG masking pipeline.
-  //  (Because this demo photo keeps its background, it is recoloured with hue/
-  //   colour blend modes over the whole frame — see demoFx() in stage.jsx —
-  //   rather than the production silhouette mask.)
-  // ===========================================================================
-  const DEMO_CAR_SRC = null;
-
-  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-    "placement": "right",
-    "accent": "#1F4FFF",
-    "defaultFinish": "all",
-    "panelMode": true,
-    "renderSeconds": 14
-  }/*EDITMODE-END*/;
-
   function App() {
-    const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
-
-    const [carUrl, setCarUrl] = useState(saved.carUrl != null ? saved.carUrl : DEMO_CAR_SRC);
+    const [carUrl, setCarUrl] = useState(saved.carUrl || null);
     const [originalUrl, setOriginalUrl] = useState(saved.originalUrl || null);
-    // Bundled demo photo carries its own background, so it composites best in the
-    // "My background" scene rather than the studio bay. A real (uploaded) car uses
-    // the studio pipeline. isDemo also flips the recolour engine to full-frame mode.
-    const isDemo = DEMO_CAR_SRC !== null && carUrl === DEMO_CAR_SRC;
     const [selectedId, setSelectedId] = useState(
       sharedColors ? (sharedColors.full || Object.values(sharedColors)[0] || null) : (saved.selectedId || null)
     );
@@ -71,13 +41,10 @@
     const [activePanel, setActivePanel] = useState(saved.activePanel || 'full');
     const [query, setQuery] = useState('');
     const [brandTab, setBrandTab] = useState('All');
-    const [finish, setFinish] = useState(t.defaultFinish || 'all');
+    const [finish, setFinish] = useState('all');
     const [favOnly, setFavOnly] = useState(false);
     const [favs, setFavs] = useState(saved.favs || {});
     const [pins, setPins] = useState(saved.pins || []);
-    const [bg, setBg] = useState(saved.bg || 'studio');
-    const [light, setLight] = useState(saved.light || 'studio');
-    const [mode, setMode] = useState('fast');
     const [baActive, setBaActive] = useState(false);
     const [rendering, setRendering] = useState(false);
     const [renderPct, setRenderPct] = useState(0);
@@ -85,28 +52,23 @@
     const [sessionRenderCount, setSessionRenderCount] = useState(0);
     const [compareOpen, setCompareOpen] = useState(false);
     const [quoteOpen, setQuoteOpen] = useState(false);
+    const [quoteSent, setQuoteSent] = useState(false);
     const [toast, setToast] = useState(null);
     const toastT = useRef(null);
 
     const all = window.WRAP_CATALOGUE;
     const sel = selectedId ? all.find((s) => s.id === selectedId) : null;
 
-    // apply accent tweak to CSS
-    useEffect(() => {
-      document.documentElement.style.setProperty('--accent', t.accent);
-    }, [t.accent]);
-    useEffect(() => { setFinish(t.defaultFinish || 'all'); }, [t.defaultFinish]);
-
     // persist
     useEffect(() => {
-      const data = { carUrl, originalUrl, selectedId, panelColors, activePanel, favs, pins, bg, light };
+      const data = { carUrl, originalUrl, selectedId, panelColors, activePanel, favs, pins };
       try { localStorage.setItem(LS, JSON.stringify(data)); } catch (e) {
         // Quota exceeded — save without large dataURLs
         if (e instanceof DOMException) {
           try { localStorage.setItem(LS, JSON.stringify({...data, carUrl: null, originalUrl: null})); } catch {}
         }
       }
-    }, [carUrl, selectedId, panelColors, activePanel, favs, pins, bg, light]);
+    }, [carUrl, selectedId, panelColors, activePanel, favs, pins]);
 
     const flash = useCallback((msg) => {
       setToast(msg); clearTimeout(toastT.current);
@@ -154,10 +116,10 @@
       try {
         const pack = await window.__wrapRenderCanvas();
         if (!pack || !pack.blob) throw new Error('canvas-null');
-        const fd = new FormData();
         // The mask is NOT sent to the API — a masked edit regenerates the car blind
         // and substitutes a different vehicle. It is only used client-side after the
         // render to re-composite the exact studio bay around the car.
+        const fd = new FormData();
         fd.append('image', pack.blob, 'composite.png');
         if (pack.swatchBlob) fd.append('swatch', pack.swatchBlob, 'swatch.png');
         fd.append('finish', (sel && sel.finish) || 'gloss');
@@ -196,21 +158,35 @@
     const finishLabel = sel ? ((window.FINISHES.find((f) => f.key === sel.finish) || {}).label || '') : '';
     const brandShort = sel ? (sel.brand === 'Avery Dennison' ? 'AVERY' : sel.brand.toUpperCase()) : '';
 
-    const wsClass = 'workspace workspace--' + (t.placement || 'right');
+    // journey: car → film → render → quote
+    const steps = [
+      { k: 'car', label: 'Car', done: !!carUrl },
+      { k: 'film', label: 'Film', done: !!sel },
+      { k: 'render', label: 'Render', done: !!renderUrl },
+      { k: 'quote', label: 'Quote', done: quoteSent },
+    ];
+    const nowIdx = steps.findIndex((s) => !s.done);
 
     return h('div', { className: 'app' },
-      // ── top bar (website floating-nav language) ──
+      // ── top bar ──
       h('header', { className: 'topbar' },
         h('div', { className: 'tb-brand' },
           h('div', { className: 'tb-wm' }, 'MATTHEWS', h('span', { className: 'sl' }, '/'), 'CLARK'),
-          h('div', { className: 'tb-tool' }, 'Wrap Visualisation Studio')),
-        h('div', { className: 'tb-spacer' }),
-        h('div', { className: 'tb-spacer' }),
+          h('div', { className: 'tb-tool' }, 'Wrap Studio')),
+
+        // journey rail
+        h('div', { className: 'journey' },
+          steps.map((s, i) => h(React.Fragment, { key: s.k },
+            i > 0 ? h('span', { className: 'j-sep' + (steps[i - 1].done ? ' done' : '') }) : null,
+            h('span', { className: 'j-step' + (s.done ? ' done' : i === nowIdx ? ' now' : '') },
+              h('span', { className: 'n' }, s.done ? '✓' : String(i + 1).padStart(2, '0').slice(1)),
+              s.label)))),
+
         h('div', { className: 'tb-actions' },
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
             try { localStorage.removeItem(LS); } catch {}
             setCarUrl(null); setOriginalUrl(null); setSelectedId(null); setPanelColors({}); setActivePanel('full');
-            setFavs({}); setPins([]); setBg('studio'); setLight('studio'); setRenderUrl(null);
+            setFavs({}); setPins([]); setRenderUrl(null); setQuoteSent(false);
             flash('Session reset');
           }}, h(I.Refresh, { size: 14 }), 'Reset'),
           h('button', { className: 'btn btn--ghost btn--sm', onClick: () => {
@@ -236,75 +212,58 @@
             'Send to M&C', h('span', { className: 'arr' }, h(I.Send, { size: 13 }))))),
 
       // ── workspace ──
-      h('div', { className: wsClass },
+      h('div', { className: 'workspace' },
         h(window.WrapStage, {
-          swatch: sel, carUrl, setCarUrl, originalUrl, setOriginalUrl, bg, setBg, light, setLight, mode, setMode,
+          swatch: sel, carUrl, setCarUrl, originalUrl, setOriginalUrl,
           rendering, renderPct, startRender, baActive, setBaActive,
           panels: PANELS, panelColors, activePanel, setActivePanel,
-          showLabels: t.panelMode, finishLabel, brandShort, demo: isDemo, renderUrl,
+          finishLabel, brandShort, renderUrl,
         }),
         h(window.CataloguePanel, {
           query, setQuery, brandTab, setBrandTab, finish, setFinish, favOnly, setFavOnly,
           selectedId, onSelect, favs, toggleFav, pins, togglePin,
           openCompare: () => setCompareOpen(true), panelColors, activePanel, panels: PANELS,
-          onQuote: () => setQuoteOpen(true), placement: t.placement,
+          onQuote: () => setQuoteOpen(true),
         })),
 
-      compareOpen ? h(CompareModal, { pins, carUrl, light, onClose: () => setCompareOpen(false), onPick: (sw) => { onSelect(sw); setCompareOpen(false); } }) : null,
+      compareOpen ? h(CompareModal, { pins, carUrl, onClose: () => setCompareOpen(false), onPick: (sw) => { onSelect(sw); setCompareOpen(false); } }) : null,
       quoteOpen ? h(QuoteModal, { sel, panelColors, panels: PANELS, carUrl,
         onClose: () => setQuoteOpen(false),
         onSent: (ok, msg) => {
-          if (ok) { setQuoteOpen(false); flash('Sent to Matthews & Clark — we\'ll come back fast'); }
+          if (ok) { setQuoteOpen(false); setQuoteSent(true); flash('Sent to Matthews & Clark — we\'ll come back fast'); }
           else { flash(msg || 'Could not send — try again'); }
         } }) : null,
 
       // toast
-      h('div', { className: 'toast' + (toast ? ' show' : '') }, toast ? h(I.Check, { size: 16 }) : null, toast || ''),
-
-      // ── tweaks ──
-      h(window.TweaksPanel, null,
-        h(window.TweakSection, { label: 'Layout' }),
-        h(window.TweakRadio, { label: 'Catalogue', value: t.placement, options: ['right', 'left', 'bottom'],
-          onChange: (v) => setTweak('placement', v) }),
-        h(window.TweakToggle, { label: 'Multi-colour panels', value: t.panelMode, onChange: (v) => setTweak('panelMode', v) }),
-        h(window.TweakSection, { label: 'Catalogue' }),
-        h(window.TweakSelect, { label: 'Default finish', value: t.defaultFinish,
-          options: ['all'].concat(window.FINISHES.map((f) => f.key)), onChange: (v) => setTweak('defaultFinish', v) }),
-        h(window.TweakSection, { label: 'Brand & render' }),
-        h(window.TweakColor, { label: 'Accent', value: t.accent,
-          options: ['#1F4FFF', '#4A78FF', '#E7E9EC', '#2F9E5B'], onChange: (v) => setTweak('accent', v) }),
-        h(window.TweakSlider, { label: 'Studio render time', value: t.renderSeconds, min: 4, max: 25, unit: 's',
-          onChange: (v) => setTweak('renderSeconds', v) })));
+      h('div', { className: 'toast' + (toast ? ' show' : '') }, toast ? h(I.Check, { size: 16 }) : null, toast || ''));
   }
 
-  // ── 2×2 comparison ──
-  function CompareModal({ pins, carUrl, light, onClose, onPick }) {
+  // ── 2×2 comparison — each cell staged in the real bay ──
+  function CompareModal({ pins, carUrl, onClose, onPick }) {
     const all = window.WRAP_CATALOGUE;
     const items = pins.filter(Boolean).map((id) => all.find((s) => s.id === id)).filter(Boolean);
     return h('div', { className: 'modal-veil', onClick: onClose },
       h('div', { className: 'modal modal--cmp', onClick: (e) => e.stopPropagation() },
         h('div', { className: 'modal-head' },
-          h('div', null, h('div', { className: 'm-eyebrow' }, 'Comparison'), h('h3', null, 'Your car in ' + items.length + ' finishes')),
+          h('div', null, h('div', { className: 'm-eyebrow' }, 'Comparison'), h('h3', null, 'Your car in ' + items.length + ' films')),
           h('button', { className: 'pill-btn', onClick: onClose }, h(I.X, { size: 16 }))),
         h('div', { className: 'cmp-grid' },
-          items.map((sw) => h(CompareCell, { key: sw.id, sw, carUrl, light, onPick })))));
+          items.map((sw) => h(CompareCell, { key: sw.id, sw, carUrl, onPick })))));
   }
-  function CompareCell({ sw, carUrl, light, onPick }) {
+  function CompareCell({ sw, carUrl, onPick }) {
     const fx = window.fxFor(sw);
     const mask = carUrl ? { WebkitMaskImage: `url(${carUrl})`, maskImage: `url(${carUrl})` } : null;
-    return h('button', { className: 'cmp-cell', 'data-light': light, onClick: () => onPick(sw),
+    return h('button', { className: 'cmp-cell', onClick: () => onPick(sw),
       style: { '--wrap-color': sw.hex } },
       h('div', { className: 'cmp-stage' },
-        h('div', { className: 'bay-floor' }),
-        h('div', { className: 'car-box', 'data-colored': '1', style: { position: 'relative', width: '88%', aspectRatio: '16/10', margin: 'auto' } },
+        h('div', { className: 'car-box' },
           carUrl
             ? h(React.Fragment, null,
                 h('img', { className: 'car-base', src: carUrl, alt: '' }),
                 h('div', { className: 'car-fx car-tone', style: { ...mask, opacity: fx.tone.opacity, background: '#000' } }),
                 h('div', { className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...mask, ...fx.tint } }),
                 h('div', { className: 'car-fx car-sheen', style: { ...mask, opacity: fx.sheen.opacity, background: 'linear-gradient(118deg,rgba(255,255,255,.9),transparent 26%,transparent 72%,rgba(255,255,255,.4))' } }))
-            : h('div', { className: 'car-ph' },
-                h('div', { className: 'ph-color ' + (fx.anim || ''), style: { background: fx.tint.background, opacity: .9 } })))),
+            : h('div', { style: { position: 'absolute', inset: '20% 10%', borderRadius: 12, background: fx.tint.background, opacity: .85 } }))),
       h('div', { className: 'cmp-meta' },
         h('div', { className: 'cmp-dot', style: { background: window.swChipBg(sw) } }),
         h('div', { style: { minWidth: 0 } },
@@ -320,7 +279,6 @@
     const list = assigned.length ? assigned : (sel ? [{ p: panels[0], sw: sel }] : []);
     const rank = { standard: 0, premium: 1, specialist: 2 };
     const top = list.reduce((t, x) => rank[x.sw.tier] > rank[t] ? x.sw.tier : t, 'standard');
-    const tier = window.TIER_LABEL[top];
     const priceTier = top;
     const [name, setName] = useState('');
     const [car, setCar] = useState('');
@@ -367,7 +325,7 @@
               h('span', { className: 'ql-panel' }, p.label),
               h('span', { className: 'ql-name' }, sw.name),
               h('span', { className: 'ql-code' }, sw.code))) : h('div', { className: 'q-line' }, 'No colour selected yet.'),
-            h('div', { className: 'q-note' }, "We'll confirm availability and come back with a fixed price — usually same day.")),
+            h('div', { className: 'q-note' }, "We'll confirm availability and come back with a fixed price, usually same day.")),
           h('div', { className: 'q-form' },
             h('label', null, 'Name', h('input', { value: name, onChange: (e) => setName(e.target.value), placeholder: 'First & last' })),
             h('label', null, 'Car', h('input', { value: car, onChange: (e) => setCar(e.target.value), placeholder: 'e.g. 2024 BMW M3 Competition' })),
