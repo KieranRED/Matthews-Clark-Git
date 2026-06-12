@@ -257,7 +257,7 @@
   function Stage(props) {
     const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, bg, light, mode, setMode, rendering, renderPct,
             startRender, baActive, setBaActive, panels, panelColors, activePanel, setActivePanel,
-            showLabels, finishLabel, brandShort, demo } = props;
+            showLabels, finishLabel, brandShort, demo, renderUrl } = props;
     const stageRef = useRef(null);
     const fileRef = useRef(null);
     const [baPos, setBaPos] = useState(58);
@@ -370,8 +370,8 @@
         background: 'linear-gradient(118deg, rgba(255,255,255,.9) 0%, transparent 26%, transparent 72%, rgba(255,255,255,.4) 100%)' } }),
     ] : null;
 
-    // The displayed car: recolouredUrl (canvas engine) or carUrl (base/chrome/shift)
-    const displayUrl = recolouredUrl || carUrl;
+    // The displayed car: renderUrl (studio render) > recolouredUrl (canvas engine) > carUrl (base/chrome/shift)
+    const displayUrl = props.renderUrl || recolouredUrl || carUrl;
 
     useEffect(() => {
       window.__wrapDownload = async () => {
@@ -401,6 +401,25 @@
         return true;
       };
       return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
+    }, [displayUrl]);
+
+    // Expose canvas PNG blob for studio render upload — captures CSS-composite (recolouredUrl||carUrl)
+    // at capture time renderUrl is null so displayUrl === recolouredUrl||carUrl, which is correct
+    useEffect(() => {
+      window.__wrapRenderCanvas = async () => {
+        if (!displayUrl) return null;
+        try {
+          const img = new Image();
+          img.src = displayUrl;
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+          const cv = document.createElement('canvas');
+          cv.width = img.naturalWidth || 1200;
+          cv.height = img.naturalHeight || 800;
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          return await new Promise((res) => cv.toBlob(res, 'image/png'));
+        } catch { return null; }
+      };
+      return () => { if (window.__wrapRenderCanvas) delete window.__wrapRenderCanvas; };
     }, [displayUrl]);
 
     const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
@@ -452,9 +471,9 @@
         h('div', { className: 'light-overlay' }),
 
         // before/after
-        baActive && colored ? h(React.Fragment, null,
-          h('div', { className: 'ba-tag after' }, 'Wrapped'),
-          h('div', { className: 'ba-tag before' }, 'No wrap'),
+        baActive && (colored || props.renderUrl) ? h(React.Fragment, null,
+          h('div', { className: 'ba-tag after' }, props.renderUrl ? 'Studio Render' : 'Wrapped'),
+          h('div', { className: 'ba-tag before' }, props.renderUrl ? 'Original' : 'No wrap'),
           h('div', { className: 'ba-divider', style: { left: baPos + '%' },
             onMouseDown: (e) => { e.stopPropagation(); dragRef.current = true; },
             onTouchStart: (e) => { e.stopPropagation(); dragRef.current = true; } },
@@ -477,10 +496,10 @@
         h('div', { className: 'render-veil' + (rendering ? ' on' : '') },
           h('div', { className: 'render-card' },
             h('div', { className: 'rk' }, 'Studio Render'),
-            h('h3', null, 'Compositing your wrap'),
-            h('p', null, 'Re-lighting the paint, reflections and material depth.'),
+            h('h3', null, 'Rendering studio shot…'),
+            h('p', null, 'Compositing into the M&C studio bay — usually 15–30 seconds.'),
             h('div', { className: 'render-bar' }, h('i', { style: { width: renderPct + '%' } })),
-            h('div', { className: 'render-pct' }, Math.round(renderPct) + '%  ·  ~12s'))),
+            h('div', { className: 'render-pct' }, Math.round(renderPct) + '%'))),
 
         // ── HUD ──
         h('div', { className: 'stage-hud' },
