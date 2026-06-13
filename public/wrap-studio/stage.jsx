@@ -302,17 +302,42 @@
         // Dynamic import via new Function bypasses Babel's import() transformation.
         // Browser caches the module after first load so subsequent calls are instant.
         // Two CDNs: esm.sh primary, jsdelivr fallback (either can flake per-network).
-        const CDNS = [
+        const MODULE_CDNS = [
           'https://esm.sh/@imgly/background-removal@1.4.5',
           'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm',
         ];
         let mod = null, lastErr = null;
-        for (const u of CDNS) {
+        for (const u of MODULE_CDNS) {
           try { mod = await new Function('u', 'return import(u)')(u); break; }
           catch (e) { lastErr = e; }
         }
-        if (!mod) throw lastErr || new Error('Could not load background removal');
-        const resultBlob = await mod.removeBackground(file, { device: 'gpu' });
+        if (!mod) throw new Error('Could not load the background-removal tool. Check your connection and try again.');
+
+        // The library downloads a multi-MB model the first time. On a flaky
+        // connection that fetch fails with a bare "Failed to fetch" and the whole
+        // call rejects — so we pin the model host explicitly and retry across a
+        // fallback host (jsdelivr 403s the binary data package; unpkg serves it)
+        // and across GPU→CPU (WebGPU is unavailable in some browsers).
+        // staticimgly is the library default and the most reliable; unpkg backs it up.
+        const DATA_CDNS = [
+          'https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/',
+          'https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/',
+        ];
+        let resultBlob = null;
+        lastErr = null;
+        for (const publicPath of DATA_CDNS) {
+          for (const device of ['gpu', 'cpu']) {
+            try { resultBlob = await mod.removeBackground(file, { publicPath, device }); break; }
+            catch (e) { lastErr = e; }
+          }
+          if (resultBlob) break;
+        }
+        if (!resultBlob) {
+          const m = (lastErr && (lastErr.message || String(lastErr))) || '';
+          throw new Error(/fetch|network|load/i.test(m)
+            ? 'Could not download the cutout model — check your connection and try again.'
+            : (m || 'Background removal failed'));
+        }
 
         // Convert result blob to dataURL for masking + storage
         const cutoutDataUrl = await new Promise((res, rej) => {
