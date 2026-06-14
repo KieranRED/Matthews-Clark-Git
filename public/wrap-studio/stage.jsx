@@ -257,7 +257,7 @@
   function Stage(props) {
     const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, rendering, renderPct,
             startRender, baActive, setBaActive, panels, panelColors, activePanel, setActivePanel,
-            finishLabel, brandShort, renderUrl } = props;
+            finishLabel, brandShort, renderUrl, rendersLeft, renderCap } = props;
     const stageRef = useRef(null);
     const fileRef = useRef(null);
     const [baPos, setBaPos] = useState(58);
@@ -444,19 +444,18 @@
       return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
     }, [displayUrl]);
 
-    // Expose the inputs for the studio render. The car is the fixed anchor; the
-    // model builds our studio AROUND it. We send three images:
-    //  - photo: the ORIGINAL, un-cut customer photo (downscaled). Sending the full
-    //    photo — not the background-removed cutout — is what keeps thin parts like
-    //    rear wings, spoilers and aerials intact (the cutout often clips them), and
-    //    gives gpt-image-2 the real car to preserve at its exact angle/position.
-    //  - bay: the M&C studio bay as a REFERENCE the model rebuilds around the car,
-    //    re-projected to the car's perspective with matching floor/shadows/lighting.
-    //  - swatch: a solid PNG of the exact wrap colour.
-    // No edit mask and no client re-composite: a masked edit regenerates the car
-    // blind (swaps the vehicle), and locking a fixed bay would prevent the
-    // perspective/shadow matching we want. `size` tracks the photo's aspect so the
-    // car is never stretched.
+    // Expose the composite for the studio render. We REFRAME the car onto the bay
+    // at a believable scale (≈70% of frame, seated low with room around it) so the
+    // model has space to rebuild a real room — otherwise a tight phone photo fills
+    // the frame and the car looks massive / "flopped on" with no studio around it.
+    //  - The car comes from the ORIGINAL photo (not the cutout) so thin parts like
+    //    rear wings/spoilers/aerials and the car's identity stay intact.
+    //  - Its outer border is feathered so the original surroundings dissolve into
+    //    our bay, leaving the car (centre) sharp — no hard rectangle seam.
+    //  - A contact shadow is pre-drawn to anchor it.
+    // The model then relights, matches perspective, and blends it into one photo.
+    // swatch = solid PNG of the exact wrap colour. No edit mask (a masked edit
+    // regenerates the car blind and swaps the vehicle).
     useEffect(() => {
       const photoSrc = originalUrl || carUrl;
       window.__wrapRenderCanvas = async () => {
@@ -471,24 +470,48 @@
             loadImg('/wrap-studio/studio-bay.PNG'),
           ]);
 
-          // Downscale to keep uploads fast without losing the detail the model needs
-          const scaleToBlob = (img, maxEdge, type, q) => {
-            const s = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
-            const w = Math.max(1, Math.round(img.naturalWidth * s));
-            const hh = Math.max(1, Math.round(img.naturalHeight * s));
-            const c = document.createElement('canvas'); c.width = w; c.height = hh;
-            c.getContext('2d').drawImage(img, 0, 0, w, hh);
-            return new Promise((res) => c.toBlob(res, type, q));
-          };
+          // Landscape canvas — a car in a room reads wide
+          const W = 1536, H = 1024;
+          const cv = document.createElement('canvas');
+          cv.width = W; cv.height = H;
+          const ctx = cv.getContext('2d');
 
-          const photoBlob = await scaleToBlob(photo, 1536, 'image/jpeg', 0.92);
-          const bayBlob = await scaleToBlob(bay, 1024, 'image/jpeg', 0.9);
+          // Studio backdrop: our actual bay, covering the frame
+          const bs = Math.max(W / bay.naturalWidth, H / bay.naturalHeight);
+          ctx.drawImage(bay, (W - bay.naturalWidth * bs) / 2, (H - bay.naturalHeight * bs) / 2,
+            bay.naturalWidth * bs, bay.naturalHeight * bs);
 
-          // Output size tracks the photo's aspect so the car isn't stretched
-          const ar = photo.naturalWidth / photo.naturalHeight;
-          let size = '1024x1024';
-          if (ar >= 1.2) size = '1536x1024';
-          else if (ar <= 0.83) size = '1024x1536';
+          // Car photo scaled to sit IN the scene (not fill it), seated low-centre
+          const fit = Math.min((W * 0.72) / photo.naturalWidth, (H * 0.80) / photo.naturalHeight);
+          const pw = Math.max(1, Math.round(photo.naturalWidth * fit));
+          const ph = Math.max(1, Math.round(photo.naturalHeight * fit));
+          const px = Math.round((W - pw) / 2);
+          const py = Math.round(H * 0.93 - ph);
+
+          // Feather the photo's outer border so its original background melts into
+          // the bay, keeping the car (and wing) sharp in the centre
+          const o = document.createElement('canvas');
+          o.width = pw; o.height = ph;
+          const octx = o.getContext('2d');
+          octx.drawImage(photo, 0, 0, pw, ph);
+          octx.globalCompositeOperation = 'destination-in';
+          const m = Math.round(Math.min(pw, ph) * 0.10);
+          octx.filter = `blur(${Math.max(1, Math.round(m * 0.8))}px)`;
+          octx.fillStyle = '#fff';
+          octx.fillRect(m, m, pw - 2 * m, ph - 2 * m);
+          octx.filter = 'none';
+          octx.globalCompositeOperation = 'source-over';
+
+          // Pre-drawn contact shadow to anchor the car to the floor
+          ctx.save();
+          ctx.filter = 'blur(16px)';
+          ctx.fillStyle = 'rgba(0,0,0,0.4)';
+          ctx.beginPath();
+          ctx.ellipse(W / 2, py + ph * 0.95, pw * 0.40, ph * 0.05, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.drawImage(o, px, py);
 
           // Exact-colour reference swatch
           let swatchBlob = null;
@@ -507,7 +530,8 @@
             swatchBlob = await new Promise((res) => sc.toBlob(res, 'image/png'));
           }
 
-          return { photoBlob, bayBlob, swatchBlob, size };
+          const photoBlob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.92));
+          return { photoBlob, swatchBlob, size: '1536x1024' };
         } catch { return null; }
       };
       return () => { if (window.__wrapRenderCanvas) delete window.__wrapRenderCanvas; };
@@ -603,10 +627,21 @@
                   cs ? h('span', { className: 'sw', style: { background: cs.hex } }) : null, p.label);
               }))) : null,
 
-          // top-right: the one primary stage action
+          // top-right: the one primary stage action — the deliberate AI step.
+          // The instant colour preview (left/auto) is free; THIS generates the
+          // photoreal render and uses one of the visitor's daily allowance.
           carUrl ? h('div', { className: 'hud-tr' },
-            h('button', { className: 'render-cta', disabled: rendering, onClick: startRender },
-              h(I.Sparkle, { size: 15 }), renderUrl ? 'Re-render studio shot' : 'Studio render')) : null,
+            h('div', { className: 'render-stack' },
+              h('button', { className: 'render-cta', disabled: rendering || rendersLeft === 0,
+                onClick: startRender, title: 'Generate a photoreal AI render in the M&C studio' },
+                h(I.Sparkle, { size: 16 }),
+                rendering ? 'Generating…' : (renderUrl ? 'Generate again' : 'Generate studio render')),
+              h('div', { className: 'render-note' },
+                rendersLeft === 0
+                  ? 'Daily limit reached — resets tomorrow'
+                  : (typeof rendersLeft === 'number'
+                      ? `Photoreal AI · ${rendersLeft} of ${renderCap || 3} left today · ~2 min`
+                      : `Photoreal AI · ${renderCap || 3} free per day · ~2 min`)))) : null,
 
           // bottom-left: film caption
           carUrl ? h('div', { className: 'hud-bl' },

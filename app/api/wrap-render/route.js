@@ -1,33 +1,70 @@
 import { OpenAI, toFile } from 'openai';
+import { NextResponse } from 'next/server';
 import { hasKv, kvGet, kvIncr, kvExpire } from '@/lib/kv';
 
 export const runtime = 'nodejs';        // required — OpenAI SDK uses Node APIs
 export const maxDuration = 300;         // gpt-image-2 high-quality edit can take 120-180s
 
-const DAILY_CAP = 10;                   // per IP per day
+const DAILY_CAP = 3;                    // AI studio renders per visitor per day
+const DAY_SECONDS = 86400;
+const COOKIE = 'mc_wrap_id';
+
+// ── visitor identity + daily cap ───────────────────────────────────────────
+// Anonymous tool, so the strongest *practical* cap keys on IP AND a persistent
+// cookie together (whichever is higher wins). This stops casual repeat use and
+// protects spend. It is NOT VPN-proof — only login/accounts can truly guarantee
+// a per-person cap; this is the best available without auth.
+function dayStamp() { return new Date().toISOString().slice(0, 10); }
+function clientIp(request) {
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) return xff.split(',')[0].trim();
+  return request.headers.get('x-real-ip') || 'local';
+}
+function newId() {
+  const r = globalThis.crypto && globalThis.crypto.randomUUID ? globalThis.crypto.randomUUID() : (Date.now() + '' + Math.random());
+  return r.replace(/[^a-z0-9]/gi, '').slice(0, 32);
+}
+async function readUsed(ip, cid) {
+  if (!hasKv()) return { used: 0, enforced: false };
+  const day = dayStamp();
+  const [a, b] = await Promise.all([
+    kvGet(`wrapr:ip:${ip}:${day}`).catch(() => 0),
+    cid ? kvGet(`wrapr:cid:${cid}:${day}`).catch(() => 0) : Promise.resolve(0),
+  ]);
+  return { used: Math.max(Number(a) || 0, Number(b) || 0), enforced: true };
+}
+async function bumpUsed(ip, cid) {
+  if (!hasKv()) return 0;
+  const day = dayStamp();
+  const kIp = `wrapr:ip:${ip}:${day}`, kCid = `wrapr:cid:${cid}:${day}`;
+  const [ni, nc] = await Promise.all([ kvIncr(kIp), cid ? kvIncr(kCid) : Promise.resolve(0) ]);
+  if (Number(ni) === 1) kvExpire(kIp, DAY_SECONDS).catch(() => {});
+  if (cid && Number(nc) === 1) kvExpire(kCid, DAY_SECONDS).catch(() => {});
+  return Math.max(Number(ni) || 0, Number(nc) || 0);
+}
+function withCookie(res, cid, setCookie) {
+  if (setCookie) res.cookies.set(COOKIE, cid, { httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 365, path: '/' });
+  return res;
+}
+
+// GET — report the visitor's remaining renders (and seed the cookie)
+export async function GET(request) {
+  const ip = clientIp(request);
+  let cid = request.cookies.get(COOKIE)?.value;
+  const setCookie = !cid; if (!cid) cid = newId();
+  const { used, enforced } = await readUsed(ip, cid);
+  return withCookie(NextResponse.json({
+    ok: true, cap: DAILY_CAP, remaining: enforced ? Math.max(0, DAILY_CAP - used) : DAILY_CAP, enforced,
+  }), cid, setCookie);
+}
 
 export async function POST(request) {
-  // Rate limiting disabled — re-enable before public launch
-
-  // 1. Parse multipart body
+  // Parse multipart body
   let formData;
   try { formData = await request.formData(); }
   catch { return Response.json({ ok: false, error: 'invalid' }, { status: 400 }); }
 
-  // Render strategy (the car is the fixed anchor; the model builds our studio
-  // around it):
-  //  - image[0] is the ORIGINAL, un-cut customer photo. Sending the full photo —
-  //    not a background-removed cutout — keeps thin parts like rear wings and
-  //    spoilers intact and gives the model the real car to preserve at its exact
-  //    angle. No edit mask: a masked region is regenerated blind and the model
-  //    swaps the vehicle (verified: BMW M3 in → Supra/Golf out).
-  //  - image[1] is the M&C studio bay, a reference the model rebuilds AROUND the
-  //    car — re-projected to the car's perspective, with matching floor, shadows
-  //    and lighting. We deliberately do NOT pixel-lock the bay: matching its
-  //    perspective to the car is the whole point.
-  //  - image[2] is a solid sample of the exact wrap colour.
-  const imageFile = formData.get('image');       // original customer photo (downscaled)
-  const bayFile = formData.get('bay');           // studio bay reference image
+  const imageFile = formData.get('image');       // 1536×1024 composite: car reframed into the M&C bay
   const swatchFile = formData.get('swatch');     // solid-colour reference of the exact wrap colour
   const finish = String(formData.get('finish') || 'gloss');
   const colourName = String(formData.get('colourName') || 'wrap');
@@ -38,17 +75,27 @@ export async function POST(request) {
     return Response.json({ ok: false, error: 'no_image' }, { status: 400 });
   }
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Identify visitor + enforce the daily cap BEFORE the expensive model call
+  const ip = clientIp(request);
+  let cid = request.cookies.get(COOKIE)?.value;
+  const setCookie = !cid; if (!cid) cid = newId();
+  const usage = await readUsed(ip, cid);
+  if (usage.enforced && usage.used >= DAILY_CAP) {
+    return withCookie(NextResponse.json(
+      { ok: false, error: 'rate_limited', cap: DAILY_CAP, remaining: 0 }, { status: 429 }), cid, setCookie);
+  }
 
-  const photo = await toFile(
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const composite = await toFile(
     Buffer.from(await imageFile.arrayBuffer()), 'car.jpg', { type: 'image/jpeg' });
-  const bay = (bayFile && typeof bayFile !== 'string')
-    ? await toFile(Buffer.from(await bayFile.arrayBuffer()), 'bay.jpg', { type: 'image/jpeg' })
-    : undefined;
   const swatch = (swatchFile && typeof swatchFile !== 'string')
     ? await toFile(Buffer.from(await swatchFile.arrayBuffer()), 'swatch.png', { type: 'image/png' })
     : undefined;
 
+  // The client sends image[0] = the customer car REFRAMED onto our bay at a
+  // believable scale (car ≈70% of frame, seated low, outer border feathered into
+  // the bay). The model keeps the car exactly, wraps it, then rebuilds the studio
+  // around it — relight, perspective, shadow, reflection — into one seamless photo.
   const finishDesc = {
     gloss: 'high-gloss vinyl wrap — deep wet-look shine, crisp soft-box reflections following the body lines',
     satin: 'satin vinyl wrap — smooth semi-sheen, soft diffused highlights, no mirror reflections',
@@ -63,39 +110,33 @@ export async function POST(request) {
 
   const colourClause = colourHex
     ? `The wrap colour is EXACTLY ${colourHex} ("${colourName}")` +
-      (swatch ? ', shown as a solid sample in the last reference image — match it precisely.' : '.')
+      (swatch ? ', shown as a solid sample in the second reference image — match it precisely.' : '.')
     : `The wrap is "${colourName}".`;
 
-  const bayClause = bay
-    ? `The SECOND image is the Matthews & Clark studio bay. Rebuild the car's entire surroundings as this exact studio.`
-    : `Place the car in a clean professional wrap-shop studio: mid-grey walls, a polished light-grey floor, soft overhead lighting.`;
-
-  const wrapClause = `Wrap every painted body panel (bonnet, roof, doors, wings, bumpers, boot, sills, mirror caps) in a ${finishDesc}. ` +
+  const wrapClause =
+    `Wrap every painted body panel (bonnet, roof, doors, wings, bumpers, boot, sills, mirror caps) in a ${finishDesc}. ` +
     `${colourClause} Coverage must be perfectly uniform across every panel. ` +
     `Leave the glass, lights, grille mesh, badges, number plate, tyres and wheels unwrapped.`;
 
   const prompt =
-    `Photorealistic automotive studio photograph. The FIRST image is a real customer's car — it is the fixed subject. ` +
-    `Do NOT move, rotate, rescale, reshape or restyle the car: keep its EXACT camera angle, position, proportions, stance, ` +
-    `ride height, wheel design, glass, headlights, grille, badges, number plate and every panel line, and keep ALL thin parts ` +
-    `(rear wing, spoiler, splitter, aerial, mirror arms) fully intact. It must stay instantly recognisable as the same vehicle. ` +
+    `Photorealistic automotive studio photograph. The image shows a real customer's car placed in the Matthews & Clark studio bay ` +
+    `at the correct size, angle and position. Keep the car EXACTLY as shown — do not move, rotate, rescale, reshape or restyle it; ` +
+    `preserve its make, model, body shape, proportions, stance, ride height, wheels, glass, headlights, grille, badges, number plate, ` +
+    `every panel line, and ALL thin parts (rear wing, spoiler, splitter, aerial, mirror arms). It must stay the same recognisable vehicle. ` +
     `${wrapClause} ` +
-    `${bayClause} Completely replace everything currently around the car — its original background, ground and surroundings — with this studio. ` +
-    `Make it one believable photograph: rebuild the floor and walls so their perspective and vanishing point match the car's camera angle; ` +
+    `Turn it into one seamless photograph: blend away any soft edge, halo or seam around the car so it sits naturally in the room; ` +
+    `rebuild the studio floor and walls so their perspective and vanishing point match the car's camera angle; ` +
     `relight the car so its highlights, reflections and shadow direction match the studio's overhead lighting and colour temperature; ` +
-    `cast a soft contact shadow under the tyres and a subtle reflection of the car on the polished floor. Sharp focus, no added text or watermarks.`;
-
-  const images = [photo];
-  if (bay) images.push(bay);
-  if (swatch) images.push(swatch);
+    `cast a soft contact shadow under the tyres and a subtle reflection of the car on the polished floor. ` +
+    `The car must sit at a natural scale within the studio, NOT fill the frame. Sharp focus, no added text or watermarks.`;
 
   let result;
   try {
     result = await client.images.edit({
       model: 'gpt-image-2',     // snapshot gpt-image-2-2026-04-21 — processes inputs at high fidelity automatically
-      image: images,            // [photo, bay?, swatch?] — photo is the edit base, others are references
+      image: swatch ? [composite, swatch] : composite,  // composite is the edit base; swatch is a colour reference
       prompt,
-      size,                     // tracks the photo's aspect so the car isn't stretched
+      size,
       quality: 'high',
       n: 1,
     });
@@ -103,10 +144,14 @@ export async function POST(request) {
     const msg = err?.message || String(err);
     const status = err?.status || err?.statusCode || '?';
     console.error('[wrap-render][openai-error]', status, msg, JSON.stringify(err?.error || ''));
-    return Response.json({ ok: false, error: 'api_error', detail: msg }, { status: 500 });
+    return withCookie(NextResponse.json({ ok: false, error: 'api_error', detail: msg }, { status: 500 }), cid, setCookie);
   }
 
-  // Return as data URL
+  // Count this successful render against the visitor's daily allowance
+  const used = await bumpUsed(ip, cid);
+  const remaining = usage.enforced ? Math.max(0, DAILY_CAP - used) : null;
+
   const b64 = result.data[0].b64_json;
-  return Response.json({ ok: true, renderUrl: `data:image/png;base64,${b64}` });
+  return withCookie(NextResponse.json(
+    { ok: true, renderUrl: `data:image/png;base64,${b64}`, cap: DAILY_CAP, remaining }), cid, setCookie);
 }

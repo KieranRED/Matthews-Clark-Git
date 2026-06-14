@@ -49,7 +49,8 @@
     const [rendering, setRendering] = useState(false);
     const [renderPct, setRenderPct] = useState(0);
     const [renderUrl, setRenderUrl] = useState(null);
-    const [sessionRenderCount, setSessionRenderCount] = useState(0);
+    const [rendersLeft, setRendersLeft] = useState(null);   // null until known
+    const RENDER_CAP = 3;
     const [compareOpen, setCompareOpen] = useState(false);
     const [quoteOpen, setQuoteOpen] = useState(false);
     const [quoteSent, setQuoteSent] = useState(false);
@@ -73,6 +74,15 @@
     const flash = useCallback((msg) => {
       setToast(msg); clearTimeout(toastT.current);
       toastT.current = setTimeout(() => setToast(null), 2200);
+    }, []);
+
+    // How many AI renders this visitor has left today (server-enforced)
+    useEffect(() => {
+      let alive = true;
+      fetch('/api/wrap-render', { method: 'GET' })
+        .then((r) => r.json()).then((d) => { if (alive && d && typeof d.remaining === 'number') setRendersLeft(d.remaining); })
+        .catch(() => {});
+      return () => { alive = false; };
     }, []);
 
     const onSelect = useCallback((sw) => {
@@ -100,8 +110,7 @@
 
     const startRender = useCallback(async () => {
       if (!carUrl) { flash('Upload your car photo first'); return; }
-      // session cap disabled — re-enable before public launch
-      // if (sessionRenderCount >= 3) { flash('Too many renders — try again shortly'); return; }
+      if (rendersLeft === 0) { flash('That\'s your 3 studio renders for today — they reset tomorrow'); return; }
       if (typeof window.__wrapRenderCanvas !== 'function') { flash('Render not ready yet'); return; }
 
       setRendering(true); setRenderPct(0);
@@ -122,7 +131,6 @@
         // shadows. No mask, no client re-composite.
         const fd = new FormData();
         fd.append('image', pack.photoBlob, 'car.jpg');
-        if (pack.bayBlob) fd.append('bay', pack.bayBlob, 'bay.jpg');
         if (pack.swatchBlob) fd.append('swatch', pack.swatchBlob, 'swatch.png');
         fd.append('finish', (sel && sel.finish) || 'gloss');
         fd.append('colourName', (sel && sel.name) || 'wrap');
@@ -135,18 +143,18 @@
         clearTimeout(to);
         cancelAnimationFrame(raf); setRenderPct(100);
 
-        if (resp.status === 429) { setRendering(false); setRenderPct(0); flash('Too many renders — try again shortly'); return; }
+        if (resp.status === 429) { setRendering(false); setRenderPct(0); setRendersLeft(0); flash('That\'s your 3 studio renders for today — they reset tomorrow'); return; }
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || 'api-' + resp.status);
 
         setRenderUrl(data.renderUrl);
-        setSessionRenderCount((c) => c + 1);
+        if (typeof data.remaining === 'number') setRendersLeft(data.remaining);
         setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 300);
       } catch (err) {
         cancelAnimationFrame(raf); setRendering(false); setRenderPct(0);
         flash(err && err.name === 'AbortError' ? 'Render timed out — try again' : (err.message || 'Render failed — try again'));
       }
-    }, [carUrl, sel, flash, sessionRenderCount]);
+    }, [carUrl, sel, flash, rendersLeft]);
 
     // A studio render belongs to one photo + colour combination — clear it the
     // moment either changes so a stale render never masks the live preview
@@ -214,7 +222,7 @@
           swatch: sel, carUrl, setCarUrl, originalUrl, setOriginalUrl,
           rendering, renderPct, startRender, baActive, setBaActive,
           panels: PANELS, panelColors, activePanel, setActivePanel,
-          finishLabel, brandShort, renderUrl,
+          finishLabel, brandShort, renderUrl, rendersLeft, renderCap: RENDER_CAP,
         }),
         h(window.CataloguePanel, {
           query, setQuery, brandTab, setBrandTab, finish, setFinish, favOnly, setFavOnly,
