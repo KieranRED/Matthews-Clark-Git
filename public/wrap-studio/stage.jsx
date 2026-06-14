@@ -255,7 +255,7 @@
   }
 
   function Stage(props) {
-    const { swatch, carUrl, setCarUrl, setOriginalUrl, rendering, renderPct,
+    const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, rendering, renderPct,
             startRender, baActive, setBaActive, panels, panelColors, activePanel, setActivePanel,
             finishLabel, brandShort, renderUrl } = props;
     const stageRef = useRef(null);
@@ -323,14 +323,23 @@
           'https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/',
           'https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/',
         ];
+        // model: 'isnet' is the full-precision general matte — noticeably better on
+        // thin structures (rear wings, spoilers, aerials) than the default quantised
+        // model. Fall back to the default model if that variant won't load.
         let resultBlob = null;
         lastErr = null;
+        outer:
         for (const publicPath of DATA_CDNS) {
           for (const device of ['gpu', 'cpu']) {
-            try { resultBlob = await mod.removeBackground(file, { publicPath, device }); break; }
-            catch (e) { lastErr = e; }
+            for (const model of ['isnet', undefined]) {
+              try {
+                const cfg = { publicPath, device };
+                if (model) cfg.model = model;
+                resultBlob = await mod.removeBackground(file, cfg);
+                break outer;
+              } catch (e) { lastErr = e; }
+            }
           }
-          if (resultBlob) break;
         }
         if (!resultBlob) {
           const m = (lastErr && (lastErr.message || String(lastErr))) || '';
@@ -435,89 +444,53 @@
       return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
     }, [displayUrl]);
 
-    // Expose composite + mask + colour-reference for the studio render upload.
-    // - composite: car pre-placed in the studio bay with a drawn contact shadow,
-    //   so gpt-image-2 receives a fully positioned scene, not a floating car.
-    // - mask: alpha mask, transparent ONLY over the (dilated) car silhouette and a
-    //   reflection band beneath it — used CLIENT-SIDE ONLY by __wrapFinaliseRender
-    //   (never sent to the API: masked API edits regenerate the car blind).
-    // - swatch: small solid PNG of the exact wrap colour, sent as a reference image.
-    // IMPORTANT: composites from the ORIGINAL cutout (carUrl), NOT the canvas
-    // recolour — the recolour is patchy on hard photos and destroys the identity
-    // cues (grille, badges, trim) the model needs to keep it the same car. The
-    // wrap colour is communicated via the swatch reference + exact hex in the
-    // prompt instead. Never composites renderUrl — a finished render must not
-    // feed back into the next composite as the "car".
+    // Expose the inputs for the studio render. The car is the fixed anchor; the
+    // model builds our studio AROUND it. We send three images:
+    //  - photo: the ORIGINAL, un-cut customer photo (downscaled). Sending the full
+    //    photo — not the background-removed cutout — is what keeps thin parts like
+    //    rear wings, spoilers and aerials intact (the cutout often clips them), and
+    //    gives gpt-image-2 the real car to preserve at its exact angle/position.
+    //  - bay: the M&C studio bay as a REFERENCE the model rebuilds around the car,
+    //    re-projected to the car's perspective with matching floor/shadows/lighting.
+    //  - swatch: a solid PNG of the exact wrap colour.
+    // No edit mask and no client re-composite: a masked edit regenerates the car
+    // blind (swaps the vehicle), and locking a fixed bay would prevent the
+    // perspective/shadow matching we want. `size` tracks the photo's aspect so the
+    // car is never stretched.
     useEffect(() => {
-      const srcUrl = carUrl;
+      const photoSrc = originalUrl || carUrl;
       window.__wrapRenderCanvas = async () => {
-        if (!srcUrl) return null;
+        if (!photoSrc) return null;
         try {
           const loadImg = (src) => new Promise((res, rej) => {
             const i = new Image(); i.crossOrigin = 'anonymous';
             i.onload = () => res(i); i.onerror = rej; i.src = src;
           });
-          const [carImg, bayImg] = await Promise.all([
-            loadImg(srcUrl),
+          const [photo, bay] = await Promise.all([
+            loadImg(photoSrc),
             loadImg('/wrap-studio/studio-bay.PNG'),
           ]);
 
-          // Output matches GPT request size: 1536×1024
-          const W = 1536, H = 1024;
-          const cv = document.createElement('canvas');
-          cv.width = W; cv.height = H;
-          const ctx = cv.getContext('2d');
+          // Downscale to keep uploads fast without losing the detail the model needs
+          const scaleToBlob = (img, maxEdge, type, q) => {
+            const s = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+            const w = Math.max(1, Math.round(img.naturalWidth * s));
+            const hh = Math.max(1, Math.round(img.naturalHeight * s));
+            const c = document.createElement('canvas'); c.width = w; c.height = hh;
+            c.getContext('2d').drawImage(img, 0, 0, w, hh);
+            return new Promise((res) => c.toBlob(res, type, q));
+          };
 
-          // Studio bay — scale to cover canvas, center
-          const bayScale = Math.max(W / bayImg.naturalWidth, H / bayImg.naturalHeight);
-          const bayW = bayImg.naturalWidth * bayScale;
-          const bayH = bayImg.naturalHeight * bayScale;
-          ctx.drawImage(bayImg, (W - bayW) / 2, (H - bayH) / 2, bayW, bayH);
+          const photoBlob = await scaleToBlob(photo, 1536, 'image/jpeg', 0.92);
+          const bayBlob = await scaleToBlob(bay, 1024, 'image/jpeg', 0.9);
 
-          // Car — 65% canvas width, seated on the floor
-          const carScale = (W * 0.65) / carImg.naturalWidth;
-          const carW = carImg.naturalWidth * carScale;
-          const carH = carImg.naturalHeight * carScale;
-          const carX = (W - carW) / 2;
-          const carY = H - carH - 56;
+          // Output size tracks the photo's aspect so the car isn't stretched
+          const ar = photo.naturalWidth / photo.naturalHeight;
+          let size = '1024x1024';
+          if (ar >= 1.2) size = '1536x1024';
+          else if (ar <= 0.83) size = '1024x1536';
 
-          // Soft contact shadow under the car — anchors it to the floor and gives
-          // the model an existing shadow to refine rather than invent
-          ctx.save();
-          ctx.filter = 'blur(18px)';
-          ctx.fillStyle = 'rgba(0,0,0,0.45)';
-          ctx.beginPath();
-          ctx.ellipse(W / 2, carY + carH - 6, carW * 0.46, carH * 0.07, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-
-          ctx.drawImage(carImg, carX, carY, carW, carH);
-
-          // ── Edit mask: opaque = locked, transparent = model may edit ──
-          // Editable region = car silhouette dilated ~6px + reflection zone below.
-          const mk = document.createElement('canvas');
-          mk.width = W; mk.height = H;
-          const mctx = mk.getContext('2d');
-          mctx.fillStyle = '#000';
-          mctx.fillRect(0, 0, W, H);
-          mctx.globalCompositeOperation = 'destination-out';
-          mctx.filter = 'blur(4px)';
-          // dilate by stamping the silhouette at 8 offsets (only alpha matters here)
-          // — kept tight (6px) so the blend seam around the car stays invisible
-          for (let a = 0; a < 8; a++) {
-            const dx = Math.cos(a * Math.PI / 4) * 6, dy = Math.sin(a * Math.PI / 4) * 6;
-            mctx.drawImage(carImg, carX + dx, carY + dy, carW, carH);
-          }
-          mctx.drawImage(carImg, carX, carY, carW, carH);
-          // shadow + floor-reflection zone under the car
-          mctx.filter = 'blur(14px)';
-          mctx.beginPath();
-          mctx.ellipse(W / 2, carY + carH - 6, carW * 0.55, carH * 0.30, 0, 0, Math.PI * 2);
-          mctx.fill();
-          mctx.filter = 'none';
-          mctx.globalCompositeOperation = 'source-over';
-
-          // ── Exact-colour reference swatch ──
+          // Exact-colour reference swatch
           let swatchBlob = null;
           if (swatch && swatch.hex) {
             const sc = document.createElement('canvas');
@@ -534,18 +507,11 @@
             swatchBlob = await new Promise((res) => sc.toBlob(res, 'image/png'));
           }
 
-          const toBlob = (c) => new Promise((res) => c.toBlob(res, 'image/png'));
-          return {
-            blob: await toBlob(cv),
-            maskBlob: await toBlob(mk),
-            swatchBlob,
-            compositeUrl: cv.toDataURL('image/png'),
-            maskUrl: mk.toDataURL('image/png'),
-          };
+          return { photoBlob, bayBlob, swatchBlob, size };
         } catch { return null; }
       };
       return () => { if (window.__wrapRenderCanvas) delete window.__wrapRenderCanvas; };
-    }, [carUrl, swatch ? swatch.id : null]);
+    }, [carUrl, originalUrl, swatch ? swatch.id : null]);
 
     const wrapColorVar = swatch ? swatch.hex : '#3a3d42';
 
@@ -670,36 +636,4 @@
   window.WrapStage = Stage;
   window.fxFor = fxFor;
   window.codeFor = codeFor;
-
-  // ── Exact-background guarantee ─────────────────────────────────────────────
-  // The model regenerates the whole frame, so to make the studio bay
-  // pixel-perfect we re-composite: original bay everywhere the mask is opaque,
-  // model output only inside the editable (car + reflection) region. Soft mask
-  // edges blend the two seamlessly.
-  window.__wrapFinaliseRender = async (renderUrl, compositeUrl, maskUrl) => {
-    try {
-      const loadImg = (src) => new Promise((res, rej) => {
-        const i = new Image(); i.crossOrigin = 'anonymous';
-        i.onload = () => res(i); i.onerror = rej; i.src = src;
-      });
-      const [render, composite, mask] = await Promise.all([
-        loadImg(renderUrl), loadImg(compositeUrl), loadImg(maskUrl),
-      ]);
-      const W = 1536, H = 1024;
-      // restrict the model's output to the editable region
-      const top = document.createElement('canvas');
-      top.width = W; top.height = H;
-      const tctx = top.getContext('2d');
-      tctx.drawImage(render, 0, 0, W, H);
-      tctx.globalCompositeOperation = 'destination-out';
-      tctx.drawImage(mask, 0, 0, W, H); // removes output wherever the mask is opaque (locked)
-      // exact bay + pre-composited car underneath
-      const out = document.createElement('canvas');
-      out.width = W; out.height = H;
-      const octx = out.getContext('2d');
-      octx.drawImage(composite, 0, 0, W, H);
-      octx.drawImage(top, 0, 0);
-      return out.toDataURL('image/png');
-    } catch { return null; }
-  };
 })();

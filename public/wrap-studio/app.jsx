@@ -105,7 +105,7 @@
       if (typeof window.__wrapRenderCanvas !== 'function') { flash('Render not ready yet'); return; }
 
       setRendering(true); setRenderPct(0);
-      const CREEP = 110000; const t0 = performance.now(); let raf;  // gpt-image-2 quality:high takes 60-120s
+      const CREEP = 170000; const t0 = performance.now(); let raf;  // gpt-image-2 quality:high takes 120-180s
       const tick = (now) => {
         const p = Math.min(90, ((now - t0) / CREEP) * 90);
         setRenderPct(p);
@@ -115,19 +115,22 @@
 
       try {
         const pack = await window.__wrapRenderCanvas();
-        if (!pack || !pack.blob) throw new Error('canvas-null');
-        // The mask is NOT sent to the API — a masked edit regenerates the car blind
-        // and substitutes a different vehicle. It is only used client-side after the
-        // render to re-composite the exact studio bay around the car.
+        if (!pack || !pack.photoBlob) throw new Error('canvas-null');
+        // The car is the fixed anchor: send the ORIGINAL photo (keeps wings/thin
+        // parts), the studio bay as a reference to rebuild around it, and the exact
+        // colour swatch. The model integrates — relights, matches perspective, casts
+        // shadows. No mask, no client re-composite.
         const fd = new FormData();
-        fd.append('image', pack.blob, 'composite.png');
+        fd.append('image', pack.photoBlob, 'car.jpg');
+        if (pack.bayBlob) fd.append('bay', pack.bayBlob, 'bay.jpg');
         if (pack.swatchBlob) fd.append('swatch', pack.swatchBlob, 'swatch.png');
         fd.append('finish', (sel && sel.finish) || 'gloss');
         fd.append('colourName', (sel && sel.name) || 'wrap');
         fd.append('colourHex', (sel && sel.hex) || '');
+        fd.append('size', pack.size || '1536x1024');
 
         const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), 170000);
+        const to = setTimeout(() => ctrl.abort(), 290000);
         const resp = await fetch('/api/wrap-render', { method: 'POST', body: fd, signal: ctrl.signal });
         clearTimeout(to);
         cancelAnimationFrame(raf); setRenderPct(100);
@@ -136,13 +139,7 @@
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || 'api-' + resp.status);
 
-        // Lock the studio bay: re-composite original background outside the edit mask
-        let finalUrl = data.renderUrl;
-        if (typeof window.__wrapFinaliseRender === 'function' && pack.compositeUrl && pack.maskUrl) {
-          const composed = await window.__wrapFinaliseRender(data.renderUrl, pack.compositeUrl, pack.maskUrl);
-          if (composed) finalUrl = composed;
-        }
-        setRenderUrl(finalUrl);
+        setRenderUrl(data.renderUrl);
         setSessionRenderCount((c) => c + 1);
         setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 300);
       } catch (err) {
