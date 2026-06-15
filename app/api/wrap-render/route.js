@@ -64,7 +64,8 @@ export async function POST(request) {
   try { formData = await request.formData(); }
   catch { return Response.json({ ok: false, error: 'invalid' }, { status: 400 }); }
 
-  const imageFile = formData.get('image');       // 1536×1024 composite: car reframed into the M&C bay
+  const imageFile = formData.get('image');       // 1536×1024 composite: car reframed on a neutral backdrop
+  const bayFile = formData.get('bay');           // M&C studio reference (model rebuilds it at the car's angle)
   const swatchFile = formData.get('swatch');     // solid-colour reference of the exact wrap colour
   const finish = String(formData.get('finish') || 'gloss');
   const colourName = String(formData.get('colourName') || 'wrap');
@@ -88,14 +89,18 @@ export async function POST(request) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const composite = await toFile(
     Buffer.from(await imageFile.arrayBuffer()), 'car.jpg', { type: 'image/jpeg' });
+  const bay = (bayFile && typeof bayFile !== 'string')
+    ? await toFile(Buffer.from(await bayFile.arrayBuffer()), 'bay.jpg', { type: 'image/jpeg' })
+    : undefined;
   const swatch = (swatchFile && typeof swatchFile !== 'string')
     ? await toFile(Buffer.from(await swatchFile.arrayBuffer()), 'swatch.png', { type: 'image/png' })
     : undefined;
 
-  // The client sends image[0] = the customer car REFRAMED onto our bay at a
-  // believable scale (car ≈70% of frame, seated low, outer border feathered into
-  // the bay). The model keeps the car exactly, wraps it, then rebuilds the studio
-  // around it — relight, perspective, shadow, reflection — into one seamless photo.
+  // image[0] = the car reframed at a believable scale on a NEUTRAL backdrop.
+  // image[1] = the M&C studio reference. The model keeps the car exactly, wraps it,
+  // and rebuilds OUR studio around it — but re-photographed from the car's camera
+  // angle (the reference is shot high/downward; the car is near eye level), with all
+  // signage/text removed. Relight, perspective, shadow, reflection → one photo.
   const finishDesc = {
     gloss: 'high-gloss vinyl wrap — deep wet-look shine, crisp soft-box reflections following the body lines',
     satin: 'satin vinyl wrap — smooth semi-sheen, soft diffused highlights, no mirror reflections',
@@ -110,7 +115,7 @@ export async function POST(request) {
 
   const colourClause = colourHex
     ? `The wrap colour is EXACTLY ${colourHex} ("${colourName}")` +
-      (swatch ? ', shown as a solid sample in the second reference image — match it precisely.' : '.')
+      (swatch ? ', shown as a solid sample in the last reference image — match it precisely.' : '.')
     : `The wrap is "${colourName}".`;
 
   const wrapClause =
@@ -118,23 +123,35 @@ export async function POST(request) {
     `${colourClause} Coverage must be perfectly uniform across every panel. ` +
     `Leave the glass, lights, grille mesh, badges, number plate, tyres and wheels unwrapped.`;
 
+  const studioClause = bay
+    ? `The SECOND image is the real Matthews & Clark workshop bay. Re-create THAT exact studio around the car — same walls, floor, ` +
+      `roller door and two-post lift — but RE-PHOTOGRAPHED from the car's camera angle: the reference is shot from a high, downward ` +
+      `(~45°) angle, while the car is photographed close to eye level, so correct the studio's perspective, floor plane, horizon and ` +
+      `vanishing point to sit naturally with the car. Do NOT copy the reference's camera angle. ` +
+      `Remove ALL text, signage, lettering, logos, brand names and posters from every wall, door and surface — keep them clean and plain.`
+    : `Place the car in a clean professional wrap-shop studio: plain mid-grey walls, a polished light-grey floor, soft overhead lighting, no text or signage.`;
+
   const prompt =
-    `Photorealistic automotive studio photograph. The image shows a real customer's car placed in the Matthews & Clark studio bay ` +
-    `at the correct size, angle and position. Keep the car EXACTLY as shown — do not move, rotate, rescale, reshape or restyle it; ` +
+    `Photorealistic automotive studio photograph. The FIRST image shows a real customer's car at the correct size, angle and position ` +
+    `on a plain placeholder background. Keep the car EXACTLY as shown — do not move, rotate, rescale, reshape or restyle it; ` +
     `preserve its make, model, body shape, proportions, stance, ride height, wheels, glass, headlights, grille, badges, number plate, ` +
     `every panel line, and ALL thin parts (rear wing, spoiler, splitter, aerial, mirror arms). It must stay the same recognisable vehicle. ` +
     `${wrapClause} ` +
-    `Turn it into one seamless photograph: blend away any soft edge, halo or seam around the car so it sits naturally in the room; ` +
-    `rebuild the studio floor and walls so their perspective and vanishing point match the car's camera angle; ` +
+    `${studioClause} ` +
+    `Make it one seamless photograph at the car's camera angle: replace the placeholder background entirely; ` +
     `relight the car so its highlights, reflections and shadow direction match the studio's overhead lighting and colour temperature; ` +
     `cast a soft contact shadow under the tyres and a subtle reflection of the car on the polished floor. ` +
     `The car must sit at a natural scale within the studio, NOT fill the frame. Sharp focus, no added text or watermarks.`;
+
+  const images = [composite];
+  if (bay) images.push(bay);
+  if (swatch) images.push(swatch);
 
   let result;
   try {
     result = await client.images.edit({
       model: 'gpt-image-2',     // snapshot gpt-image-2-2026-04-21 — processes inputs at high fidelity automatically
-      image: swatch ? [composite, swatch] : composite,  // composite is the edit base; swatch is a colour reference
+      image: images,            // [car composite, bay reference, colour swatch]
       prompt,
       size,
       quality: 'high',

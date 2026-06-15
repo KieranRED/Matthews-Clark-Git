@@ -221,6 +221,24 @@ input,textarea{font:inherit}
 .render-cta:hover{background:var(--accent-bright);box-shadow:0 8px 30px oklch(49% 0.27 264 / .5)}
 .render-cta:active{transform:scale(.98)}
 .render-cta:disabled{opacity:.45;cursor:default;box-shadow:none}
+/* draw the eye to the render step once a film is chosen but not yet rendered */
+.render-cta.is-next{animation:ctaPulse 2.2s var(--ease) infinite}
+@keyframes ctaPulse{
+  0%,100%{box-shadow:0 6px 24px oklch(49% 0.27 264 / .35)}
+  50%{box-shadow:0 6px 30px oklch(49% 0.27 264 / .6), 0 0 0 5px oklch(49% 0.27 264 / .22)}
+}
+.render-note.is-next{color:var(--accent-bright);border-color:oklch(49% 0.27 264 / .45);background:oklch(22% 0.06 264 / .7)}
+
+/* quick-preview vs studio-render status (top-left of the stage) */
+.preview-tag{
+  display:inline-flex;align-items:center;gap:9px;height:34px;padding:0 14px;border-radius:9px;
+  background:oklch(15% 0.013 262 / .74);border:1px solid var(--line);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.pt-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:#e0a93b;box-shadow:0 0 0 3px oklch(72% 0.15 70 / .2)}
+.preview-tag.is-render .pt-dot{background:var(--ok);box-shadow:0 0 0 3px oklch(60% 0.13 150 / .22)}
+.pt-label{font-family:var(--f-head);font-weight:700;font-size:12px;color:var(--text)}
+.pt-sub{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
 
 /* caption plate — film identity */
 .cap{
@@ -285,9 +303,26 @@ input,textarea{font:inherit}
 .render-card .rk{font-family:var(--f-mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent-bright)}
 .render-card h3{font-family:var(--f-disp);font-size:clamp(24px,3vw,34px);letter-spacing:.05em;text-transform:uppercase;line-height:1.1}
 .render-card p{color:var(--text-2);font-size:13.5px;max-width:40ch}
-.render-bar{width:min(380px,70vw);height:2px;border-radius:99px;background:oklch(100% 0 0 / .12);overflow:hidden;margin-top:10px}
-.render-bar i{display:block;height:100%;background:var(--accent-bright);transition:width .4s linear}
+.render-bar{position:relative;width:min(420px,74vw);height:3px;border-radius:99px;background:oklch(100% 0 0 / .12);overflow:hidden;margin-top:16px}
+.render-bar i{display:block;height:100%;background:var(--accent-bright);border-radius:99px;transition:width .5s cubic-bezier(.22,1,.36,1);position:relative}
+/* moving sheen so the bar never looks frozen while it eases near the cap */
+.render-bar i::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,oklch(100% 0 0 / .55),transparent);transform:translateX(-100%);animation:barSheen 1.6s var(--ease) infinite}
+@keyframes barSheen{to{transform:translateX(220%)}}
+
+/* narrated pipeline steps (operational transparency / labor illusion) */
+.render-steps{display:flex;flex-direction:column;gap:9px;margin:18px 0 4px;text-align:left;width:min(340px,72vw)}
+.rstep{display:flex;align-items:center;gap:11px;font-size:13.5px;color:var(--text-3);transition:color .35s var(--ease)}
+.rstep-ic{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;flex:0 0 auto;border:1px solid var(--line-2);color:var(--text-3);transition:all .35s var(--ease)}
+.rstep.done{color:var(--text-2)}
+.rstep.done .rstep-ic{background:var(--accent);border-color:var(--accent);color:#fff}
+.rstep.now{color:var(--text);font-weight:500}
+.rstep.now .rstep-ic{border-color:var(--accent-bright)}
+.rstep.next{opacity:.55}
+.rstep-spin{width:12px;height:12px;border-radius:50%;border:2px solid oklch(60% 0.2 264 / .3);border-top-color:var(--accent-bright);animation:rspin .7s linear infinite}
+@keyframes rspin{to{transform:rotate(360deg)}}
+.render-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;width:min(420px,74vw);margin-top:10px}
 .render-pct{font-family:var(--f-mono);font-size:12px;letter-spacing:.2em;color:var(--text-2)}
+.render-reassure{font-size:11px;color:var(--text-3);text-align:right}
 .removal-bar{width:min(300px,60vw);height:2px;border-radius:99px;background:oklch(100% 0 0 / .12);overflow:hidden;margin-top:10px;position:relative}
 .removal-bar-sweep{position:absolute;inset:0;width:35%;background:var(--accent-bright);border-radius:99px;animation:sweep 1.2s var(--ease) infinite}
 @keyframes sweep{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
@@ -369,13 +404,13 @@ input,textarea{font:inherit}
   position:absolute;left:7px;top:5px;font-family:var(--f-mono);font-size:11px;color:oklch(100% 0 0 / .75);
   text-shadow:0 1px 3px oklch(0% 0 0 / .6);
 }
-.sw-tier{
-  position:absolute;right:6px;bottom:5px;padding:2px 6px;border-radius:5px;
-  font-family:var(--f-mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;
-  background:oklch(0% 0 0 / .45);color:oklch(100% 0 0 / .85);
-  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+/* finish written cleanly across the foot of the chip (replaces the tier badge) */
+.sw-finish{
+  position:absolute;left:0;right:0;bottom:0;padding:14px 8px 5px;
+  font-family:var(--f-mono);font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:oklch(100% 0 0 / .94);text-align:center;pointer-events:none;
+  background:linear-gradient(180deg, transparent, oklch(0% 0 0 / .46));
 }
-.sw-tier.specialist{background:var(--accent);color:#fff}
 .sw-fav{
   position:absolute;right:5px;top:5px;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;
   color:oklch(100% 0 0 / .85);background:oklch(0% 0 0 / .35);opacity:0;transition:opacity .15s;
@@ -384,7 +419,10 @@ input,textarea{font:inherit}
 .sw-fav.on{color:#ff6584}
 .sw-meta{min-width:0;padding:0 2px}
 .sw-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sw-code{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.05em;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sw-sub{display:flex;align-items:center;gap:5px;margin-top:1px;font-family:var(--f-mono);font-size:9px;letter-spacing:.04em;color:var(--text-3);white-space:nowrap;overflow:hidden}
+.sw-brand{color:var(--text-2);font-weight:500;flex:0 0 auto}
+.sw-bull{opacity:.5;flex:0 0 auto}
+.sw-code{font-family:var(--f-mono);font-size:9px;letter-spacing:.04em;color:var(--text-3);overflow:hidden;text-overflow:ellipsis}
 
 /* ── specimen detail + compare + quote footer ── */
 .panel-foot{border-top:1px solid var(--line);background:var(--ink-2)}
@@ -397,7 +435,9 @@ input,textarea{font:inherit}
   box-shadow:inset 0 0 0 1px oklch(100% 0 0 / .12);
 }
 .d-name{font-family:var(--f-disp);font-size:19px;letter-spacing:.04em;text-transform:uppercase;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.d-series{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;color:var(--text-3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-meta-row{display:flex;align-items:center;gap:8px;margin-top:4px;min-width:0}
+.d-finish{flex:0 0 auto;font-family:var(--f-mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text);background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:2px 8px}
+.d-series{font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .d-actions{display:flex;gap:6px;margin-top:8px}
 .d-specs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
 .d-spec{padding:8px 10px;border-radius:9px;background:var(--surface);border:1px solid var(--line)}

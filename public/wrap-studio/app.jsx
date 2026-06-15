@@ -4,12 +4,9 @@
   const h = React.createElement;
   const I = window.Icon;
 
-  const PANELS = [
-    { key: 'full', label: 'Full body' }, { key: 'bonnet', label: 'Bonnet' },
-    { key: 'roof', label: 'Roof' }, { key: 'mirrors', label: 'Mirrors' },
-    { key: 'pillars', label: 'Pillars' }, { key: 'boot', label: 'Boot' },
-    { key: 'accents', label: 'Accents / stripes' },
-  ];
+  // Full body only — per-panel wraps were removed (too complex to preview cleanly).
+  // The data model keeps a single 'full' panel so quote/compare still work.
+  const PANELS = [{ key: 'full', label: 'Full body' }];
   const LS = 'mc-wrap-studio-v1';
   const load = () => { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch { return {}; } };
   const saved = load();
@@ -48,6 +45,7 @@
     const [baActive, setBaActive] = useState(false);
     const [rendering, setRendering] = useState(false);
     const [renderPct, setRenderPct] = useState(0);
+    const [renderStep, setRenderStep] = useState(0);
     const [renderUrl, setRenderUrl] = useState(null);
     const [rendersLeft, setRendersLeft] = useState(null);   // null until known
     const RENDER_CAP = 3;
@@ -113,12 +111,25 @@
       if (rendersLeft === 0) { flash('That\'s your 3 studio renders for today — they reset tomorrow'); return; }
       if (typeof window.__wrapRenderCanvas !== 'function') { flash('Render not ready yet'); return; }
 
-      setRendering(true); setRenderPct(0);
-      const CREEP = 170000; const t0 = performance.now(); let raf;  // gpt-image-2 quality:high takes 120-180s
+      setRendering(true); setRenderPct(0); setRenderStep(0);
+      // Wait-perception research, applied (not gimmicks — Harrison found users
+      // dislike pauses/backwards motion):
+      //  • Occupied time feels shorter (Maister) + the "labor illusion" (Buell &
+      //    Norton) — narrate the REAL pipeline so the wait feels productive.
+      //  • Strong early movement, then an asymptotic approach to 94% so the bar
+      //    never stalls hard and never lies about being "done"; the real response
+      //    snaps it to 100 for a clean finish (peak-end).
+      //  • Steps advance on a TIME schedule so there's always visible activity
+      //    even while the bar eases near its cap.
+      const CAP = 94, TAU = 52000;                  // ms; ~63% of cap at 52s
+      const STEP_TIMES = [0, 11000, 27000, 47000, 74000, 104000]; // → 6 narrated stages
+      const t0 = performance.now(); let raf;
       const tick = (now) => {
-        const p = Math.min(90, ((now - t0) / CREEP) * 90);
-        setRenderPct(p);
-        if (p < 90) raf = requestAnimationFrame(tick);
+        const t = now - t0;
+        setRenderPct(Math.min(CAP, CAP * (1 - Math.exp(-t / TAU))));
+        let s = 0; for (let i = 0; i < STEP_TIMES.length; i++) { if (t >= STEP_TIMES[i]) s = i; }
+        setRenderStep(s);
+        raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
 
@@ -131,6 +142,7 @@
         // shadows. No mask, no client re-composite.
         const fd = new FormData();
         fd.append('image', pack.photoBlob, 'car.jpg');
+        if (pack.bayBlob) fd.append('bay', pack.bayBlob, 'bay.jpg');
         if (pack.swatchBlob) fd.append('swatch', pack.swatchBlob, 'swatch.png');
         fd.append('finish', (sel && sel.finish) || 'gloss');
         fd.append('colourName', (sel && sel.name) || 'wrap');
@@ -141,7 +153,7 @@
         const to = setTimeout(() => ctrl.abort(), 290000);
         const resp = await fetch('/api/wrap-render', { method: 'POST', body: fd, signal: ctrl.signal });
         clearTimeout(to);
-        cancelAnimationFrame(raf); setRenderPct(100);
+        cancelAnimationFrame(raf); setRenderPct(100); setRenderStep(6);
 
         if (resp.status === 429) { setRendering(false); setRenderPct(0); setRendersLeft(0); flash('That\'s your 3 studio renders for today — they reset tomorrow'); return; }
         const data = await resp.json();
@@ -220,7 +232,7 @@
       h('div', { className: 'workspace' },
         h(window.WrapStage, {
           swatch: sel, carUrl, setCarUrl, originalUrl, setOriginalUrl,
-          rendering, renderPct, startRender, baActive, setBaActive,
+          rendering, renderPct, renderStep, startRender, baActive, setBaActive,
           panels: PANELS, panelColors, activePanel, setActivePanel,
           finishLabel, brandShort, renderUrl, rendersLeft, renderCap: RENDER_CAP,
         }),

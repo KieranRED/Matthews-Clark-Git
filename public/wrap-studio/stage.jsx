@@ -41,59 +41,57 @@
     return { r: Math.round(hue2rgb(h+1/3)*255), g: Math.round(hue2rgb(h)*255), b: Math.round(hue2rgb(h-1/3)*255) };
   }
 
-  // ─── Paint pixel detection (works on ALL car colours: black, white, silver, bright) ───
+  // ─── Canvas recolour engine (quick preview) ─────────────────────────────────
+  // Paint-ONLY recolour. This is an indicative preview (the studio render is the
+  // accurate result), but it must only touch painted body panels — never glass,
+  // lights, tyres, wheels, badges or trim — for ANY car colour, black included.
+  //
+  //   1. analyseBody — the body's dominant luminance + whether the car is
+  //      chromatic (red/blue/…) or achromatic (black/white/grey).
+  //   2. isPaint — multi-cue candidate test: hue-proximity for coloured cars;
+  //      luminance-band + blue-glass + saturation rejection for achromatic cars.
+  //   3. connected components — keep only large contiguous regions, which drops
+  //      badges, number plate, mirror glass and trim slivers automatically.
+  //   4. dilate the kept mask a couple of px to close panel gaps / door handles
+  //      so the body recolours solid (no patchy holes).
+  //   5. luminance-preserving recolour of the final mask.
 
-  function analyseCar(data, w, h) {
-    // Pass 1: collect visible pixels, detect if car is chromatic or achromatic
-    let totalL = 0, totalS = 0, count = 0;
-    const hueBuckets = new Array(36).fill(0);
-    for (let y = Math.floor(h*0.12); y < h*0.88; y += 4) {
-      for (let x = Math.floor(w*0.08); x < w*0.92; x += 4) {
-        const i = (y * w + x) * 4;
-        if (data[i+3] < 60) continue;
-        const px = rgbToHSL(data[i], data[i+1], data[i+2]);
-        if (px.l < 0.03 || px.l > 0.97) continue; // exclude pure black/white extremes
-        totalL += px.l; totalS += px.s; count++;
-        if (px.s > 0.06) hueBuckets[Math.floor(px.h / 10) % 36]++;
+  function analyseBody(d, cw, ch) {
+    let sumS = 0, n = 0;
+    const hue = new Array(36).fill(0);
+    const lHist = new Array(20).fill(0);
+    for (let y = Math.floor(ch * 0.10); y < ch * 0.90; y += 3) {
+      for (let x = Math.floor(cw * 0.06); x < cw * 0.94; x += 3) {
+        const i = (y * cw + x) * 4;
+        if (d[i+3] < 80) continue;
+        const p = rgbToHSL(d[i], d[i+1], d[i+2]);
+        if (p.l < 0.04 || p.l > 0.98) continue;
+        sumS += p.s; n++;
+        if (p.s > 0.08) hue[Math.floor(p.h / 10) % 36]++;
+        lHist[Math.min(19, Math.floor(p.l * 20))]++;
       }
     }
-    if (!count) return { achromatic: true, avgL: 0.5, domH: -1 };
-
-    const avgL = totalL / count;
-    const avgS = totalS / count;
-
-    // Find dominant hue (if car is chromatic)
-    let maxB = 0, maxC = 0;
-    for (let i = 0; i < 36; i++) { if (hueBuckets[i] > maxC) { maxC = hueBuckets[i]; maxB = i; } }
-    const achromatic = avgS < 0.08 || maxC < count * 0.08;
-
-    return { achromatic, avgL, domH: achromatic ? -1 : maxB * 10 + 5 };
+    if (!n) return { achromatic: true, bodyL: 0.5, domH: -1 };
+    const avgS = sumS / n;
+    let mb = 0, mc = 0; for (let i = 0; i < 20; i++) { if (lHist[i] > mc) { mc = lHist[i]; mb = i; } }
+    let hb = 0, hc = 0; for (let i = 0; i < 36; i++) { if (hue[i] > hc) { hc = hue[i]; hb = i; } }
+    return { achromatic: avgS < 0.10 || hc < n * 0.10, bodyL: (mb + 0.5) / 20, domH: hb * 10 + 5 };
   }
 
-  function isPaintPixel(px, carInfo) {
-    const { h, s, l } = px;
-    // Universal exclusions — these are never paint
-    if (l < 0.04) return false;   // absolute black (tyres, deep shadow)
-    if (l > 0.97) return false;   // pure specular highlight
-
-    if (carInfo.achromatic) {
-      // White, silver, grey, black cars — detect by luminance proximity to car average
-      // Glass is usually darker with slight blue tint, chrome is near-white with no variation
-      const lDiff = Math.abs(l - carInfo.avgL);
-      if (lDiff > 0.40) return false;   // very different luminance = different material
-      if (s > 0.28) return false;       // suspiciously saturated for an achromatic car = interior/reflection
-      if (s < 0.04 && l > 0.80) return false; // near-white low-sat = chrome trim / glass highlight
+  function isPaint(p, info) {
+    const { h, s, l } = p;
+    if (l < 0.05) return false;                       // tyre / deep shadow
+    if (l > 0.96 && s < 0.12) return false;           // chrome / specular highlight
+    if (info.achromatic) {
+      if (Math.abs(l - info.bodyL) > 0.34) return false;            // far from body tone = glass/trim
+      if (s > 0.12 && h > 170 && h < 265 && l < info.bodyL) return false; // bluish + dark = window glass
+      if (s > 0.32) return false;                                    // too saturated for an achromatic car
       return true;
-    } else {
-      // Chromatic car (red, blue, green etc.) — detect by hue proximity
-      if (s < 0.04) return false;       // achromatic pixel on a coloured car = chrome/glass/rubber
-      const diff = Math.min(Math.abs(h - carInfo.domH), 360 - Math.abs(h - carInfo.domH));
-      return diff < 40 || s > 0.18;    // hue-close to paint, or highly saturated
     }
+    if (s < 0.10) return false;                       // desaturated on a coloured car = glass/chrome/rubber
+    const diff = Math.min(Math.abs(h - info.domH), 360 - Math.abs(h - info.domH));
+    return diff < 45 || s > 0.22;                     // hue-close to paint, or vividly saturated
   }
-
-  // ─── Canvas recolour engine ────────────────────────────────────────────────
-  // Replaces CSS blend modes. Only paints paint pixels, leaves glass/trim alone.
 
   function recolourCanvas(carUrl, targetHex, finish) {
     return new Promise((resolve) => {
@@ -109,9 +107,11 @@
         const id = ctx.getImageData(0, 0, cw, ch);
         const d = id.data;
 
-        // PPF clear / PPF matte — just a very subtle tint, don't recolour
+        const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
+        const tHSL = rgbToHSL(tr, tg, tb);
+
+        // PPF clear / PPF matte — protective films: subtle tint only, keep paint
         if (finish === 'ppf-clear' || finish === 'ppf-matte') {
-          const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
           const strength = finish === 'ppf-matte' ? 0.12 : 0.06;
           for (let i = 0; i < d.length; i += 4) {
             if (d[i+3] < 20) continue;
@@ -122,82 +122,62 @@
           ctx.putImageData(id, 0, 0); return resolve(cv.toDataURL('image/png'));
         }
 
-        const carInfo = analyseCar(d, cw, ch);
-        const { r: tr, g: tg, b: tb } = hexToRGB(targetHex);
-        const tHSL = rgbToHSL(tr, tg, tb);
-
-        // Finish-specific saturation modifier
-        const satMult = finish === 'matte' ? 0.80 : finish === 'satin' ? 0.88 : 1.0;
-
-        // Lighting-removal recolour:
-        // Strip original lighting → apply target colour → add back 30% of body-line variation
-        // GPT re-lights the scene properly. Finish overlays (CSS) add gloss/matte/metallic on top.
-        //
-        // BODY_LINE_RETAIN = 0.30 — keeps panel shapes, creases, shadow edges visible
-        const BODY_LINE_RETAIN = 0.30;
-
-        // ── BULLETPROOF PAINT MASK ──────────────────────────────────────────
-        //
-        // Step 1: Initial candidates — colour/luminance heuristics
-        // Step 2: Connected component analysis (BFS, O(n))
-        //         Paint body is the LARGEST contiguous region — trim, speckles,
-        //         glass flakes and chrome are small disconnected components and
-        //         get eliminated automatically regardless of car colour
-        // Step 3: Size threshold — components < 1% of candidates are discarded
-        // Step 4: Apply colour only to surviving paint pixels
-        //
-        // This approach is car-colour agnostic: black, white, silver, red, any.
-
+        const info = analyseBody(d, cw, ch);
+        const satMult = finish === 'matte' ? 0.82 : finish === 'satin' ? 0.90 : 1.0;
         const n = cw * ch;
 
-        // Step 1: initial candidate pass
-        const cands = new Uint8Array(n);
+        // 1) candidate paint pixels
+        const cand = new Uint8Array(n);
         for (let i = 0; i < d.length; i += 4) {
-          if (d[i+3] < 25) continue;
-          if (isPaintPixel(rgbToHSL(d[i], d[i+1], d[i+2]), carInfo)) cands[i >> 2] = 1;
+          if (d[i+3] < 40) continue;
+          if (isPaint(rgbToHSL(d[i], d[i+1], d[i+2]), info)) cand[i >> 2] = 1;
         }
 
-        // Step 2: BFS connected components with O(1) queue
+        // 2) connected components (BFS, O(1) queue) — keep only large regions
         const labels = new Int32Array(n).fill(-1);
-        const compSizes = [];
-        const bfsQ = new Int32Array(n); // pre-allocated queue — no Array.shift() O(n) cost
-        let nextLabel = 0;
-
-        for (let start = 0; start < n; start++) {
-          if (!cands[start] || labels[start] >= 0) continue;
-          const label = nextLabel++;
-          let head = 0, tail = 0;
-          bfsQ[tail++] = start;
-          labels[start] = label;
-          let size = 0;
+        const sizes = [];
+        const q = new Int32Array(n);
+        let next = 0;
+        for (let s = 0; s < n; s++) {
+          if (!cand[s] || labels[s] >= 0) continue;
+          const lab = next++; let head = 0, tail = 0, sz = 0;
+          q[tail++] = s; labels[s] = lab;
           while (head < tail) {
-            const cur = bfsQ[head++]; size++;
-            const cy = Math.floor(cur / cw), cx = cur % cw;
-            // 4-connected neighbours
-            if (cy > 0)    { const nb = cur - cw; if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
-            if (cy < ch-1) { const nb = cur + cw; if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
-            if (cx > 0)    { const nb = cur - 1;  if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
-            if (cx < cw-1) { const nb = cur + 1;  if (cands[nb] && labels[nb] < 0) { labels[nb] = label; bfsQ[tail++] = nb; } }
+            const c = q[head++]; sz++;
+            const cy = (c / cw) | 0, cx = c % cw;
+            if (cy > 0)    { const nb = c - cw; if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
+            if (cy < ch-1) { const nb = c + cw; if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
+            if (cx > 0)    { const nb = c - 1;  if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
+            if (cx < cw-1) { const nb = c + 1;  if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
           }
-          compSizes.push(size);
+          sizes.push(sz);
+        }
+        let total = 0; for (let i = 0; i < cand.length; i++) total += cand[i];
+        const minSize = Math.max(300, total * 0.02);
+        let paint = new Uint8Array(n);
+        for (let i = 0; i < n; i++) { const l = labels[i]; if (l >= 0 && sizes[l] >= minSize) paint[i] = 1; }
+
+        // 3) dilate 2px to close panel gaps / handles, but never onto tyre/chrome
+        for (let pass = 0; pass < 2; pass++) {
+          const grown = paint.slice();
+          for (let i = 0; i < d.length; i += 4) {
+            const pix = i >> 2;
+            if (paint[pix] || d[i+3] < 40) continue;
+            const p = rgbToHSL(d[i], d[i+1], d[i+2]);
+            if (p.l < 0.05 || (p.l > 0.96 && p.s < 0.12)) continue; // keep tyres/chrome out
+            const x = pix % cw, y = (pix / cw) | 0;
+            if ((x > 0 && paint[pix-1]) || (x < cw-1 && paint[pix+1]) ||
+                (y > 0 && paint[pix-cw]) || (y < ch-1 && paint[pix+cw])) grown[pix] = 1;
+          }
+          paint = grown;
         }
 
-        // Step 3: keep components >= 1% of all candidates (eliminates all isolated noise)
-        const totalCands = cands.reduce((a, b) => a + b, 0);
-        const minCompSize = Math.max(200, totalCands * 0.01);
-        const keepSet = new Uint8Array(nextLabel);
-        for (let l = 0; l < nextLabel; l++) { if (compSizes[l] >= minCompSize) keepSet[l] = 1; }
-
-        // Step 4: apply colour only to pixels whose component survived
+        // 4) luminance-preserving recolour of the final paint mask
         for (let i = 0; i < d.length; i += 4) {
-          const pix = i >> 2;
-          if (!cands[pix] || !keepSet[labels[pix]]) continue;
-          const px = rgbToHSL(d[i], d[i+1], d[i+2]);
-          const deviation = px.l - carInfo.avgL;
-          let outL = tHSL.l + deviation * BODY_LINE_RETAIN;
-          outL = Math.max(0.02, Math.min(0.97, outL));
-          const { r, g, b } = hslToRGB(tHSL.h, tHSL.s * satMult, outL);
-          d[i] = r; d[i+1] = g; d[i+2] = b;
+          if (!paint[i >> 2]) continue;
+          const L = rgbToHSL(d[i], d[i+1], d[i+2]).l;
+          const rc = hslToRGB(tHSL.h, tHSL.s * satMult, L);
+          d[i] = rc.r; d[i+1] = rc.g; d[i+2] = rc.b;
         }
 
         ctx.putImageData(id, 0, 0);
@@ -255,7 +235,7 @@
   }
 
   function Stage(props) {
-    const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, rendering, renderPct,
+    const { swatch, carUrl, setCarUrl, originalUrl, setOriginalUrl, rendering, renderPct, renderStep,
             startRender, baActive, setBaActive, panels, panelColors, activePanel, setActivePanel,
             finishLabel, brandShort, renderUrl, rendersLeft, renderCap } = props;
     const stageRef = useRef(null);
@@ -444,18 +424,15 @@
       return () => { if (window.__wrapDownload) delete window.__wrapDownload; };
     }, [displayUrl]);
 
-    // Expose the composite for the studio render. We REFRAME the car onto the bay
-    // at a believable scale (≈70% of frame, seated low with room around it) so the
-    // model has space to rebuild a real room — otherwise a tight phone photo fills
-    // the frame and the car looks massive / "flopped on" with no studio around it.
-    //  - The car comes from the ORIGINAL photo (not the cutout) so thin parts like
-    //    rear wings/spoilers/aerials and the car's identity stay intact.
-    //  - Its outer border is feathered so the original surroundings dissolve into
-    //    our bay, leaving the car (centre) sharp — no hard rectangle seam.
-    //  - A contact shadow is pre-drawn to anchor it.
-    // The model then relights, matches perspective, and blends it into one photo.
-    // swatch = solid PNG of the exact wrap colour. No edit mask (a masked edit
-    // regenerates the car blind and swaps the vehicle).
+    // Build the studio-render inputs. Two images go to the model:
+    //  1) photoBlob — the car REFRAMED at ≈70% scale, seated low on a NEUTRAL
+    //     wall→floor backdrop (not the bay). Reframing fixes "car fills the frame /
+    //     looks flopped on"; the neutral backdrop avoids baking the bay's high
+    //     downward angle + signage into the edit. From the ORIGINAL photo so wings/
+    //     identity survive; outer border feathered; contact shadow pre-drawn.
+    //  2) bayBlob — the bay as a REFERENCE the model rebuilds AROUND the car at the
+    //     car's camera angle (see route prompt). swatchBlob pins the colour.
+    // No edit mask (a masked edit regenerates the car blind and swaps the vehicle).
     useEffect(() => {
       const photoSrc = originalUrl || carUrl;
       window.__wrapRenderCanvas = async () => {
@@ -476,10 +453,19 @@
           cv.width = W; cv.height = H;
           const ctx = cv.getContext('2d');
 
-          // Studio backdrop: our actual bay, covering the frame
-          const bs = Math.max(W / bay.naturalWidth, H / bay.naturalHeight);
-          ctx.drawImage(bay, (W - bay.naturalWidth * bs) / 2, (H - bay.naturalHeight * bs) / 2,
-            bay.naturalWidth * bs, bay.naturalHeight * bs);
+          // NEUTRAL backdrop — NOT the bay. We do not bake the bay in because the
+          // bay photo is shot from a high downward angle and carries signage; baking
+          // it makes the model fight two perspectives and keep stray text. Instead a
+          // plain wall→floor gradient gives the car room + a level horizon, and the
+          // bay is sent separately as a reference for the model to rebuild at the
+          // car's camera angle.
+          const g = ctx.createLinearGradient(0, 0, 0, H);
+          g.addColorStop(0.00, '#33363b');   // upper wall (darker)
+          g.addColorStop(0.52, '#54585e');
+          g.addColorStop(0.60, '#65696f');   // wall→floor horizon, roughly at the car's eye level
+          g.addColorStop(1.00, '#8a8e95');   // polished floor (lighter)
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, W, H);
 
           // Car photo scaled to sit IN the scene (not fill it), seated low-centre
           const fit = Math.min((W * 0.72) / photo.naturalWidth, (H * 0.80) / photo.naturalHeight);
@@ -489,7 +475,7 @@
           const py = Math.round(H * 0.93 - ph);
 
           // Feather the photo's outer border so its original background melts into
-          // the bay, keeping the car (and wing) sharp in the centre
+          // the neutral backdrop, keeping the car (and wing) sharp in the centre
           const o = document.createElement('canvas');
           o.width = pw; o.height = ph;
           const octx = o.getContext('2d');
@@ -530,8 +516,17 @@
             swatchBlob = await new Promise((res) => sc.toBlob(res, 'image/png'));
           }
 
+          // Bay sent as a separate REFERENCE — the model rebuilds this studio
+          // around the car at the car's perspective (not baked into the composite)
+          const bc = document.createElement('canvas');
+          const bScale = Math.min(1, 1024 / Math.max(bay.naturalWidth, bay.naturalHeight));
+          bc.width = Math.round(bay.naturalWidth * bScale);
+          bc.height = Math.round(bay.naturalHeight * bScale);
+          bc.getContext('2d').drawImage(bay, 0, 0, bc.width, bc.height);
+          const bayBlob = await new Promise((res) => bc.toBlob(res, 'image/jpeg', 0.9));
+
           const photoBlob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.92));
-          return { photoBlob, swatchBlob, size: '1536x1024' };
+          return { photoBlob, bayBlob, swatchBlob, size: '1536x1024' };
         } catch { return null; }
       };
       return () => { if (window.__wrapRenderCanvas) delete window.__wrapRenderCanvas; };
@@ -605,43 +600,66 @@
         // drop veil
         h('div', { className: 'drop-veil' }, h(I.Upload, { size: 22, style: { marginRight: 10 } }), 'Drop to place your car'),
 
-        // render veil — the developing room
-        h('div', { className: 'render-veil' + (rendering ? ' on' : '') },
-          h('div', { className: 'render-card' },
-            h('div', { className: 'rk' }, 'Studio render'),
-            h('h3', null, 'Developing your studio shot'),
-            h('p', null, 'Photographic lighting, floor reflection, your exact film. Usually 1–2 minutes.'),
-            h('div', { className: 'render-bar' }, h('i', { style: { width: renderPct + '%' } })),
-            h('div', { className: 'render-pct' }, Math.round(renderPct) + '%'))),
+        // render veil — the developing room. Narrates the real pipeline (labor
+        // illusion / operational transparency) so the ~2-min wait feels active.
+        (() => {
+          const colourName = swatch ? swatch.name : 'your colour';
+          const STEPS = [
+            'Reading your car’s panels',
+            'Lifting it into the M&C bay',
+            'Matching the studio lighting',
+            'Wrapping every panel in ' + colourName,
+            'Casting shadows & floor reflection',
+            'Final polish',
+          ];
+          return h('div', { className: 'render-veil' + (rendering ? ' on' : '') },
+            h('div', { className: 'render-card' },
+              h('div', { className: 'rk' }, 'Studio render'),
+              h('h3', null, 'Developing your studio shot'),
+              h('div', { className: 'render-steps' },
+                STEPS.map((s, idx) => {
+                  const state = idx < renderStep ? 'done' : (idx === renderStep ? 'now' : 'next');
+                  return h('div', { key: idx, className: 'rstep ' + state },
+                    h('span', { className: 'rstep-ic' },
+                      state === 'done' ? h(I.Check, { size: 13 })
+                        : state === 'now' ? h('span', { className: 'rstep-spin' }) : null),
+                    h('span', { className: 'rstep-tx' }, s));
+                })),
+              h('div', { className: 'render-bar' }, h('i', { style: { width: renderPct + '%' } })),
+              h('div', { className: 'render-foot' },
+                h('span', { className: 'render-pct' }, Math.round(renderPct) + '%'),
+                h('span', { className: 'render-reassure' }, 'A real studio shoot, not a filter — worth the minute.'))));
+        })(),
 
         // ── HUD ──
         h('div', { className: 'stage-hud' },
-          // top-left: coverage chips
-          carUrl ? h('div', { className: 'hud-tl' },
-            h('div', { className: 'panel-chips' },
-              panels.map((p) => {
-                const cid = panelColors[p.key];
-                const cs = cid ? window.WRAP_CATALOGUE.find((s) => s.id === cid) : null;
-                return h('button', { key: p.key, className: 'pchip' + (activePanel === p.key ? ' on' : ''),
-                  onClick: () => setActivePanel(p.key) },
-                  cs ? h('span', { className: 'sw', style: { background: cs.hex } }) : null, p.label);
-              }))) : null,
+          // top-left: preview-vs-render status — makes it unmistakable that the
+          // live view is an APPROXIMATE colour preview until you generate the render
+          carUrl && swatch ? h('div', { className: 'hud-tl' },
+            h('div', { className: 'preview-tag' + (renderUrl ? ' is-render' : '') },
+              h('span', { className: 'pt-dot' }),
+              h('span', { className: 'pt-label' }, renderUrl ? 'Studio render' : 'Quick preview'),
+              h('span', { className: 'pt-sub' }, renderUrl ? 'true colour & finish' : 'indicative colour only'))) : null,
 
           // top-right: the one primary stage action — the deliberate AI step.
-          // The instant colour preview (left/auto) is free; THIS generates the
-          // photoreal render and uses one of the visitor's daily allowance.
+          // The instant colour preview is free + approximate; THIS generates the
+          // photoreal render (the true colour) and uses one daily render.
           carUrl ? h('div', { className: 'hud-tr' },
             h('div', { className: 'render-stack' },
-              h('button', { className: 'render-cta', disabled: rendering || rendersLeft === 0,
+              h('button', {
+                className: 'render-cta' + (swatch && !renderUrl && !rendering && rendersLeft !== 0 ? ' is-next' : ''),
+                disabled: rendering || rendersLeft === 0,
                 onClick: startRender, title: 'Generate a photoreal AI render in the M&C studio' },
                 h(I.Sparkle, { size: 16 }),
                 rendering ? 'Generating…' : (renderUrl ? 'Generate again' : 'Generate studio render')),
-              h('div', { className: 'render-note' },
+              h('div', { className: 'render-note' + (swatch && !renderUrl && !rendering && rendersLeft !== 0 ? ' is-next' : '') },
                 rendersLeft === 0
                   ? 'Daily limit reached — resets tomorrow'
-                  : (typeof rendersLeft === 'number'
-                      ? `Photoreal AI · ${rendersLeft} of ${renderCap || 3} left today · ~2 min`
-                      : `Photoreal AI · ${renderCap || 3} free per day · ~2 min`)))) : null,
+                  : (swatch && !renderUrl
+                      ? `↑ Next step — see the true colour · ${typeof rendersLeft === 'number' ? rendersLeft : (renderCap || 3)} left today`
+                      : (typeof rendersLeft === 'number'
+                          ? `Photoreal AI · ${rendersLeft} of ${renderCap || 3} left today · ~2 min`
+                          : `Photoreal AI · ${renderCap || 3} free per day · ~2 min`))))) : null,
 
           // bottom-left: film caption
           carUrl ? h('div', { className: 'hud-bl' },

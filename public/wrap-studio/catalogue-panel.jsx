@@ -19,6 +19,12 @@
     if (sw.finish === 'chrome') return '#999';
     return sw.hex;
   }
+  function brandShort(sw) {
+    return sw.brand === 'Avery Dennison' ? 'Avery' : sw.brand;
+  }
+  function finishLabel(key) {
+    return ((window.FINISHES || []).find((f) => f.key === key) || {}).label || key;
+  }
 
   function Swatch(props) {
     const { sw, on, fav, onSelect, onFav } = props;
@@ -28,12 +34,16 @@
         sw.swatchUrl ? h('img', { src: sw.swatchUrl, alt: '', style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', position: 'absolute', top: 0, left: 0, borderRadius: 'inherit' } }) : null,
         chipInner(sw),
         sw.hexConfidence === 'low' ? h('span', { className: 'sw-approx', title: 'Colour is approximate — ' + sw.finish + ' films shift with angle and light' }, '~') : null,
-        h('span', { className: 'sw-tier' + (sw.tier === 'specialist' ? ' specialist' : '') }, sw.tier),
+        // finish, written cleanly across the foot of the chip
+        h('span', { className: 'sw-finish finish--' + sw.finish }, finishLabel(sw.finish)),
         h('span', { className: 'sw-fav' + (fav ? ' on' : ''), onClick: (e) => { e.stopPropagation(); onFav(sw); } },
           h(I.Heart, { size: 13, fill: fav ? 'currentColor' : 'none' }))),
       h('div', { className: 'sw-meta' },
         h('div', { className: 'sw-name' }, sw.name),
-        h('div', { className: 'sw-code' }, sw.code)));
+        h('div', { className: 'sw-sub' },
+          h('span', { className: 'sw-brand' }, brandShort(sw)),
+          h('span', { className: 'sw-bull' }, '·'),
+          h('span', { className: 'sw-code' }, sw.code))));
   }
 
   function CataloguePanel(props) {
@@ -104,7 +114,9 @@
             h('div', { className: 'd-chip', style: { background: chipBg(sel) } }, chipInner(sel)),
             h('div', { style: { minWidth: 0, flex: 1 } },
               h('div', { className: 'd-name' }, sel.name),
-              h('div', { className: 'd-series' }, sel.brand + ' · ' + sel.series + ' · ' + sel.code),
+              h('div', { className: 'd-meta-row' },
+                h('span', { className: 'd-finish finish--' + sel.finish }, finishLabel(sel.finish)),
+                h('span', { className: 'd-series' }, brandShort(sel) + ' · ' + sel.code)),
               h('div', { className: 'd-actions' },
                 h('button', { className: 'btn btn--sm btn--ghost', onClick: () => toggleFav(sel) },
                   h(I.Heart, { size: 12, fill: favs[sel.id] ? 'currentColor' : 'none' }), favs[sel.id] ? 'Saved' : 'Save'),
@@ -139,11 +151,11 @@
         h('div', { className: 'quote' },
           h('div', { className: 'quote-row' },
             h('div', { className: 'quote-sel' },
-              h('div', { className: 'ql' }, assignedCount > 1 ? assignedCount + ' panels assigned' : 'Applying to'),
+              h('div', { className: 'ql' }, 'Full-body wrap'),
               h('div', { className: 'qv' },
                 sel ? h('span', { className: 'swdot', style: { background: chipBg(sel) } }) : null,
                 sel ? sel.name : 'Pick a film',
-                h('span', { className: 'pn' }, ' · ' + activePanelLabel)))),
+                sel ? h('span', { className: 'pn' }, ' · ' + finishLabel(sel.finish)) : null))),
           h('button', { className: 'btn btn--primary', disabled: !sel, onClick: onQuote },
             h(I.Send, { size: 15 }), 'Get a quote for this wrap'))));
   }
