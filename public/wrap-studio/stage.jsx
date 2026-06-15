@@ -245,11 +245,16 @@
     const [removing, setRemoving] = useState(false);
     const [removeError, setRemoveError] = useState(null);
     const [recolouredUrl, setRecolouredUrl] = useState(null);
+    // true once we have a clean background-removed cutout. When matting fails we
+    // still show the original photo (so the user is never stuck and can render),
+    // but we DON'T run the live recolour on it — recolouring a photo that still
+    // has its background would tint the background too.
+    const [cutoutReady, setCutoutReady] = useState(false);
     const recolourAbort = useRef(null);
 
     // ── Canvas recolour: runs whenever the car or swatch changes ──────────────
     useEffect(() => {
-      if (!carUrl || !swatch) { setRecolouredUrl(null); return; }
+      if (!carUrl || !swatch || !cutoutReady) { setRecolouredUrl(null); return; }
       // Chrome + shift are full CSS replacements — canvas not needed
       if (swatch.finish === 'chrome' || swatch.finish === 'shift') { setRecolouredUrl(null); return; }
 
@@ -262,26 +267,49 @@
         if (token.alive) setRecolouredUrl(url);
       });
       return () => { token.alive = false; };
-    }, [carUrl, swatch ? swatch.id : null]);
+    }, [carUrl, cutoutReady, swatch ? swatch.id : null]);
 
     const colored = !!swatch;
 
     // ── file ingest — client-side bg removal, stores both originalUrl + carUrl ──
     const ingest = useCallback(async (file) => {
       if (!file || !/^image\//.test(file.type)) return;
-      setRemoving(true);
       setRemoveError(null);
+      setCutoutReady(false);
+      // Show the car INSTANTLY, then isolate it in the background. The cutout is a
+      // progressive enhancement (enables the live recolour); it never blocks — the
+      // user can generate the studio render immediately (that uses the original).
+      let origDataUrl = null;
       try {
-        // Store original as dataURL (for before/after slider)
-        const origDataUrl = await new Promise((res, rej) => {
+        origDataUrl = await new Promise((res, rej) => {
           const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej;
           r.readAsDataURL(file);
         });
-        if (setOriginalUrl) setOriginalUrl(origDataUrl);
+      } catch {
+        setRemoveError('Could not read that image — try another photo.');
+        return;
+      }
+      if (setOriginalUrl) setOriginalUrl(origDataUrl);
+      setCarUrl(origDataUrl);          // ← car visible immediately
+      setRemoving(true);               // small non-blocking "isolating" chip
+      try {
 
-        // Dynamic import via new Function bypasses Babel's import() transformation.
-        // Browser caches the module after first load so subsequent calls are instant.
-        // Two CDNs: esm.sh primary, jsdelivr fallback (either can flake per-network).
+        // Downscale the input before matting — big phone photos make CPU inference
+        // crawl (this was the "stuck" hang). ~1400px long edge keeps a clean cutout
+        // while staying fast.
+        const inputForMatte = await (async () => {
+          try {
+            const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = origDataUrl; });
+            const s = Math.min(1, 1400 / Math.max(im.naturalWidth, im.naturalHeight));
+            if (s >= 1) return file;
+            const c = document.createElement('canvas');
+            c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s);
+            c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+            return await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+          } catch { return file; }
+        })();
+
+        // Load the matting module (esm.sh primary, jsdelivr fallback)
         const MODULE_CDNS = [
           'https://esm.sh/@imgly/background-removal@1.4.5',
           'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm',
@@ -293,39 +321,40 @@
         }
         if (!mod) throw new Error('Could not load the background-removal tool. Check your connection and try again.');
 
-        // The library downloads a multi-MB model the first time. On a flaky
-        // connection that fetch fails with a bare "Failed to fetch" and the whole
-        // call rejects — so we pin the model host explicitly and retry across a
-        // fallback host (jsdelivr 403s the binary data package; unpkg serves it)
-        // and across GPU→CPU (WebGPU is unavailable in some browsers).
-        // staticimgly is the library default and the most reliable; unpkg backs it up.
+        // Use the fast/light model ('small' — the @imgly quantised matte) — the
+        // studio render uses the original photo, not this cutout, so cutout speed
+        // beats thin-part precision. Only attempt GPU when WebGPU actually exists
+        // (otherwise the call stalls trying to init a context that isn't there);
+        // fall to CPU. Model data from staticimgly, unpkg as fallback. Hard timeout.
         const DATA_CDNS = [
           'https://staticimgly.com/@imgly/background-removal-data/1.4.5/dist/',
           'https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/',
         ];
-        // model: 'isnet' is the full-precision general matte — noticeably better on
-        // thin structures (rear wings, spoilers, aerials) than the default quantised
-        // model. Fall back to the default model if that variant won't load.
+        const devices = (typeof navigator !== 'undefined' && navigator.gpu) ? ['gpu', 'cpu'] : ['cpu'];
+        const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
         let resultBlob = null;
         lastErr = null;
         outer:
-        for (const publicPath of DATA_CDNS) {
-          for (const device of ['gpu', 'cpu']) {
-            for (const model of ['isnet', undefined]) {
-              try {
-                const cfg = { publicPath, device };
-                if (model) cfg.model = model;
-                resultBlob = await mod.removeBackground(file, cfg);
-                break outer;
-              } catch (e) { lastErr = e; }
+        for (const device of devices) {
+          for (const publicPath of DATA_CDNS) {
+            try {
+              resultBlob = await withTimeout(
+                mod.removeBackground(inputForMatte, { publicPath, device, model: 'small' }),
+                device === 'gpu' ? 30000 : 45000); // background task — give up rather than churn forever
+              break outer;
+            } catch (e) {
+              lastErr = e;
+              if (/timeout/i.test(e && e.message) && device === 'gpu') break; // GPU stalled → switch to CPU
             }
           }
         }
         if (!resultBlob) {
           const m = (lastErr && (lastErr.message || String(lastErr))) || '';
-          throw new Error(/fetch|network|load/i.test(m)
-            ? 'Could not download the cutout model — check your connection and try again.'
-            : (m || 'Background removal failed'));
+          throw new Error(/timeout/i.test(m)
+            ? 'Background removal is taking too long on this device — try a smaller photo, or another browser.'
+            : (/fetch|network|load/i.test(m)
+                ? 'Could not download the cutout model — check your connection and try again.'
+                : (m || 'Background removal failed')));
         }
 
         // Convert result blob to dataURL for masking + storage
@@ -333,10 +362,12 @@
           const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej;
           r.readAsDataURL(resultBlob);
         });
-        setCarUrl(cutoutDataUrl);
+        setCarUrl(cutoutDataUrl);   // ← upgrade to the clean cutout
+        setCutoutReady(true);       //    enables the live recolour
       } catch (err) {
-        console.error('[Stage] bg removal failed:', err);
-        setRemoveError(err.message || 'Background removal failed');
+        // Non-blocking: the original photo is already showing and the render still
+        // works, so isolation failing just means no live recolour for this photo.
+        console.warn('[Stage] background isolation skipped:', err && err.message);
       } finally {
         setRemoving(false);
       }
@@ -384,7 +415,7 @@
     // Finish overlay layers — used for ALL finishes on top of the canvas-recoloured car.
     // Skipped when a studio render is showing: the render is a finished full-scene
     // photograph, so silhouette-masked sheen layers would misalign on top of it.
-    const fxLayers = (carUrl && fx && !renderUrl) ? [
+    const fxLayers = (carUrl && fx && cutoutReady && !renderUrl) ? [
       h('div', { key: 'tone', className: 'car-fx car-tone', style: { ...maskStyle, opacity: fx.tone.opacity, background: '#000' } }),
       h('div', { key: 'tint', className: 'car-fx car-tint ' + (fx.anim || ''), style: { ...maskStyle, ...fx.tint } }),
       h('div', { key: 'sheen', className: 'car-fx car-sheen', style: { ...maskStyle, opacity: fx.sheen.opacity,
@@ -583,19 +614,15 @@
             h('div', { className: 'knob' }, h(I.Split, { size: 20 })))
         ) : null,
 
-        // bg removal progress overlay — stays visible on error so the user can see what went wrong
-        (removing || removeError) ? h('div', { className: 'render-veil on' },
-          h('div', { className: 'render-card' },
-            h('div', { className: 'rk' }, 'Preparing your car'),
-            removeError
-              ? h('h3', { style: { color: 'var(--warn)' } }, 'Background removal failed')
-              : h('h3', null, 'Lifting your car off its background'),
-            removeError
-              ? h('p', null, removeError)
-              : h('p', null, 'A few seconds — we isolate the car so the wrap sits only on the body.'),
-            !removeError ? h('div', { className: 'removal-bar' }, h('div', { className: 'removal-bar-sweep' })) : null,
-            removeError ? h('button', { className: 'btn btn--sm', style: { marginTop: 8 },
-              onClick: () => setRemoveError(null) }, 'Dismiss') : null)) : null,
+        // Background isolation runs quietly — a small NON-blocking chip, never a veil.
+        // The car is already on screen and the studio render works regardless.
+        removing ? h('div', { className: 'isolating-chip' },
+          h('span', { className: 'iso-spin' }),
+          'Isolating your car for live colour…') : null,
+        // Only a true read failure shows a (dismissible) error.
+        removeError ? h('div', { className: 'isolating-chip iso-error' },
+          removeError,
+          h('button', { className: 'iso-dismiss', onClick: () => setRemoveError(null) }, h(I.X, { size: 13 }))) : null,
 
         // drop veil
         h('div', { className: 'drop-veil' }, h(I.Upload, { size: 22, style: { marginRight: 10 } }), 'Drop to place your car'),
@@ -636,10 +663,11 @@
           // top-left: preview-vs-render status — makes it unmistakable that the
           // live view is an APPROXIMATE colour preview until you generate the render
           carUrl && swatch ? h('div', { className: 'hud-tl' },
-            h('div', { className: 'preview-tag' + (renderUrl ? ' is-render' : '') },
+            h('div', { className: 'preview-tag' + (renderUrl ? ' is-render' : (cutoutReady ? '' : ' is-limited')) },
               h('span', { className: 'pt-dot' }),
-              h('span', { className: 'pt-label' }, renderUrl ? 'Studio render' : 'Quick preview'),
-              h('span', { className: 'pt-sub' }, renderUrl ? 'true colour & finish' : 'indicative colour only'))) : null,
+              h('span', { className: 'pt-label' }, renderUrl ? 'Studio render' : (cutoutReady ? 'Quick preview' : 'Colour selected')),
+              h('span', { className: 'pt-sub' }, renderUrl ? 'true colour & finish'
+                : (cutoutReady ? 'indicative colour only' : 'generate render to see it on your car')))) : null,
 
           // top-right: the one primary stage action — the deliberate AI step.
           // The instant colour preview is free + approximate; THIS generates the

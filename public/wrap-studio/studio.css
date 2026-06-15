@@ -239,6 +239,20 @@ input,textarea{font:inherit}
 .preview-tag.is-render .pt-dot{background:var(--ok);box-shadow:0 0 0 3px oklch(60% 0.13 150 / .22)}
 .pt-label{font-family:var(--f-head);font-weight:700;font-size:12px;color:var(--text)}
 .pt-sub{font-family:var(--f-mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3)}
+.preview-tag.is-limited .pt-dot{background:var(--text-3);box-shadow:0 0 0 3px oklch(100% 0 0 / .08)}
+
+/* non-blocking background-isolation chip (bottom-centre) */
+.isolating-chip{
+  position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:14;
+  display:inline-flex;align-items:center;gap:9px;height:34px;padding:0 14px;border-radius:99px;
+  background:oklch(15% 0.013 262 / .82);border:1px solid var(--line-2);color:var(--text-2);
+  font-size:12px;white-space:nowrap;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 6px 20px oklch(0% 0 0 / .4);
+}
+.isolating-chip.iso-error{color:var(--warn);border-color:oklch(63% 0.2 25 / .5)}
+.iso-spin{width:13px;height:13px;border-radius:50%;border:2px solid oklch(60% 0.2 264 / .3);border-top-color:var(--accent-bright);animation:rspin .7s linear infinite;flex:0 0 auto}
+.iso-dismiss{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;color:inherit;margin-left:2px}
+.iso-dismiss:hover{background:oklch(100% 0 0 / .1)}
 
 /* caption plate — film identity */
 .cap{

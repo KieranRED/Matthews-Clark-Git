@@ -123,15 +123,22 @@
       //    even while the bar eases near its cap.
       const CAP = 94, TAU = 52000;                  // ms; ~63% of cap at 52s
       const STEP_TIMES = [0, 11000, 27000, 47000, 74000, 104000]; // → 6 narrated stages
-      const t0 = performance.now(); let raf;
-      const tick = (now) => {
-        const t = now - t0;
+      // Wall-clock + setInterval (NOT requestAnimationFrame): rAF pauses when the
+      // tab is backgrounded, which froze the bar mid-render. We recompute from
+      // elapsed wall time every tick and again on tab refocus, so it's always
+      // correct when the user looks back.
+      const t0 = Date.now();
+      const compute = () => {
+        const t = Date.now() - t0;
         setRenderPct(Math.min(CAP, CAP * (1 - Math.exp(-t / TAU))));
         let s = 0; for (let i = 0; i < STEP_TIMES.length; i++) { if (t >= STEP_TIMES[i]) s = i; }
         setRenderStep(s);
-        raf = requestAnimationFrame(tick);
       };
-      raf = requestAnimationFrame(tick);
+      let timer = setInterval(compute, 200);
+      const onVis = () => { if (!document.hidden) compute(); };
+      document.addEventListener('visibilitychange', onVis);
+      const stopProgress = () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVis); };
+      compute();
 
       try {
         const pack = await window.__wrapRenderCanvas();
@@ -153,7 +160,7 @@
         const to = setTimeout(() => ctrl.abort(), 290000);
         const resp = await fetch('/api/wrap-render', { method: 'POST', body: fd, signal: ctrl.signal });
         clearTimeout(to);
-        cancelAnimationFrame(raf); setRenderPct(100); setRenderStep(6);
+        stopProgress(); setRenderPct(100); setRenderStep(6);
 
         if (resp.status === 429) { setRendering(false); setRenderPct(0); setRendersLeft(0); flash('That\'s your 3 studio renders for today — they reset tomorrow'); return; }
         const data = await resp.json();
@@ -163,7 +170,7 @@
         if (typeof data.remaining === 'number') setRendersLeft(data.remaining);
         setTimeout(() => { setRendering(false); flash('Studio render ready'); }, 300);
       } catch (err) {
-        cancelAnimationFrame(raf); setRendering(false); setRenderPct(0);
+        stopProgress(); setRendering(false); setRenderPct(0);
         flash(err && err.name === 'AbortError' ? 'Render timed out — try again' : (err.message || 'Render failed — try again'));
       }
     }, [carUrl, sel, flash, rendersLeft]);
