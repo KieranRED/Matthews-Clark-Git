@@ -42,56 +42,14 @@
   }
 
   // ─── Canvas recolour engine (quick preview) ─────────────────────────────────
-  // Paint-ONLY recolour. This is an indicative preview (the studio render is the
-  // accurate result), but it must only touch painted body panels — never glass,
-  // lights, tyres, wheels, badges or trim — for ANY car colour, black included.
-  //
-  //   1. analyseBody — the body's dominant luminance + whether the car is
-  //      chromatic (red/blue/…) or achromatic (black/white/grey).
-  //   2. isPaint — multi-cue candidate test: hue-proximity for coloured cars;
-  //      luminance-band + blue-glass + saturation rejection for achromatic cars.
-  //   3. connected components — keep only large contiguous regions, which drops
-  //      badges, number plate, mirror glass and trim slivers automatically.
-  //   4. dilate the kept mask a couple of px to close panel gaps / door handles
-  //      so the body recolours solid (no patchy holes).
-  //   5. luminance-preserving recolour of the final mask.
-
-  function analyseBody(d, cw, ch) {
-    let sumS = 0, n = 0;
-    const hue = new Array(36).fill(0);
-    const lHist = new Array(20).fill(0);
-    for (let y = Math.floor(ch * 0.10); y < ch * 0.90; y += 3) {
-      for (let x = Math.floor(cw * 0.06); x < cw * 0.94; x += 3) {
-        const i = (y * cw + x) * 4;
-        if (d[i+3] < 80) continue;
-        const p = rgbToHSL(d[i], d[i+1], d[i+2]);
-        if (p.l < 0.04 || p.l > 0.98) continue;
-        sumS += p.s; n++;
-        if (p.s > 0.08) hue[Math.floor(p.h / 10) % 36]++;
-        lHist[Math.min(19, Math.floor(p.l * 20))]++;
-      }
-    }
-    if (!n) return { achromatic: true, bodyL: 0.5, domH: -1 };
-    const avgS = sumS / n;
-    let mb = 0, mc = 0; for (let i = 0; i < 20; i++) { if (lHist[i] > mc) { mc = lHist[i]; mb = i; } }
-    let hb = 0, hc = 0; for (let i = 0; i < 36; i++) { if (hue[i] > hc) { hc = hue[i]; hb = i; } }
-    return { achromatic: avgS < 0.10 || hc < n * 0.10, bodyL: (mb + 0.5) / 20, domH: hb * 10 + 5 };
-  }
-
-  function isPaint(p, info) {
-    const { h, s, l } = p;
-    if (l < 0.05) return false;                       // tyre / deep shadow
-    if (l > 0.96 && s < 0.12) return false;           // chrome / specular highlight
-    if (info.achromatic) {
-      if (Math.abs(l - info.bodyL) > 0.34) return false;            // far from body tone = glass/trim
-      if (s > 0.12 && h > 170 && h < 265 && l < info.bodyL) return false; // bluish + dark = window glass
-      if (s > 0.32) return false;                                    // too saturated for an achromatic car
-      return true;
-    }
-    if (s < 0.10) return false;                       // desaturated on a coloured car = glass/chrome/rubber
-    const diff = Math.min(Math.abs(h - info.domH), 360 - Math.abs(h - info.domH));
-    return diff < 45 || s > 0.22;                     // hue-close to paint, or vividly saturated
-  }
+  // Runs on the background-removed cutout (so only the car is ever touched, never
+  // the surroundings). This is an INDICATIVE preview — the studio render is the
+  // accurate result. Reliability beats precision here: rather than a per-pixel
+  // paint mask (which fragmented on metallic/grey cars → "half the paint" and
+  // misfired on lights), we recolour the WHOLE car luminance-preserved with a
+  // smooth per-pixel weight that protects the bright zones (head/tail lights,
+  // chrome, hot reflections) and the tyres, and gently eases off on dark glass.
+  // Full, even coverage on every car colour; lights kept; no holes.
 
   function recolourCanvas(carUrl, targetHex, finish) {
     return new Promise((resolve) => {
@@ -122,62 +80,32 @@
           ctx.putImageData(id, 0, 0); return resolve(cv.toDataURL('image/png'));
         }
 
-        const info = analyseBody(d, cw, ch);
+        const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
         const satMult = finish === 'matte' ? 0.82 : finish === 'satin' ? 0.90 : 1.0;
-        const n = cw * ch;
 
-        // 1) candidate paint pixels
-        const cand = new Uint8Array(n);
         for (let i = 0; i < d.length; i += 4) {
-          if (d[i+3] < 40) continue;
-          if (isPaint(rgbToHSL(d[i], d[i+1], d[i+2]), info)) cand[i >> 2] = 1;
-        }
+          if (d[i+3] < 20) continue;                  // outside the cutout
+          const px = rgbToHSL(d[i], d[i+1], d[i+2]);
+          const L = px.l, S = px.s;
 
-        // 2) connected components (BFS, O(1) queue) — keep only large regions
-        const labels = new Int32Array(n).fill(-1);
-        const sizes = [];
-        const q = new Int32Array(n);
-        let next = 0;
-        for (let s = 0; s < n; s++) {
-          if (!cand[s] || labels[s] >= 0) continue;
-          const lab = next++; let head = 0, tail = 0, sz = 0;
-          q[tail++] = s; labels[s] = lab;
-          while (head < tail) {
-            const c = q[head++]; sz++;
-            const cy = (c / cw) | 0, cx = c % cw;
-            if (cy > 0)    { const nb = c - cw; if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
-            if (cy < ch-1) { const nb = c + cw; if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
-            if (cx > 0)    { const nb = c - 1;  if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
-            if (cx < cw-1) { const nb = c + 1;  if (cand[nb] && labels[nb] < 0) { labels[nb] = lab; q[tail++] = nb; } }
-          }
-          sizes.push(sz);
-        }
-        let total = 0; for (let i = 0; i < cand.length; i++) total += cand[i];
-        const minSize = Math.max(300, total * 0.02);
-        let paint = new Uint8Array(n);
-        for (let i = 0; i < n; i++) { const l = labels[i]; if (l >= 0 && sizes[l] >= minSize) paint[i] = 1; }
+          // weight = how strongly to apply colour (1 = full). The body — at ANY
+          // luminance, including the shadowed/dark side of grey & black cars — stays
+          // at ~1 so coverage is always complete and even (no "half the paint").
+          // Only the genuine extremes ease off: bright lights/chrome/highlights stay
+          // bright; the darkest pixels (tyres/shadow) ease out but recolour ≈ black
+          // there anyway, so they read correctly. Dark glass tints like the body —
+          // an accepted trade for guaranteed full coverage (this is an indicative
+          // preview; the studio render is the accurate one).
+          void S;
+          let w = 1;
+          if (L > 0.80) w *= clamp01((0.98 - L) / 0.18);  // head lights, chrome, specular → keep bright
+          if (L < 0.10) w *= clamp01(L / 0.10);           // tyres / deep shadow
+          if (w <= 0.001) continue;
 
-        // 3) dilate 2px to close panel gaps / handles, but never onto tyre/chrome
-        for (let pass = 0; pass < 2; pass++) {
-          const grown = paint.slice();
-          for (let i = 0; i < d.length; i += 4) {
-            const pix = i >> 2;
-            if (paint[pix] || d[i+3] < 40) continue;
-            const p = rgbToHSL(d[i], d[i+1], d[i+2]);
-            if (p.l < 0.05 || (p.l > 0.96 && p.s < 0.12)) continue; // keep tyres/chrome out
-            const x = pix % cw, y = (pix / cw) | 0;
-            if ((x > 0 && paint[pix-1]) || (x < cw-1 && paint[pix+1]) ||
-                (y > 0 && paint[pix-cw]) || (y < ch-1 && paint[pix+cw])) grown[pix] = 1;
-          }
-          paint = grown;
-        }
-
-        // 4) luminance-preserving recolour of the final paint mask
-        for (let i = 0; i < d.length; i += 4) {
-          if (!paint[i >> 2]) continue;
-          const L = rgbToHSL(d[i], d[i+1], d[i+2]).l;
           const rc = hslToRGB(tHSL.h, tHSL.s * satMult, L);
-          d[i] = rc.r; d[i+1] = rc.g; d[i+2] = rc.b;
+          d[i]   = Math.round(d[i]   * (1 - w) + rc.r * w);
+          d[i+1] = Math.round(d[i+1] * (1 - w) + rc.g * w);
+          d[i+2] = Math.round(d[i+2] * (1 - w) + rc.b * w);
         }
 
         ctx.putImageData(id, 0, 0);
@@ -251,6 +179,26 @@
     // has its background would tint the background too.
     const [cutoutReady, setCutoutReady] = useState(false);
     const recolourAbort = useRef(null);
+
+    // On load with a restored photo, detect whether it's a real cutout (has
+    // transparency) so the live recolour works again without re-uploading.
+    useEffect(() => {
+      if (!carUrl) return;
+      let alive = true;
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => {
+        if (!alive) return;
+        try {
+          const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+          const x = c.getContext('2d'); x.drawImage(im, 0, 0, 64, 64);
+          const dd = x.getImageData(0, 0, 64, 64).data;
+          let transparent = 0; for (let i = 3; i < dd.length; i += 4) if (dd[i] < 200) transparent++;
+          if (transparent / (dd.length / 4) > 0.08) setCutoutReady(true);
+        } catch {}
+      };
+      im.src = carUrl;
+      return () => { alive = false; };
+    }, []); // mount only — ingest sets cutoutReady during a fresh upload
 
     // ── Canvas recolour: runs whenever the car or swatch changes ──────────────
     useEffect(() => {
