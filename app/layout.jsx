@@ -4,14 +4,18 @@
 // mc-site routes skip the (crm) layout entirely, eliminating the render-blocking
 // CSS bundle from the marketing site's critical path.
 
-import { Anton, Archivo, Inter_Tight, JetBrains_Mono } from "next/font/google";
+// Font strategy: only the two fonts on the first-paint critical path are loaded
+// as web fonts — Inter Tight (body/inputs) + Anton (hero titles). JetBrains Mono
+// (--font-mono) and Archivo (--font-ui) now fall back to system fonts via the
+// :root declarations in globals.css, removing 2 font files from the critical path.
+// preload:true emits <link rel=preload as=font> so the 2 remaining fonts start
+// downloading before the font CSS is parsed.
+import { Anton, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import "./styles/lead-flow.css";
 
-const fontSans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const fontMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
-const fontDisplay = Anton({ subsets: ["latin"], variable: "--font-display", weight: "400", display: "swap" });
-const fontUi = Archivo({ subsets: ["latin"], variable: "--font-ui", display: "swap" });
+const fontSans = Inter_Tight({ subsets: ["latin"], variable: "--font-sans", display: "swap", preload: true });
+const fontDisplay = Anton({ subsets: ["latin"], variable: "--font-display", weight: "400", display: "swap", preload: true });
 
 export const metadata = {
   title: "Matthews & Clark — Start a Job",
@@ -46,7 +50,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${fontSans.variable} ${fontMono.variable} ${fontDisplay.variable} ${fontUi.variable}`}>
+      <body className={`${fontSans.variable} ${fontDisplay.variable}`}>
         {children}
       </body>
     </html>
