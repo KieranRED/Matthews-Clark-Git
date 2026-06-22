@@ -23,6 +23,10 @@ A single platform that runs the business — no spreadsheets, no duct-taped SaaS
 - **Styling**: Custom CSS modules (dark, monospace-accented CRM aesthetic)
 - **Deployment**: Vercel (production at matthewsandclark.co.za)
 
+## Current State
+
+Phase 09 complete (2026-06-22) — Neon schema, webhook receiver, phone normalisation, lead auto-linking, and WABA subscribe endpoint all shipped. Awaiting live Meta WABA provisioning for end-to-end testing. Phase 10 (Web Push) next.
+
 ## Current Milestone: v1.2 WhatsApp Business Integration
 
 **Goal:** Add a WhatsApp conversation layer to the CRM that logs all team conversations, links them to CRM leads, fires AI-powered alerts, and surfaces conversation intelligence on lead cards.
@@ -83,7 +87,7 @@ A single platform that runs the business — no spreadsheets, no duct-taped SaaS
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Storage | Upstash Redis | Serverless-native, no connection pooling |
+| Storage | Upstash Redis + Neon Postgres | KV for hot path (leads/jobs/clients/push subs); Neon for WhatsApp conversation storage (Validated in Phase 09) |
 | Hosting | Vercel | Existing, Blob + Cron native |
 | Social posting | Direct platform APIs (no SaaS) | Full control, no recurring SaaS cost, same quality |
 | Video storage | Vercel Blob (7-day TTL) | Platform downloads original; cost negligible |
