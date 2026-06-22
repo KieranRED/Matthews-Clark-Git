@@ -1,788 +1,530 @@
-# Architecture Patterns: Social Content Scheduler
+# Architecture: WhatsApp Business Integration
 
-**Domain:** Social content scheduling integrated into an existing Next.js 15 CRM
-**Researched:** 2026-05-29
-**Overall confidence:** HIGH (KV patterns from source, API flows from official docs)
-
----
-
-## Existing KV Schema (reference)
-
-The codebase uses a consistent naming convention. Understanding it is required before adding content keys.
-
-```
-lead:{id}                    → lead object
-leads:index                  → sorted set, score = createdAt ms
-
-client:{id}                  → client object
-clients:index                → sorted set, score = updatedAt ms
-client:{id}:leads            → sorted set of lead IDs per client
-client:{id}:jobs             → sorted set of job IDs per client
-clientByPhone:{phoneNorm}    → clientId lookup
-clientByEmail:{email}        → clientId lookup
-
-job:{id}                     → job object
-jobs:index                   → sorted set, score = updatedAt ms
-```
-
-All reads/writes go through `lib/kv.js` (REST API client for Upstash, not `@upstash/redis`). `kvGet`, `kvSet`, `kvDel`, `kvZAdd`, `kvZRevRange`, `kvZRem`, `kvKeys`, `kvIncr` are the available primitives.
+**Milestone:** v1.2 WhatsApp Business Integration
+**Researched:** 2026-06-22
+**Confidence:** HIGH (all integration points verified against live source code)
 
 ---
 
-## Content Post KV Schema
+## Existing Architecture Summary
 
-Follow the exact same conventions as leads and jobs.
+The codebase is a Next.js 15 App Router monolith deployed on Vercel with the following conventions:
 
-### Keys
-
-```
-content:{post_id}            → post object (full record)
-content:index                → sorted set, score = scheduled_at ms (for cron dispatch)
-content:published:index      → sorted set, score = published_at ms (for analytics cron)
-```
-
-### Post Object Shape
-
-```js
-{
-  id: "uuid",
-  createdAt: "ISO",
-  updatedAt: "ISO",
-
-  // Content
-  caption: "string",
-  hashtags: ["string"],           // stored as array, joined on publish
-  blobUrl: "string",              // Vercel Blob URL — public, no auth
-  qualityTag: "optimised" | "check_export" | "pending",
-  qualityMeta: {                  // written by ffprobe step
-    codec: "string",              // e.g. "h264"
-    resolution: "1920x1080",
-    fps: 30,
-    bitrate: 8000000,             // bps
-    durationSec: 45
-  },
-
-  // Scheduling
-  scheduledAt: "ISO",             // UTC, what the cron compares against
-  status: "draft" | "scheduled" | "publishing" | "published" | "failed",
-  failReason: "string | null",
-
-  // Platform targets
-  platforms: ["instagram", "tiktok"],
-
-  // Platform-specific IDs (written after publish)
-  igContainerId: "string | null",
-  igMediaId: "string | null",
-  tiktokPublishId: "string | null",
-
-  // Analytics (written by daily analytics cron after 48hr)
-  metrics: {
-    instagram: {
-      views: number,
-      reach: number,
-      likes: number,
-      comments: number,
-      shares: number,
-      saved: number,
-      avgWatchTimeSec: number,
-      fetchedAt: "ISO"
-    } | null,
-    tiktok: {
-      views: number,
-      likes: number,
-      comments: number,
-      shares: number,
-      fetchedAt: "ISO"
-    } | null
-  },
-
-  // UTM attribution
-  utm: {
-    campaign: "string | null",    // maps to lead.utm.campaign
-    content: "string | null"      // post ID or slug for tracking
-  }
-}
-```
-
-### Index Operations
-
-```
-// Write on create / schedule
-kvZAdd("content:index", Date.parse(post.scheduledAt), post.id)
-
-// Write on publish success
-kvZAdd("content:published:index", Date.now(), post.id)
-kvZRem("content:index", post.id)
-
-// Cron dispatch: posts due now
-kvZRevRange("content:index", 0, -1)  // fetch all, filter score <= Date.now()
-// Better: use ZRANGEBYSCORE — add kvZRangeByScore to lib/kv.js (see below)
-```
-
-### Required KV Primitive Addition
-
-The cron dispatch needs `ZRANGEBYSCORE` to fetch only posts due by now. Add to `lib/kv.js`:
-
-```js
-// GET posts with score <= maxScore (epoch ms)
-export async function kvZRangeByScore(setKey, minScore, maxScore) {
-  const res = await kvFetch(
-    `/zrangebyscore/${encodeURIComponent(setKey)}/${minScore}/${maxScore}`
-  );
-  return Array.isArray(res) ? res.map(String) : [];
-}
-```
+- All admin UI lives in one client-side React tree: `app/(crm)/admin/(protected)/kit/app.jsx`
+- Routing inside that tree is client-side slug parsing (`shell.jsx::parsePath`), not Next.js pages. Adding a new screen = add a `slug[0] === "whatsapp"` branch in `parsePath` + import the screen component in `app.jsx`
+- Data for the CRM shell is fetched by `useCrmKitData` polling `/api/admin/crm-kit` every 15 seconds. WhatsApp thread-list data should follow this same pattern: separate fetch, same polling approach
+- API routes at `/api/admin/*` use the `verifyAdminSession` cookie check from `lib/adminAuth.js`. Cron routes use `Authorization: Bearer ${CRON_SECRET}` instead
+- Notifications fire via `lib/telegram.js`. Web Push is additive alongside this — do not replace Telegram
+- Storage: Upstash Redis KV via REST (`lib/kv.js`). No persistent connections. WhatsApp conversation data goes to Neon Postgres, not KV
 
 ---
 
-## New Store File
+## Neon Postgres in a Serverless/Edge Environment
 
-Create `lib/contentStore.js` following the exact pattern of `lib/jobStore.js`:
+**Recommended driver:** `@neondatabase/serverless` with the `neon()` HTTP function.
 
-```
-lib/contentStore.js
-  createPost(data)        → validates, assigns id, writes content:{id} + content:index
-  getPost(id)             → kvGet content:{id}
-  updatePost(id, patch)   → merge-patch + kvSet + reindex if scheduledAt changed
-  listPostIds({limit})    → kvZRevRange content:index (newest scheduled first)
-  listPosts({limit,status})
-  deletePost(id)          → kvDel + kvZRem from both indexes
-  listDuePosts(nowMs)     → kvZRangeByScore content:index, 0, nowMs
-  listPostsForAnalytics() → kvZRangeByScore content:published:index, 0, cutoffMs
-                           where cutoffMs = Date.now() - 48hr in ms
-                           filtered to posts where metrics.instagram is null OR
-                           metrics.tiktok is null
-```
-
----
-
-## API Routes
-
-### New routes (all under `/app/api/admin/content/`)
-
-```
-/api/admin/content/route.js
-  GET   → list posts (calls listPosts)
-  POST  → create draft post (no upload yet)
-
-/api/admin/content/upload/route.js
-  POST  → multipart: receive video file
-          → put to Vercel Blob (public)
-          → run mediainfo.js quality check on the buffer
-          → return { blobUrl, qualityTag, qualityMeta }
-
-/api/admin/content/[postId]/route.js
-  GET    → getPost
-  PATCH  → updatePost (caption, hashtags, scheduledAt, platforms, status)
-  DELETE → deletePost + kvDel blob if blobUrl present (via Vercel Blob del())
-
-/api/admin/content/[postId]/publish/route.js
-  POST  → manual immediate publish trigger (calls same logic as cron)
-```
-
-### New cron routes
-
-```
-/api/cron/content-publish/route.js
-  GET   → triggered every 15 min by Vercel cron
-          → listDuePosts(Date.now())
-          → for each: run publishPost(post)
-
-/api/cron/content-analytics/route.js
-  GET   → triggered daily (e.g. 06:00 UTC)
-          → listPostsForAnalytics()
-          → for each: fetch IG + TikTok metrics, store in post.metrics
-
-/api/cron/content-obsidian/route.js
-  GET   → triggered nightly (e.g. 02:00 UTC)
-          → listPosts({ limit: 1000, status: "published" })
-          → for each post: render markdown, upsert to GitHub via Octokit
-```
-
-### Modified routes
-
-```
-/api/admin/crm-kit/route.js
-  → add content posts to the aggregated payload (or leave out — content screen
-    can use its own fetch to /api/admin/content)
-  Recommendation: content screen fetches independently. The crm-kit
-  endpoint is already large; content data has different cache needs.
-```
-
-### Auth pattern (consistent with existing routes)
-
-All `/api/admin/content/*` routes follow the same cookie auth check:
+Use the HTTP transport (`neon()`) not WebSockets (`Pool/Client`) for Vercel Node.js serverless functions. Each route handler is a stateless invocation — there is no connection to reuse across requests. HTTP transport has ~3-4 round-trip setup cost vs ~8 for TCP, which is the right trade-off here.
 
 ```js
-import { cookies } from "next/headers";
-import { adminCookieName, verifyAdminSession } from "@/lib/adminAuth";
+// lib/neon.js — shared factory, created per invocation
+import { neon } from "@neondatabase/serverless";
 
-export async function GET(request) {
-  const token = cookies().get(adminCookieName())?.value || null;
-  const session = await verifyAdminSession(token);
-  if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  // ...
+export function db() {
+  return neon(process.env.DATABASE_URL);
 }
 ```
 
-Cron routes use `CRON_SECRET` bearer token instead (Vercel injects automatically):
+Use the **pooled** connection string (`-pooler` hostname from Neon dashboard). This routes through Neon's PgBouncer in transaction mode, preventing connection exhaustion when many serverless invocations run in parallel.
 
-```js
-export async function GET(request) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  // ...
-}
-```
+Do NOT double-pool (client-side pool + Neon PgBouncer). One layer is enough.
 
----
+For **migrations** (schema changes only, not query traffic), use `DATABASE_URL_UNPOOLED` — Neon's PgBouncer in transaction mode does not support `SET search_path` or DDL session-level commands.
 
-## ffprobe / Video Quality Check on Vercel
-
-**Verdict: ffprobe binary is not viable on Vercel serverless. Use mediainfo.js (WASM).**
-
-### Why ffprobe fails on Vercel
-
-- `ffprobe-static` and `@ffprobe-installer/ffprobe` rely on `__dirname` for binary path resolution, which resolves incorrectly in Next.js App Router's `.next/server/` bundle context
-- Installing either package pushes the serverless function over Vercel's 50 MB compressed bundle limit
-- Vercel explicitly does not recommend ffmpeg/ffprobe for serverless functions
-- Build compilation errors were documented in 2024 with `@ffprobe-installer` in Next.js 14+
-
-### Recommended approach: mediainfo.js (WASM)
-
-`mediainfo.js` is a WebAssembly port of MediaInfoLib. The WASM file is ~2.4 MB and works in both browser and Node.js. It returns codec, resolution, bitrate, fps, and duration — exactly what's needed for the quality tag.
-
-**Quality check logic in `/api/admin/content/upload/route.js`:**
-
-```js
-import MediaInfo from "mediainfo.js";
-import { put } from "@vercel/blob";
-
-export async function POST(request) {
-  // 1. Parse multipart body (Next.js 15: request.formData())
-  const formData = await request.formData();
-  const file = formData.get("video");
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  // 2. Upload to Vercel Blob first (gives us public URL)
-  const blob = await put(`content/${crypto.randomUUID()}.mp4`, buffer, {
-    access: "public",
-    contentType: file.type
-  });
-
-  // 3. Run mediainfo quality check on the buffer
-  const mi = await MediaInfo({ format: "JSON" });
-  const result = await mi.analyzeData(buffer.length, (size, offset) =>
-    buffer.subarray(offset, offset + size)
-  );
-  mi.close();
-
-  const tracks = result?.media?.track ?? [];
-  const video = tracks.find(t => t["@type"] === "Video") ?? {};
-  const general = tracks.find(t => t["@type"] === "General") ?? {};
-
-  const qualityMeta = {
-    codec: video.Format?.toLowerCase() ?? null,         // "avc" = h264
-    resolution: video.Width && video.Height
-      ? `${video.Width}x${video.Height}` : null,
-    fps: parseFloat(video.FrameRate) || null,
-    bitrate: parseInt(video.BitRate, 10) || null,       // bps
-    durationSec: parseFloat(general.Duration) || null
-  };
-
-  // 4. Determine quality tag
-  // Optimised: h264/h265, >= 1080p, >= 24fps, >= 5Mbps, <= 90s (IG limit)
-  const isOptimised = (
-    ["avc", "hevc", "h264", "h265"].includes(qualityMeta.codec) &&
-    parseInt(video.Height) >= 1080 &&
-    qualityMeta.fps >= 24 &&
-    qualityMeta.bitrate >= 5_000_000 &&
-    qualityMeta.durationSec <= 90
-  );
-  const qualityTag = qualityMeta.codec ? (isOptimised ? "optimised" : "check_export") : "pending";
-
-  return Response.json({ blobUrl: blob.url, qualityTag, qualityMeta });
-}
-```
-
-**Installation:**
 ```bash
-npm install mediainfo.js
+npm install @neondatabase/serverless
 ```
 
-**WASM loading in Next.js:** Next.js 15 supports WASM natively via `experimental.serverComponentsExternalPackages` or by treating it as a static asset. `mediainfo.js` loads its WASM from `node_modules/mediainfo.js/dist/MediaInfoModule.wasm`. Add to `next.config.js`:
-
-```js
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["mediainfo.js"]
-  }
-};
+Add to `.env.local` (real values from Neon dashboard):
+```
+DATABASE_URL=postgres://user:pass@ep-xxx-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require
+DATABASE_URL_UNPOOLED=postgres://user:pass@ep-xxx.eu-west-2.aws.neon.tech/neondb?sslmode=require
 ```
 
-**Confidence:** MEDIUM. mediainfo.js is confirmed to support Node.js and WASM runtime. The `serverComponentsExternalPackages` config is needed for packages with native WASM. Validate this actually loads in Vercel's runtime in Phase 1.
+**Confidence:** HIGH — sourced from Neon official serverless driver documentation.
 
 ---
 
-## Instagram Container → Publish Flow
+## Database Schema (Neon Postgres)
 
-**Official source:** Meta Graph API v25.0, `graph.instagram.com`
+Five tables. All IDs are UUIDs. Phone numbers stored in E.164-without-plus format (matching `normalizePhone()` in `lib/leadStore.js`).
 
-### Complete flow
+```sql
+-- Registered team WhatsApp numbers
+CREATE TABLE team_numbers (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  wa_id         TEXT UNIQUE NOT NULL,   -- e.g. "27821234567"
+  display_name  TEXT NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- Every message in/out on every thread
+CREATE TABLE conversation_messages (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  wamid           TEXT UNIQUE NOT NULL,  -- Meta message ID, for deduplication
+  thread_key      TEXT NOT NULL,          -- "{team_wa_id}:{contact_wa_id}"
+  direction       TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+  from_wa_id      TEXT NOT NULL,
+  to_wa_id        TEXT NOT NULL,
+  message_type    TEXT NOT NULL,          -- text, image, audio, document, etc.
+  body            TEXT,
+  media_url       TEXT,
+  timestamp_ms    BIGINT NOT NULL,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  lead_id         TEXT,                   -- KV lead ID (nullable, auto-linked)
+  client_id       TEXT,                   -- KV client ID (nullable, auto-linked)
+  ai_analysed     BOOLEAN DEFAULT false
+);
+
+CREATE INDEX ON conversation_messages (thread_key, timestamp_ms DESC);
+CREATE INDEX ON conversation_messages (from_wa_id);
+CREATE INDEX ON conversation_messages (created_at);
+
+-- AI-derived intelligence per thread, updated per message analysis
+CREATE TABLE lead_intelligence (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_key      TEXT UNIQUE NOT NULL,
+  lead_id         TEXT,
+  warmth_score    INT CHECK (warmth_score BETWEEN 1 AND 10),
+  objections      JSONB DEFAULT '[]',     -- ["price", "timing"]
+  status_signal   TEXT,                   -- "hot", "cold", "dead", "converted"
+  follow_up_at    TIMESTAMPTZ,
+  last_analysed   TIMESTAMPTZ,
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Aftercare events (post-delivery follow-ups)
+CREATE TABLE aftercare_events (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lead_id         TEXT NOT NULL,
+  event_type      TEXT NOT NULL,          -- "7day", "30day", "review_request"
+  scheduled_at    TIMESTAMPTZ NOT NULL,
+  sent_at         TIMESTAMPTZ,
+  status          TEXT DEFAULT 'pending', -- pending, sent, failed
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX ON aftercare_events (status, scheduled_at);
+
+-- Broadcast campaign records
+CREATE TABLE broadcast_campaigns (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            TEXT NOT NULL,
+  message_template TEXT NOT NULL,
+  target_criteria JSONB NOT NULL,         -- {stage: "lost", inactive_days: 30}
+  status          TEXT DEFAULT 'draft',   -- draft, running, done
+  sent_count      INT DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  run_at          TIMESTAMPTZ
+);
+```
+
+**Push subscriptions** are stored in KV (not Postgres) to keep them consistent with the existing KV-first pattern and avoid a Postgres query on every push dispatch:
 
 ```
-Step 1 — Create container
-  POST https://graph.instagram.com/v25.0/{IG_USER_ID}/media
-  Body (form or JSON):
-    media_type = "REELS"
-    video_url  = {blobUrl}      ← Vercel Blob public URL, Meta fetches it
-    caption    = {caption + hashtags joined}
-    share_to_feed = true
-  Response: { id: "<IG_CONTAINER_ID>" }
-
-Step 2 — Poll status (max 5 checks, 1 per minute)
-  GET https://graph.instagram.com/v25.0/{IG_CONTAINER_ID}
-    ?fields=status_code
-    &access_token={INSTAGRAM_ACCESS_TOKEN}
-  Response status_code values:
-    IN_PROGRESS → keep polling
-    FINISHED    → proceed to publish
-    ERROR       → fail post, store failReason
-    EXPIRED     → container expired (24hr TTL), must recreate
-    PUBLISHED   → already published (shouldn't happen in this flow)
-
-Step 3 — Publish
-  POST https://graph.instagram.com/v25.0/{IG_USER_ID}/media_publish
-  Body:
-    creation_id = {IG_CONTAINER_ID}
-    access_token = {INSTAGRAM_ACCESS_TOKEN}
-  Response: { id: "<IG_MEDIA_ID>" }
-  → Store ig_media_id in post record
+push:sub:{deviceId}     → { endpoint, keys: { p256dh, auth }, ua, createdAt }
+push:subs:index         → sorted set, score = createdAt ms, member = deviceId
 ```
-
-### Key constraints
-- `video_url` must be publicly accessible (Vercel Blob public URLs satisfy this)
-- Rate limit: 100 API-published posts per rolling 24-hour window
-- Reels eligible for Reels tab: 5–90 seconds, 9:16 aspect ratio
-- Container expires after 24 hours if not published
-- Access token: long-lived Page/Business token stored in `INSTAGRAM_ACCESS_TOKEN` env var
-
-### Cron scheduling concern
-
-The 15-minute cron starts Step 1 and Step 3. Step 2 (polling) needs to happen between them. Two options:
-
-**Option A (simpler): Single-cron with inline polling**
-The cron function polls status up to 5 times with `setTimeout`-equivalent delays. Vercel Pro function max duration is 60s (Fluid compute) / 300s for paid. Five 1-minute polls = 5 minutes, which fits within Pro limits but not Hobby (10s max on Hobby).
-
-**Option B (recommended): Two-phase KV state machine**
-- Cron run N: detects post due → POST container → set `status = "publishing"`, `igContainerId = X`
-- Cron run N+1 (15 min later): finds `status = "publishing"` posts → polls status → if FINISHED, publishes
-- Cleaner, no long-running function, works on Hobby
-
-**Use Option B.** Add `igContainerId` to the post and handle the publishing state in the cron.
 
 ---
 
-## TikTok URL-Based Upload Flow
+## Data Flows
 
-**Official source:** TikTok Content Posting API v2, `open.tiktokapis.com`
-
-### Complete flow (PULL_FROM_URL — recommended for Vercel)
+### 1. Inbound Message: Webhook to DB to Push to CRM
 
 ```
-Step 1 — Query creator info (once per session / cache)
-  GET https://open.tiktokapis.com/v2/post/publish/creator_info/query/
-  Headers: Authorization: Bearer {TIKTOK_ACCESS_TOKEN}
-  Response: { privacy_level_options: [...], comment_disabled, duet_disabled, ... }
-  → Cache result in KV for 1 hour: kv.set("tiktok:creator_info", data, {ex: 3600})
+Meta Cloud API
+  → POST /api/whatsapp/webhook
+      [1] Verify X-Hub-Signature-256 (HMAC-SHA256 of raw body with WHATSAPP_APP_SECRET)
+      [2] Return 200 immediately (Meta retries if non-2xx)
+      [3] Parse payload:
+            entry[].changes[].value.messages[] → inbound messages
+            entry[].changes[].value.statuses[] → delivery receipts (log, don't push)
+      [4] For each message:
+            a. Upsert to conversation_messages (wamid as dedup key — ON CONFLICT DO NOTHING)
+            b. Derive thread_key = "{team_wa_id}:{contact_wa_id}"
+            c. Phone lookup: normalizePhone(from_wa_id) → kvGet clientByPhone:{phone}
+               → populate lead_id + client_id on the message row
+            d. Dispatch Web Push to all subscribed devices (fire-and-forget, non-blocking)
+            e. Enqueue AI analysis (write flag to KV: whatsapp:ai:queue:{wamid} = 1)
+               → AI runs in a separate cron or deferred — NOT inline in webhook handler
+      [5] Return 200
 
-Step 2 — Initialize post
-  POST https://open.tiktokapis.com/v2/post/publish/video/init/
-  Headers: Authorization: Bearer {TIKTOK_ACCESS_TOKEN}
-  Body (JSON):
-    {
-      "post_info": {
-        "title": "{caption}",
-        "privacy_level": "PUBLIC_TO_EVERYONE",  // or from creator_info
-        "disable_duet": false,
-        "disable_stitch": false,
-        "disable_comment": false
-      },
-      "source_info": {
-        "source": "PULL_FROM_URL",
-        "video_url": "{blobUrl}"               // Vercel Blob public URL
-      }
-    }
-  Response: { data: { publish_id: "...", upload_url: null } }
-  → Store publish_id in post record
+Web Push dispatch (step d):
+  → kvZRevRange("push:subs:index", 0, -1) → all deviceIds
+  → for each: kvGet push:sub:{deviceId}
+  → webpush.sendNotification(subscription, JSON.stringify({ title, body, threadKey }))
+  → if 410 Gone: kvDel push:sub:{deviceId} + kvZRem push:subs:index
 
-Step 3 — Poll status (same two-phase cron pattern as Instagram)
-  GET https://open.tiktokapis.com/v2/post/publish/status/fetch/
-  Body: { "publish_id": "{publish_id}" }
-  Response status values:
-    PROCESSING_DOWNLOAD → TikTok is fetching from blob_url, keep polling
-    PUBLISH_COMPLETE    → success, post is live
-    FAILED              → check fail_reason field
-    SEND_TO_USER_INBOX  → fallback: user must finish in-app (Inbox flow)
+CRM polling:
+  → useCrmKitData polls /api/admin/crm-kit every 15s (existing)
+  → WhatsApp tab fetches /api/admin/whatsapp/threads independently
+  → New message badge on WhatsApp nav item driven by unread count from threads endpoint
 ```
 
-### Key constraints
-- `video.publish` scope required — must be approved via TikTok audit before posts are public
-- Until audit approval: all posts are `SELF_ONLY` (private) in testing
-- Domain verification: TikTok requires URL prefix ownership verification for `PULL_FROM_URL` — register `*.vercel-storage.com` or the specific Vercel Blob domain in TikTok dev portal
-- Rate limit: 6 init requests per minute per user access token
-- PULL_FROM_URL URL must be HTTPS, no redirects, accessible for up to 1 hour
+### 2. AI Analysis: Async via Cron
 
-### Vercel Blob URL compatibility
-Vercel Blob generates URLs like `https://{account}.public.blob.vercel-storage.com/{path}`. These are HTTPS, publicly accessible, no redirects. Domain `public.blob.vercel-storage.com` needs to be registered as a verified domain in the TikTok developer portal before PULL_FROM_URL will work.
+```
+Vercel Cron (every 5 min) → GET /api/cron/whatsapp-ai
+  → kvKeys("whatsapp:ai:queue:*") → pending wamids
+  → for each:
+      SELECT message + last N messages in thread FROM conversation_messages
+      → Claude API: analyze warmth, objections, status signal, follow-up timing
+      → UPSERT lead_intelligence ON CONFLICT (thread_key) DO UPDATE
+      → if status_signal = "hot": dispatch Web Push alert to team
+      → if follow_up_at set: schedule aftercare_events row
+      → kvDel whatsapp:ai:queue:{wamid}
+```
+
+### 3. Outbound Message from CRM
+
+```
+CRM chat UI → POST /api/admin/whatsapp/send
+  → verifyAdminSession
+  → call Meta Cloud API: POST https://graph.facebook.com/v20.0/{phone_number_id}/messages
+  → on success: INSERT conversation_messages (direction='outbound')
+  → return { ok, message }
+```
+
+### 4. Vercel Cron: Morning Briefing (daily 07:00 SAST = 05:00 UTC)
+
+```
+GET /api/cron/whatsapp-morning-briefing
+  → Query last 24hr threads with unanswered inbound messages
+  → Query all active leads with no WhatsApp contact in 3+ days
+  → Build summary → telegramSendMessage (existing pattern) + Web Push
+```
+
+### 5. Vercel Cron: No-Contact Check (every 15 min)
+
+```
+GET /api/cron/whatsapp-no-contact
+  → SELECT thread_keys where last inbound message > X hours ago and no outbound reply
+  → Cross-reference with leads in "new" or "quoted" stage (KV lookup)
+  → If threshold exceeded: dispatch Web Push + Telegram alert
+  → Threshold: 4hr during business hours (08:00-18:00 SAST)
+```
 
 ---
 
-## Obsidian Export
+## New Files
 
-**Verdict: GitHub API via Octokit is the only viable approach on Vercel. No filesystem, no git binary.**
-
-### Why not filesystem or git binary
-
-- Vercel serverless functions have a read-only filesystem (`/tmp` is writable but ephemeral, destroyed after each invocation)
-- The Obsidian vault lives on a local machine, not a server path accessible to Vercel
-- Running `git` as a subprocess in a serverless function requires a bundled binary — same size and path-resolution problems as ffprobe
-
-### Recommended approach: GitHub Contents API via Octokit
-
-The nightly cron pushes markdown files directly to a GitHub repository that is also the Obsidian vault (via the `obsidian-git` plugin on the client side). Obsidian pulls the repo on open/sync. No filesystem access required.
-
-**Flow:**
+### Library
 
 ```
-1. Nightly cron fetches all published posts from KV
-2. For each post: render a markdown file
-3. Use @octokit/rest to call repos.createOrUpdateFileContents()
-   - If file exists: GET current SHA first, pass in update call
-   - If new: call with no SHA
-4. Commit message: "content: update post YYYY-MM-DD {post_id}"
+lib/neon.js
+  → db() factory: returns neon(process.env.DATABASE_URL)
+  → Used by all WhatsApp route handlers and crons
+
+lib/whatsappStore.js
+  → insertMessage(msg)
+  → listThreads({ limit, offset })              → thread summaries (last msg + unread count)
+  → listMessages({ threadKey, limit, before })  → paginated message history
+  → linkLeadToThread(threadKey, leadId, clientId)
+  → upsertIntelligence(threadKey, data)
+  → getIntelligence(threadKey)
+
+lib/webPush.js
+  → initVapid()                   → sets VAPID details once (call on module load)
+  → saveSubscription(deviceId, sub)
+  → removeSubscription(deviceId)
+  → listSubscriptions()
+  → dispatchPush(payload)         → sends to all saved subscriptions, cleans up 410s
+
+lib/whatsappApi.js
+  → sendMessage({ toWaId, fromPhoneId, body })  → Meta Cloud API call
+  → verifyWebhookSignature(rawBody, signature)  → HMAC-SHA256 verification
 ```
 
-**Markdown file naming:**
+### API Routes (all new)
 
 ```
-content/posts/{YYYY}/{MM}/{post_id}.md
+app/api/whatsapp/webhook/route.js
+  GET  → webhook verification (hub.mode, hub.verify_token, hub.challenge)
+  POST → inbound message handler (described in data flow above)
+  export const runtime = "nodejs"   ← required for crypto.createHmac
+
+app/api/admin/whatsapp/threads/route.js
+  GET  → list threads with last message, unread count, linked lead
+  → verifyAdminSession
+
+app/api/admin/whatsapp/threads/[threadKey]/messages/route.js
+  GET  → paginated message history for a thread
+  → verifyAdminSession
+
+app/api/admin/whatsapp/send/route.js
+  POST → send outbound message
+  → verifyAdminSession
+
+app/api/admin/whatsapp/numbers/route.js
+  GET  → list team_numbers
+  POST → register a new team number
+  → verifyAdminSession
+
+app/api/admin/whatsapp/numbers/[id]/route.js
+  PATCH  → update display_name
+  DELETE → remove number
+  → verifyAdminSession
+
+app/api/admin/whatsapp/intelligence/[threadKey]/route.js
+  GET → get lead_intelligence for a thread
+  → verifyAdminSession
+
+app/api/push/subscribe/route.js
+  POST → save Web Push subscription to KV
+  → verifyAdminSession (only team members subscribe)
+
+app/api/push/unsubscribe/route.js
+  POST → remove subscription
+  → verifyAdminSession
+
+app/api/cron/whatsapp-ai/route.js
+  GET → process AI analysis queue (CRON_SECRET auth)
+  export const maxDuration = 60
+
+app/api/cron/whatsapp-morning-briefing/route.js
+  GET → daily morning summary (CRON_SECRET auth)
+
+app/api/cron/whatsapp-no-contact/route.js
+  GET → no-contact alert check (CRON_SECRET auth)
 ```
 
-**Markdown frontmatter + body structure:**
+### CRM Screen
 
-```markdown
+```
+app/(crm)/admin/(protected)/kit/screens-whatsapp.jsx
+  → Thread list (left panel on desktop, full screen on mobile)
+  → Chat view (right panel on desktop, nested route on mobile)
+  → Compose bar with send button
+  → Lead link badge (shows linked lead name, links to /admin/jobs/{leadId})
+  → AI intelligence sidebar (warmth score, objections, follow-up date)
+  → "Register number" button (opens team_numbers management)
+
+public/sw.js
+  → Service worker for Web Push
+  → Handles "push" event: show notification with title + body
+  → Handles "notificationclick": focus existing tab or open /admin/whatsapp
+```
+
+### Migration
+
+```
+db/migrations/001_whatsapp.sql
+  → All 5 CREATE TABLE statements above
+  → Run once against DATABASE_URL_UNPOOLED before deploying routes
+```
+
 ---
-id: {post_id}
-scheduled: {scheduledAt}
-published: {publishedAt}
-platforms: [instagram, tiktok]
-quality: optimised
-utm_campaign: {utm.campaign}
-ig_media_id: {igMediaId}
-tiktok_publish_id: {tiktokPublishId}
-signal: audience-growth | conversion | non-performer | pending
----
 
-# {first 60 chars of caption}
+## Modified Files
 
-{full caption}
+### `vercel.json`
 
-{hashtags joined with space}
-
-## Metrics (48hr)
-
-| Platform  | Views | Likes | Comments | Shares | Saves |
-|-----------|-------|-------|----------|--------|-------|
-| Instagram | {n}   | {n}   | {n}      | {n}    | {n}   |
-| TikTok    | {n}   | {n}   | {n}      | {n}    | -     |
-```
-
-**Signal tagging logic (computed from metrics):**
-- `audience-growth` → shares > 20 OR reach > 3x avg reach
-- `conversion` → lead.utm.campaign matches this post's utm.campaign within 7 days
-- `non-performer` → views < 500 after 48hr
-- `pending` → metrics not yet fetched
-
-**Required env vars for Obsidian export:**
-```
-GITHUB_TOKEN=ghp_...          # PAT with repo write scope
-OBSIDIAN_REPO_OWNER=kieran    # GitHub username/org
-OBSIDIAN_REPO_NAME=mc-vault   # Repository name
-```
-
-**Installation:**
-```bash
-npm install @octokit/rest
-```
-
-**New file:** `lib/obsidianExport.js` — exports `upsertPostToVault(post)` and `buildMarkdown(post)`.
-
----
-
-## Vercel Cron Configuration
-
-Create `vercel.json` at project root (currently absent):
+Add three new cron entries to the existing file (which already has 3 entries for social content):
 
 ```json
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    {
-      "path": "/api/cron/content-publish",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/content-analytics",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/content-obsidian",
-      "schedule": "0 2 * * *"
-    }
+    { "path": "/api/cron/post",               "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/token-refresh",      "schedule": "0 9 * * *" },
+    { "path": "/api/cron/blob-cleanup",       "schedule": "0 3 * * *" },
+    { "path": "/api/cron/whatsapp-no-contact",         "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/whatsapp-ai",                 "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/whatsapp-morning-briefing",   "schedule": "0 5 * * *" }
   ]
 }
 ```
 
-**Constraints:**
-- Cron jobs only run on production deployment (not preview)
-- Hobby plan: 2 cron max, timing varies ±1 hour — use Pro (already on Vercel based on project)
-- `CRON_SECRET` is auto-injected by Vercel as a bearer token
-- All schedules are UTC
-- Each cron is a standard GET request to the route
+Note: existing vercel.json already has 3 crons — this brings the total to 6. Pro plan limit is 40.
 
----
+### `app/(crm)/admin/(protected)/kit/shell.jsx`
 
-## New CRM Screen
+Two changes:
 
-**File:** `app/(crm)/admin/(protected)/kit/screens-content.jsx`
-
-Follows the identical pattern of `screens-leads.jsx`, `screens-job.jsx` etc — a client-side React component that reads from the CRM shell's data context, plus its own async fetch for content-specific data.
-
-**Navigation:** Add `content` screen to `shell.jsx` nav items.
-
-**Data fetch:** Content screen fetches from `/api/admin/content` independently (not via `crm-kit` aggregate endpoint). This is intentional — content data changes on a different cadence to leads/jobs.
-
-**UI components needed:**
-- Post list with status badge, quality tag, scheduled time, platform icons
-- Schedule picker (datetime-local input)
-- Video upload with drag-and-drop, quality result display
-- Metrics table (shows after 48hr)
-- Platform toggle (Instagram / TikTok / both)
-
----
-
-## Data Flow Diagrams
-
-### Upload Flow
-
-```
-Browser (drag video)
-  → POST /api/admin/content/upload (multipart)
-    → parse formData, get file buffer
-    → put(buffer) → Vercel Blob
-    → mediainfo.js(buffer) → qualityMeta
-    → return { blobUrl, qualityTag, qualityMeta }
-  ← { blobUrl, qualityTag, qualityMeta }
-  → POST /api/admin/content (create post with blobUrl + quality)
-  ← { post }
+1. Add `"whatsapp"` route to `parsePath`:
+```js
+if (slug[0] === "whatsapp") return { name: "whatsapp", params: { threadKey: slug[1] || null } };
 ```
 
-### Publish Flow (15-min cron)
-
-```
-Vercel Cron → GET /api/cron/content-publish
-  → verifyAdminSession(CRON_SECRET)
-  → listDuePosts(Date.now())
-
-  For each post where status = "scheduled":
-    → if "instagram" in platforms:
-        POST /{IG_ID}/media (container creation)
-        → update post: status="publishing", igContainerId=X
-
-    → if "tiktok" in platforms:
-        POST /v2/post/publish/video/init/ (PULL_FROM_URL)
-        → update post: tiktokPublishId=X
-
-  For each post where status = "publishing":
-    → if igContainerId present:
-        GET /{igContainerId}?fields=status_code
-        if FINISHED → POST /{IG_ID}/media_publish → igMediaId
-    → if tiktokPublishId present:
-        GET /v2/post/publish/status/fetch/ → check status
-        if PUBLISH_COMPLETE → tiktokPublishId confirmed
-    → if all platforms done: status="published"
-      → kvZAdd content:published:index
-      → kvZRem content:index
+2. Add WhatsApp nav item to the `items` array in `BottomNav` and mcNav in `DesktopSidebar`:
+```js
+{ id: "whatsapp", label: "WhatsApp", href: "/admin/whatsapp", ic: <Icon.whatsapp /> }
 ```
 
-### Analytics Flow (daily cron)
+Add unread count badge: thread list endpoint returns `unreadCount` total → drive the `ct` prop on the nav item.
 
-```
-Vercel Cron → GET /api/cron/content-analytics
-  → listPostsForAnalytics()  // published > 48hr ago, metrics null
-  For each post:
-    → if igMediaId:
-        GET /{igMediaId}/insights?metric=views,reach,likes,comments,shares,saved,ig_reels_avg_watch_time
-        → store in post.metrics.instagram
-    → if tiktokPublishId:
-        GET /v2/video/query/?fields=view_count,like_count,comment_count,share_count
-        → store in post.metrics.tiktok
-    → updatePost(id, { metrics, updatedAt })
+### `app/(crm)/admin/(protected)/kit/app.jsx`
+
+Add WhatsApp screen import and route branch:
+
+```js
+import WhatsAppScreen from "./screens-whatsapp";
+
+// In the route switch:
+if (route.name === "whatsapp") body = <WhatsAppScreen index={index} params={route.params} />;
 ```
 
-### Obsidian Export Flow (nightly cron)
+### `app/(crm)/admin/(protected)/kit/icons.jsx`
 
-```
-Vercel Cron → GET /api/cron/content-obsidian
-  → listPosts({ limit: 500, status: "published" })
-  For each post:
-    → buildMarkdown(post)            // lib/obsidianExport.js
-    → computeSignal(post)            // audience-growth | conversion | non-performer | pending
-    → path = content/posts/{YYYY}/{MM}/{post.id}.md
-    → octokit.repos.getContent(path) // get SHA if exists, null if new
-    → octokit.repos.createOrUpdateFileContents({
-        owner, repo, path,
-        message: `content: ${post.id}`,
-        content: base64(markdown),
-        sha: existingFileSha || undefined
-      })
+Add a `whatsapp` icon entry (SVG path, follow existing pattern of other icons in this file).
+
+### `app/(crm)/admin/(protected)/layout.jsx`
+
+Register the service worker on mount. This is the protected layout wrapping all admin screens — the right place since push subscriptions are team-only:
+
+```jsx
+useEffect(() => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+}, []);
 ```
 
----
+### `next.config.mjs`
 
-## New vs Modified Files
+Add `@neondatabase/serverless` to `serverExternalPackages` if Vercel's bundler struggles with it (test in Phase 1 — may not be needed since it's pure JS with no WASM):
 
-### New files
-
-```
-lib/contentStore.js                                    # KV operations for posts
-lib/obsidianExport.js                                  # markdown builder + Octokit upsert
-
-app/api/admin/content/route.js                        # list + create posts
-app/api/admin/content/upload/route.js                 # video upload + quality check
-app/api/admin/content/[postId]/route.js               # get + patch + delete post
-app/api/admin/content/[postId]/publish/route.js       # manual publish trigger
-
-app/api/cron/content-publish/route.js                 # 15-min publish cron
-app/api/cron/content-analytics/route.js               # daily analytics cron
-app/api/cron/content-obsidian/route.js                # nightly Obsidian export cron
-
-app/(crm)/admin/(protected)/kit/screens-content.jsx   # content screen component
-
-vercel.json                                           # cron schedule config (new file)
+```js
+serverExternalPackages: ['mediainfo.js', '@imgly/background-removal-node', 'onnxruntime-node']
+// Add '@neondatabase/serverless' only if build fails without it
 ```
 
-### Modified files
+### Files Explicitly NOT Modified
 
 ```
-lib/kv.js
-  → add kvZRangeByScore(setKey, minScore, maxScore)
-
-app/(crm)/admin/(protected)/kit/shell.jsx
-  → add "Content" nav item linking to screens-content
-
-next.config.js
-  → add serverComponentsExternalPackages: ["mediainfo.js"]
-```
-
-### Files explicitly NOT modified
-
-```
-lib/leadStore.js          # no changes; UTM attribution is read-only link by campaign value
-lib/jobStore.js           # no changes
-app/api/admin/crm-kit/    # content data fetched separately; do not bundle into aggregate endpoint
+lib/kv.js        — no new primitives needed; push subscriptions use existing kvGet/kvSet/kvZAdd/kvZRem
+lib/leadStore.js — no changes; phone normalization is read via normalizePhone() import
+lib/telegram.js  — no changes; Telegram keeps running in parallel to Web Push
 ```
 
 ---
 
 ## Build Order (dependency-respecting)
 
-1. **KV schema + contentStore** — everything else depends on post CRUD
-   - `lib/kv.js` (add kvZRangeByScore)
-   - `lib/contentStore.js`
+### Phase 1: Database Foundation
 
-2. **Upload route + quality check** — needed before any post can have a blobUrl
-   - `app/api/admin/content/upload/route.js`
-   - Validate mediainfo.js loads correctly in Vercel's runtime
+Everything else reads from Postgres. This must exist first.
 
-3. **Post CRUD routes** — needed before the screen or crons
-   - `app/api/admin/content/route.js`
-   - `app/api/admin/content/[postId]/route.js`
+1. Write `db/migrations/001_whatsapp.sql`
+2. Run migration against Neon (using `DATABASE_URL_UNPOOLED`)
+3. Create `lib/neon.js` (db() factory)
+4. Create `lib/whatsappStore.js` (query functions)
+5. Smoke-test: write a test route that does `SELECT 1` via `neon()` and returns the result
 
-4. **Content CRM screen** — requires CRUD routes to be working
-   - `app/(crm)/admin/(protected)/kit/screens-content.jsx`
-   - `shell.jsx` nav update
+### Phase 2: Webhook Receiver
 
-5. **Publish cron + IG/TikTok publish logic** — requires posts to exist in KV
-   - `app/api/cron/content-publish/route.js`
-   - `vercel.json` (content-publish entry)
+The webhook must be live before any messages can flow in. Requires Phase 1.
 
-6. **Analytics cron** — requires published posts with platform IDs
-   - `app/api/cron/content-analytics/route.js`
-   - `vercel.json` (content-analytics entry)
+6. Create `lib/whatsappApi.js` (verifyWebhookSignature + sendMessage)
+7. Create `app/api/whatsapp/webhook/route.js` (GET verification + POST handler)
+8. Register webhook URL in Meta Developer Console
+9. Verify: send a WhatsApp message to the business number, confirm it appears in `conversation_messages`
 
-7. **Obsidian export cron** — requires posts with metrics (can run earlier without metrics, writes pending signal)
-   - `lib/obsidianExport.js`
-   - `app/api/cron/content-obsidian/route.js`
-   - `vercel.json` (content-obsidian entry)
+### Phase 3: Web Push
+
+Push dispatch is called from the webhook handler (Phase 2 depends on it being ready, or the webhook can log-and-skip push until this phase is done).
+
+10. Generate VAPID keys: `npx web-push generate-vapid-keys`
+11. Create `lib/webPush.js`
+12. Create `public/sw.js` (service worker)
+13. Create `app/api/push/subscribe/route.js` + `app/api/push/unsubscribe/route.js`
+14. Register service worker in `app/(crm)/admin/(protected)/layout.jsx`
+15. Verify: subscribe a browser, send a test push from a scratch route
+
+### Phase 4: CRM WhatsApp Tab
+
+Requires Phase 1 (data exists) and Phase 2 (messages flowing in).
+
+16. Create `app/api/admin/whatsapp/threads/route.js`
+17. Create `app/api/admin/whatsapp/threads/[threadKey]/messages/route.js`
+18. Create `app/api/admin/whatsapp/send/route.js`
+19. Create `app/api/admin/whatsapp/numbers/route.js` + `[id]/route.js`
+20. Create `app/(crm)/admin/(protected)/kit/screens-whatsapp.jsx`
+21. Modify `shell.jsx` (parsePath + nav items) and `app.jsx` (import + route branch) and `icons.jsx`
+
+### Phase 5: AI Intelligence
+
+Requires Phase 1 (data to analyse) and ideally Phase 4 (visible in CRM).
+
+22. Create `app/api/cron/whatsapp-ai/route.js`
+23. Create `app/api/admin/whatsapp/intelligence/[threadKey]/route.js`
+24. Add intelligence panel to `screens-whatsapp.jsx`
+25. Add `whatsapp-ai` cron to `vercel.json`
+
+### Phase 6: Automated Outbound (Crons)
+
+Requires Phase 2 (can send messages) and Phase 4 (CRM data context).
+
+26. Create `app/api/cron/whatsapp-no-contact/route.js`
+27. Create `app/api/cron/whatsapp-morning-briefing/route.js`
+28. Add both to `vercel.json`
+29. Add aftercare scheduling logic (writes to `aftercare_events`, no separate cron needed — `whatsapp-no-contact` can also check aftercare_events)
+
+### Phase 7: Broadcast Campaigns
+
+Requires Phases 2 + 4 + a UI to create campaigns.
+
+30. Add `app/api/admin/whatsapp/broadcasts/route.js` + `[id]/route.js`
+31. Add broadcast UI section to `screens-whatsapp.jsx`
 
 ---
 
-## Vercel-Specific Constraints Summary
+## Serverless Constraints
 
-| Constraint | Detail |
-|------------|--------|
-| Function bundle size | 50 MB compressed max. ffprobe-static pushes over. mediainfo.js WASM is ~2.4 MB. |
-| Function duration | Hobby: 10s max. Pro: 60s (standard), 300s (Fluid compute). Use two-phase cron, not inline polling. |
-| Cron scheduling | Pro plan: up to 40 crons, exact timing. Hobby: 2 crons, ±1 hour variance. |
-| Cron auth | Vercel auto-injects `CRON_SECRET` as `Authorization: Bearer ...` header. |
-| Filesystem | Read-only except `/tmp`. No git binary, no local file persistence. |
-| Blob URLs | Public URLs like `https://{acct}.public.blob.vercel-storage.com/{path}`. Valid for both IG video_url and TikTok PULL_FROM_URL (after domain verification in TikTok portal). |
-| Cron only on production | Crons do not trigger on preview deployments. |
+| Constraint | Impact | Mitigation |
+|------------|--------|------------|
+| Webhook must return 200 in <20s | Meta retries on timeout, causing duplicate events | Return 200 immediately after signature check; do all DB writes + push dispatch inline but non-blocking. Use `wamid` UNIQUE constraint for dedup (ON CONFLICT DO NOTHING) |
+| No persistent TCP | Neon connection setup cost on every invocation | `@neondatabase/serverless` HTTP transport: 3-4 roundtrips vs 8 for TCP. Use pooled connection string |
+| Cron max duration | AI analysis cron processes potentially many messages | Set `export const maxDuration = 60` on AI cron. Limit batch size to 20 messages per invocation; KV queue handles the rest on next run |
+| Web push `web-push` package | Uses Node.js `crypto` module — not available in Edge runtime | Set `export const runtime = "nodejs"` on the webhook route and any route that calls `dispatchPush` |
+| Service worker scope | `/sw.js` must be served from root to cover `/admin/*` | Place in `public/sw.js` — Next.js serves `public/` at `/` automatically |
+| VAPID private key is a secret | Must never be in client code | `VAPID_PRIVATE_KEY` env var (server-only). `NEXT_PUBLIC_VAPID_PUBLIC_KEY` for the browser subscription call |
+| Vercel function cold starts | First request after idle takes ~500-800ms | Neon HTTP transport is more tolerant of cold starts than TCP. Webhook handler is always hot (Meta sends messages constantly) |
+| Cron only runs on production | Development testing requires local tunnel | Use `ngrok` or Vercel CLI `--prod` flag for webhook registration during development |
 
 ---
 
 ## Environment Variables Required
 
 ```bash
-# Existing
-KV_REST_API_URL
-KV_REST_API_TOKEN
-# (or UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)
+# Neon Postgres
+DATABASE_URL=                    # Pooled connection string (runtime queries)
+DATABASE_URL_UNPOOLED=           # Direct connection string (migrations only)
 
-# New: Instagram
-INSTAGRAM_ACCESS_TOKEN=     # Long-lived business/page token
-INSTAGRAM_BUSINESS_ID=      # IG user ID for the M&C account
+# Meta WhatsApp Cloud API
+WHATSAPP_APP_SECRET=             # App secret from Meta Developer Console (for HMAC verification)
+WHATSAPP_VERIFY_TOKEN=           # Your chosen token string for webhook GET verification
+WHATSAPP_PHONE_NUMBER_ID=        # Phone number ID from Meta (for sending messages)
+WHATSAPP_ACCESS_TOKEN=           # System user access token from Meta
 
-# New: TikTok
-TIKTOK_ACCESS_TOKEN=        # User access token with video.publish scope
-TIKTOK_OPEN_ID=             # TikTok open_id for the M&C account
-
-# New: Obsidian export
-GITHUB_TOKEN=               # PAT, repo write scope
-OBSIDIAN_REPO_OWNER=
-OBSIDIAN_REPO_NAME=
+# Web Push VAPID
+VAPID_PRIVATE_KEY=               # Server-only
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=    # Browser-accessible (safe to expose)
+VAPID_SUBJECT=                   # "mailto:your@email.com"
 
 # Auto-injected by Vercel (do not set manually)
 CRON_SECRET
 ```
 
+Existing env vars (`KV_REST_API_URL`, `KV_REST_API_TOKEN`, `TELEGRAM_*`, `ADMIN_SESSION_SECRET`) are unchanged.
+
 ---
 
 ## Sources
 
-- [Upstash Redis REST API](https://upstash.com/docs/redis/features/restapi) — confirmed via existing `lib/kv.js` source
-- [Instagram Graph API: Content Publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing/) — HIGH confidence, official Meta docs
-- [Instagram Media Insights](https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights/) — HIGH confidence, official Meta docs
-- [TikTok Content Posting API: Direct Post](https://developers.tiktok.com/doc/content-posting-api-reference-direct-post) — HIGH confidence, official TikTok docs
-- [TikTok Media Transfer Guide](https://developers.tiktok.com/doc/content-posting-api-media-transfer-guide) — HIGH confidence, official TikTok docs
-- [TikTok Post Status Reference](https://developers.tiktok.com/doc/content-posting-api-reference-get-video-status) — HIGH confidence, official TikTok docs
-- [mediainfo.js GitHub](https://github.com/buzz/mediainfo.js) — MEDIUM confidence (Node.js support confirmed, Vercel serverless WASM loading needs runtime validation)
-- [Vercel Cron Jobs](https://vercel.com/docs/cron-jobs) — HIGH confidence, official Vercel docs
-- [Octokit createOrUpdateFileContents](https://octokit.rest/PUT/repos/%7Bowner%7D/%7Brepo%7D/contents/%7Bpath%7D) — HIGH confidence, official Octokit docs
-- [Vercel: ffmpeg/ffprobe not recommended](https://github.com/vercel/vercel/discussions/9561) — HIGH confidence, Vercel team response
-- [Instagram Reels API Publishing Guide](https://postproxy.dev/blog/instagram-reels-api-publishing-guide/) — MEDIUM confidence, third-party but technically accurate
+- [Neon serverless driver](https://neon.com/docs/serverless/serverless-driver) — HIGH confidence, official Neon docs
+- [Neon Vercel connection methods](https://neon.com/docs/guides/vercel-connection-methods) — HIGH confidence, official Neon docs
+- [web-push npm package](https://www.npmjs.com/package/web-push) — HIGH confidence, official npm
+- [Meta WhatsApp webhook verification](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint/) — HIGH confidence, official Meta docs
+- [Next.js PWA/Service Worker guide](https://nextjs.org/docs/app/guides/progressive-web-apps) — HIGH confidence, official Next.js docs (updated Feb 2026)
+- [Vercel cron limits and CRON_SECRET](https://vercel.com/docs/cron-jobs/manage-cron-jobs) — HIGH confidence, official Vercel docs
+- Existing codebase: `lib/kv.js`, `lib/adminAuth.js`, `lib/leadStore.js`, `lib/telegram.js`, `app/(crm)/admin/(protected)/kit/app.jsx`, `shell.jsx`, `useCrmKitData.jsx` — HIGH confidence, read directly

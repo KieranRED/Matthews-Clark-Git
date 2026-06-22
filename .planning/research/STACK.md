@@ -1,477 +1,412 @@
-# Technology Stack — Social Content Scheduler
+# Technology Stack — v1.2 WhatsApp Business Integration
 
-**Project:** Matthews & Clark Social Content Scheduler
-**Researched:** 2026-05-29
-**Milestone:** v1.0 Social Content Scheduler (subsequent milestone on existing Next.js 15 App Router + Vercel + Upstash KV + Vercel Blob stack)
-
----
-
-## Existing Stack (Validated — Do Not Re-Evaluate)
-
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| Framework | Next.js 15 App Router | Deployed on Vercel |
-| KV Store | Upstash Redis | All lead/job/client data |
-| Media Store | Vercel Blob | Already in use for photos |
-| Notifications | Telegram bots | M&C group + Izimoto group |
-| Auth | Custom cookie-based | Admin + token-protected public links |
+**Project:** Matthews & Clark CRM
+**Milestone:** v1.2 WhatsApp Business Integration
+**Researched:** 2026-06-22
+**Scope:** NEW packages only. Existing stack (Next.js 15, Upstash KV, Vercel Blob, Telegram) not re-researched.
 
 ---
 
-## New Dependencies Required
+## Summary
 
-### 1. Instagram Graph API — Reels Posting
+Four new capability areas require packages. Three are clean additions with a single obvious package each. One (Web Push) has a maintenance caveat that does not affect functionality. No ORM is recommended — raw SQL via the Neon serverless driver is sufficient and keeps the bundle lean. The Meta Cloud API requires zero npm packages beyond Node's built-in `crypto`.
 
-**API version:** v25.0 (current as of May 2026, verified from official Meta docs)
-**Base URL:** `https://graph.instagram.com`
-
-**No npm client library needed.** The Meta SDKs are heavyweight and add no meaningful value over native `fetch`. Use the raw REST API directly with `fetch` in Node.js route handlers.
-
-#### Complete container-to-publish flow
-
-```
-1. POST /v25.0/{ig-user-id}/media
-   Required: media_type=REELS, video_url=<public URL>, access_token
-   Returns: ig-container-id
-
-2. GET /v25.0/{ig-container-id}?fields=status_code
-   Poll until status_code = FINISHED (poll every 5-10s, max 5 min)
-
-3. POST /v25.0/{ig-user-id}/media_publish
-   Required: creation_id={ig-container-id}, access_token
-   Returns: ig-media-id
-```
-
-For video upload, Meta's server fetches from the `video_url` directly — this means the Vercel Blob public URL is used as `video_url`. The resumable upload endpoint (`rupload.facebook.com`) is only needed for files over 100 MB or unreliable hosting — not required here since Vercel Blob is the source.
-
-**Note on `scheduled_publish_time`:** The Graph API v25.0 documentation does not expose a native schedule parameter for Reels. Scheduling is handled in-app: store the desired publish time in Upstash KV, and let the Vercel Cron job call `media_publish` at the correct time.
-
-**Note on `media_type` return value:** After publishing, querying the media's `media_type` field returns `VIDEO` — check `media_product_type` to confirm it is a Reel.
-
-#### Access token management
-
-| Token type | TTL | Refresh |
-|-----------|-----|---------|
-| Short-lived user token | ~1 hour | Not refreshable |
-| Long-lived user token | 60 days | Refreshable after 24h, before 60d |
-
-**Implementation requirement:** A cron job or startup check must refresh the long-lived token every 50-55 days. Store it in Upstash KV. Endpoint:
-```
-GET /v25.0/refresh_access_token
-   ?grant_type=ig_refresh_token
-   &access_token={long-lived-token}
-```
-
-**Rate limits:**
-- 100 API-published posts per 24-hour window per IG account (Reels + feed + stories combined)
-- Check usage: `GET /v25.0/{ig-user-id}/content_publishing_limit`
-
-**Required permissions:** `instagram_business_content_publish` (Instagram Login flow) or `instagram_content_publish` (Facebook Login flow). Standard or Advanced Access tier required.
-
-**Analytics endpoint for 48hr pull:**
-```
-GET /v25.0/{ig-media-id}/insights
-   ?metric=plays,reach,likes,saves,comments,shares
-   &access_token=...
-```
-New metrics as of Dec 2025: skip_rate (% who scrolled past in first 3s), reposts_count. Skip rate requires a statistical minimum view count — low-reach Reels may return null.
+**Confidence:** HIGH for all four areas. Versions verified against npm registry and official documentation (June 2026).
 
 ---
 
-### 2. TikTok Content Posting API — Video Posting
+## Recommended Stack Additions
 
-**API version:** v2 (current)
-**Base URL:** `https://open.tiktokapis.com/v2/post/publish/`
+### 1. Meta WhatsApp Business Cloud API
 
-**No npm client library needed.** Use native `fetch`.
+**Package:** None required.
 
-#### Auth and OAuth
+Use the Graph API directly via `fetch`. No npm SDK needed.
 
-| Token type | TTL | Refresh |
-|-----------|-----|---------|
-| User access token | 24 hours (86400s) | Refresh using refresh_token |
-| Refresh token | 365 days | Requires new OAuth flow after expiry |
+| Item | Value | Source |
+|------|-------|--------|
+| API base URL | `https://graph.facebook.com/v25.0` | Graph API changelog (introduced 2026-02-18) |
+| Send endpoint | `POST /{PHONE_NUMBER_ID}/messages` | Meta Developers docs |
+| Webhook verification | `GET` handler, echo `hub.challenge` | Meta webhook handshake spec |
+| Signature verification | `node:crypto` `createHmac('sha256', APP_SECRET)` on raw body | pons.chat implementation guide |
+| Webhook header | `x-hub-signature-256` | Meta docs |
 
-**Refresh endpoint:**
+**Why no SDK:**
+- Official Meta Node.js SDK (`whatsapp-nodejs-sdk`) is designed for single-process servers, not serverless/multi-instance deployments. Its own docs warn against it.
+- The third-party `@great-detail/whatsapp` SDK adds abstraction over a simple REST API that needs no abstraction.
+- The webhook POST body must be read as raw text before any parsing — something you control directly when using `fetch` + `req.text()`.
+
+**Environment variables needed:**
 ```
-POST https://open.tiktokapis.com/v2/oauth/token/
-Body: client_key, client_secret, grant_type=refresh_token, refresh_token
-```
-
-This is the most common production failure point: the access token expires daily. Implement proactive refresh (via cron) rather than reactive 401 handling.
-
-**Required scope:** `video.publish`
-
-**App audit:** All posts from unaudited apps are forced to private. Audit submission requires privacy policy URL, demo video of OAuth + upload flow, and data handling description. Community reports suggest 1-4 weeks for first-pass approval. Build with Inbox (draft) fallback so the feature ships before audit completes.
-
-#### Direct Post flow (requires audit approval)
-
-```
-1. POST /v2/post/publish/creator_info/query/
-   Header: Authorization: Bearer {access_token}
-   Returns: available privacy levels for user
-
-2. POST /v2/post/publish/video/init/
-   Body: {
-     post_info: { title, privacy_level, ... },
-     source_info: { source: "PULL_FROM_URL", video_url: <public URL> }
-       OR
-     source_info: { source: "FILE_UPLOAD", video_size, chunk_size, total_chunk_count }
-   }
-   Returns: publish_id, upload_url (for FILE_UPLOAD only)
-
-3. For FILE_UPLOAD: PUT chunks to upload_url
-   Headers: Content-Type: video/mp4, Content-Range: bytes {start}-{end}/{total}
-   upload_url expires 1 hour after issuance
-
-4. POST /v2/post/publish/status/fetch/
-   Body: { publish_id }
-   Poll until status = PUBLISH_COMPLETE
+WHATSAPP_PHONE_NUMBER_ID=      # from Meta App dashboard
+WHATSAPP_ACCESS_TOKEN=         # permanent system user token
+WHATSAPP_APP_SECRET=           # for HMAC verification (App Settings > Basic)
+WHATSAPP_VERIFY_TOKEN=         # any string you choose, set in Meta webhook config
 ```
 
-#### Inbox (draft) fallback flow — for pre-audit or fallback
-
-```
-1. POST /v2/post/publish/inbox/video/init/
-   (same body shape as Direct Post)
-   Returns: publish_id, upload_url
-
-2. [Same upload flow]
-
-3. Poll /v2/post/publish/status/fetch/ until SEND_TO_USER_INBOX
-   → TikTok sends in-app notification to creator to review and publish
-```
-
-**Upload method recommendation:** Use `PULL_FROM_URL` with the Vercel Blob public URL. This avoids chunked upload complexity and re-uses the same Blob URL used for Instagram. Domain verification is required — the `vercel-storage.com` domain needs verifying once in the TikTok developer console.
-
-**Rate limits:**
-- 6 init requests per minute per user access token
-- Max 5 pending shares per user in any 24-hour window
-- Status polling: 30 requests per minute per user access token
-
----
-
-### 3. Server-Side Video Quality Check (ffprobe on Vercel)
-
-This is the most constrained piece of the stack. The situation is nuanced.
-
-#### The problem
-
-`ffprobe-static` uses `__dirname` to locate its bundled binary. Next.js 15 App Router bundles server code into `.next/server/`, causing `__dirname` to resolve to the wrong path. This is a documented open bug (GitHub issue #53791). The combined `ffprobe-static` + `fluent-ffmpeg` package weight (~60-70 MB uncompressed) also risks pushing the function over the 250 MB uncompressed function limit when combined with other dependencies.
-
-**Confidence on exact resolved size: LOW** — needs measurement at implementation time.
-
-#### Recommended approach
-
-Install both packages and use `serverExternalPackages` + `outputFileTracingIncludes` in `next.config.js` to prevent bundling and force correct path resolution:
-
+**Webhook route skeleton (no packages):**
 ```js
-// next.config.js
-module.exports = {
-  serverExternalPackages: ['fluent-ffmpeg', 'ffprobe-static'],
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/upload/probe': ['./node_modules/ffprobe-static/bin/**/*'],
-    },
-  },
+// app/api/webhooks/whatsapp/route.js
+import { createHmac, timingSafeEqual } from 'node:crypto'
+
+export async function GET(req) {
+  const p = req.nextUrl.searchParams
+  if (
+    p.get('hub.mode') === 'subscribe' &&
+    p.get('hub.verify_token') === process.env.WHATSAPP_VERIFY_TOKEN
+  ) {
+    return new Response(p.get('hub.challenge'))
+  }
+  return new Response('Forbidden', { status: 403 })
 }
-```
 
-Set the binary path explicitly at runtime (avoids the `__dirname` resolution bug):
-
-```js
-import ffprobe from 'fluent-ffmpeg'
-import ffprobeStatic from 'ffprobe-static'
-
-ffprobe.setFfprobePath(ffprobeStatic.path)
-```
-
-**Packages:**
-- `fluent-ffmpeg` — fluent API wrapper for ffprobe/ffmpeg metadata extraction
-- `ffprobe-static` — precompiled ffprobe binary for Linux x64 (Vercel runtime), macOS (local dev), Windows (local dev)
-
-**Note:** Only `ffprobe` is needed for metadata extraction — **do not install `ffmpeg-static` or `@ffmpeg-installer/ffmpeg`**. Full ffmpeg (transcoding) is not required and the binary is much larger.
-
-**What to extract per video:**
-
-| Field | ffprobe stream key | Why |
-|-------|------------------|-----|
-| Codec | `codec_name` | Must be `h264` for both platforms |
-| Resolution | `width`, `height` | Minimum 1080×1920 (9:16) recommended |
-| Frame rate | `r_frame_rate` or `avg_frame_rate` | 23.98–60 fps acceptable |
-| Bitrate | `bit_rate` (stream) or container | Min 8 Mbps for 1080p Reel quality |
-| Duration | `duration` | Instagram: 5–90s; TikTok: 3s–10min |
-| Audio codec | `codec_name` on audio stream | Must be `aac` |
-
-**Vercel function constraints for the probe route:**
-- Maximum function size: 250 MB uncompressed (confirmed from official docs, May 2026)
-- Maximum duration: 300s Hobby / 800s Pro — probe runs in <1s, no concern
-- Request body limit: 4.5 MB — video files cannot be uploaded via request body; use Vercel Blob multipart upload first, then probe the Blob URL or a temp file path
-
-**Fallback if binary approach fails on Vercel:** Run the probe from a signed Blob URL using `ffprobe.input(blobUrl)` — ffprobe can probe remote URLs without downloading the full file (it reads headers and a small initial segment). This is the production-safe approach since no file I/O is needed on the function's ephemeral filesystem.
-
----
-
-### 4. Vercel Cron + Blob for Scheduled Posting
-
-#### Cron — Plan Constraints (CRITICAL)
-
-| Plan | Max cron jobs | Min frequency | Precision |
-|------|-------------|--------------|-----------|
-| Hobby | 100 | Once per day | ±59 minutes |
-| Pro | 100 | Once per minute | Per-minute |
-
-**The project is currently on Hobby (inferred from existing deployment — verify before implementation).** Hobby limits cron to once per day, and expressions that resolve more frequently than daily fail at deployment. **Pro plan is required for the scheduled posting and analytics pull features.**
-
-Minimum cron expressions needed:
-- Posting dispatcher: `*/15 * * * *` (every 15 min) — requires Pro
-- Analytics pull: `0 */2 * * *` (every 2 hours) — requires Pro
-
-#### Cron configuration in `vercel.json`
-
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/post-dispatcher",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/analytics-pull",
-      "schedule": "0 */2 * * *"
-    },
-    {
-      "path": "/api/cron/blob-cleanup",
-      "schedule": "0 3 * * *"
-    }
-  ]
-}
-```
-
-**Security:** Cron requests include `vercel-cron/1.0` user agent and `x-vercel-cron-schedule` header. Protect routes by checking `CRON_SECRET` env var (Vercel sets this automatically for cron-authenticated requests on Pro). Pattern:
-
-```js
-export async function GET(request) {
-  if (request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+export async function POST(req) {
+  const raw = await req.text()
+  const sig = req.headers.get('x-hub-signature-256') ?? ''
+  const expected =
+    'sha256=' +
+    createHmac('sha256', process.env.WHATSAPP_APP_SECRET).update(raw).digest('hex')
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) {
     return new Response('Unauthorized', { status: 401 })
   }
-  // ...
+  const body = JSON.parse(raw)
+  // body.entry[].changes[].value.messages / .statuses
+  return Response.json({ ok: true })
 }
 ```
 
-**Scheduling model:** Since no native `scheduled_publish_time` exists in either platform API, scheduled posts are stored in Upstash KV with a target Unix timestamp. The dispatcher cron runs every 15 minutes, queries KV for posts due within the current window, and calls the platform publish endpoints.
-
-KV key pattern: `scheduled_post:{id}` with fields: `platform`, `blob_url`, `caption`, `publish_at`, `status`, `ig_container_id` (pre-created), `tiktok_publish_id`.
-
-**Pre-creating the Instagram container:** Instagram containers can be created at upload time, so the 2-step create→poll→publish flow is front-loaded. At dispatch time, only `media_publish` needs to be called (assuming status is already `FINISHED`). This keeps the cron function fast.
-
-#### Vercel Blob — 7-Day Cleanup
-
-Vercel Blob has no native TTL. Implement cleanup via a daily cron:
-
+**Send message helper (no packages):**
 ```js
-import { list, del } from '@vercel/blob'
-
-// In /api/cron/blob-cleanup
-const { blobs } = await list({ prefix: 'social-videos/' })
-const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-const stale = blobs.filter(b => new Date(b.uploadedAt).getTime() < cutoff)
-if (stale.length) await del(stale.map(b => b.url))
-```
-
-`list()` returns `uploadedAt` date — use this to identify blobs older than 7 days. `del()` accepts an array of URLs for batch deletion.
-
-**Important:** Vercel Blob has no native TTL mechanism (confirmed from official docs and community, August 2025). The cron-based cleanup is the only supported approach.
-
-#### Blob storage — using existing store
-
-Vercel Blob is already provisioned. Store social videos under a namespaced prefix: `social-videos/{post-id}/{filename}`. Use `access: 'public'` so the URL is usable as `video_url` for both Instagram and TikTok PULL_FROM_URL. Use `multipart: true` on `put()` for files over ~5 MB.
-
----
-
-### 5. Obsidian-Compatible Markdown Export
-
-**No npm package required.** Obsidian's format is plain markdown with a YAML frontmatter block. Generate it with a template function.
-
-#### Format specification
-
-```markdown
----
-title: "Post title or caption excerpt"
-date: 2026-05-29
-tags:
-  - instagram
-  - reels
-  - growth-signal
-platform: instagram
-post_id: "17841234567890"
-published_at: "2026-05-29T10:00:00Z"
-reach: 4200
-plays: 8100
-likes: 312
-saves: 47
-shares: 28
-comments: 14
-skip_rate: 0.38
-signal: growth
-utm_campaign: "detailing-reel-may"
-blob_url: "https://....public.blob.vercel-storage.com/social-videos/.../clip.mp4"
----
-
-## Caption
-
-[Full caption text here]
-
-## Performance Notes
-
-[Auto-generated summary: "High save rate (47) suggests tutorial/process content performs well"]
-
-## Script Intelligence
-
-[Hook used, content type, audience response pattern]
-```
-
-**Required fields per post type:**
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `title` | string | Obsidian note title |
-| `date` | YYYY-MM-DD | Obsidian date property (sort/filter) |
-| `tags` | list | Platform, signal type (growth-signal / conversion-signal / non-performer) |
-| `platform` | string | `instagram` or `tiktok` |
-| `post_id` | string (quoted) | Platform media ID (quoted to prevent numeric truncation) |
-| `published_at` | ISO 8601 string | For timeline queries |
-| `reach`, `plays`, `likes`, `saves`, `shares`, `comments` | number | Analytics snapshot |
-| `skip_rate` | number (0–1) | Instagram Reels only, may be null |
-| `signal` | enum: `growth` / `conversion` / `non-performer` | The core classification |
-| `utm_campaign` | string | Links to CRM lead attribution |
-
-**Signal classification logic (implement in export function):**
-
-```js
-function classifySignal({ reach, saves, likes, plays }) {
-  const saveRate = saves / plays
-  const engagementRate = (likes + saves + comments + shares) / reach
-  if (saveRate > 0.02 || reach > 5000) return 'growth'
-  if (engagementRate > 0.05) return 'conversion'
-  return 'non-performer'
+// lib/whatsapp.js
+export async function sendWhatsAppMessage(to, text) {
+  const res = await fetch(
+    `https://graph.facebook.com/v25.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
+      }),
+    }
+  )
+  return res.json()
 }
 ```
-Threshold values are starting points — refine after first 20 posts.
 
-**Export destination:** Write files to a git-tracked directory (e.g. `obsidian-vault/posts/YYYY-MM/`) that can be synced via Obsidian Git plugin, or write directly to the filesystem if the vault is mounted. For a Vercel-hosted app, the practical path is: export generates the markdown string, writes it to Vercel Blob under `obsidian-export/posts/YYYY-MM/{post-id}.md`, then a separate sync mechanism (Obsidian Git, webhook, or scheduled download) pulls it into the local vault. Alternatively, write to a GitHub repo via the GitHub REST API from the cron job — this is the cleanest serverless-compatible approach.
+**Confidence:** HIGH — verified against Meta Developers docs and pons.chat implementation guide.
 
 ---
 
-## Installation
+### 2. Neon Postgres — Conversation Storage
+
+**Package:** `@neondatabase/serverless@^1.1.0`
+
+| Item | Value |
+|------|-------|
+| npm package | `@neondatabase/serverless` |
+| Version | `1.1.0` (latest as of June 2026) |
+| Weekly downloads | ~554k (healthy adoption) |
+| Transport | HTTP (single queries) + WebSocket (transactions) |
+| Edge runtime | Yes — works in Vercel Edge and serverless functions |
+| ORM | None recommended (see below) |
+
+**Why this package over alternatives:**
+- `pg` (node-postgres) uses TCP — blocked in Vercel serverless/edge runtimes.
+- `postgres.js` similarly requires persistent TCP connections.
+- `@neondatabase/serverless` communicates over HTTP for single queries, WebSocket for transactions. It is the only driver that works correctly in Vercel's serverless execution model, which is already used by the rest of this project.
+
+**Why no ORM (Drizzle/Prisma):**
+- The WhatsApp conversation schema is narrow and stable: messages, threads, push_subscriptions. Raw SQL is readable, transparent, and debuggable.
+- The existing project uses raw KV operations throughout — an ORM introduces an unfamiliar abstraction to a solo/small team workflow.
+- For migrations, a single `lib/neon-migrate.js` script with `CREATE TABLE IF NOT EXISTS` statements run once is sufficient. No CLI needed.
+- Prisma is categorically excluded — its binary engine adds ~10MB to cold start and is incompatible with the project's serverless posture.
+
+**Installation:**
+```bash
+npm install @neondatabase/serverless
+```
+
+**Usage pattern:**
+```js
+// lib/db.js
+import { neon } from '@neondatabase/serverless'
+export const sql = neon(process.env.DATABASE_URL)
+
+// In any Server Component or Route Handler:
+const messages = await sql`
+  SELECT * FROM whatsapp_messages
+  WHERE thread_id = ${threadId}
+  ORDER BY created_at ASC
+`
+```
+
+**Connection string format:**
+```
+DATABASE_URL=postgresql://user:password@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+```
+
+**Environment variables needed:**
+```
+DATABASE_URL=   # from Neon dashboard (Vercel Marketplace integration auto-populates this)
+```
+
+**Note on `force-dynamic`:** Server Components that query Neon will be statically rendered at build time unless you add `export const dynamic = 'force-dynamic'` — required for any route that shows live conversation data.
+
+**Confidence:** HIGH — verified against Neon official docs and npm registry.
+
+---
+
+### 3. Web Push Notifications (VAPID)
+
+**Package:** `web-push@^3.6.7`
+
+| Item | Value |
+|------|-------|
+| npm package | `web-push` |
+| Version | `3.6.7` (latest — last published ~2 years ago) |
+| Type definitions | bundled (no separate `@types/web-push` needed on modern versions) |
+| Official Next.js endorsement | Yes — used verbatim in Next.js PWA guide (updated 2026-02-11) |
+
+**Maintenance caveat:** `web-push@3.6.7` has not been updated in ~2 years. This is a concern on paper. In practice:
+- The VAPID spec (RFC 8292) and Web Push Protocol (RFC 8030) are stable and not changing.
+- Next.js official docs (updated February 2026) use `web-push` without qualification or alternative.
+- 433+ downstream npm packages depend on it; it is the de-facto standard Node.js VAPID implementation.
+- **Verdict: use it.** The maintenance freeze reflects spec stability, not abandonment.
+
+**Why not a managed push service (OneSignal, Webpushr, etc.):**
+- This is an internal team alert system for 2-5 people. A managed service adds a third-party dependency, a monthly cost, and a data residency question (WhatsApp conversation metadata leaving the system).
+- Web Push is a browser standard; the entire stack fits in ~30 lines of server code.
+
+**Installation:**
+```bash
+npm install web-push
+```
+
+**VAPID key generation (one-time, dev setup):**
+```bash
+npx web-push generate-vapid-keys
+```
+
+**Environment variables needed:**
+```
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=   # exposed to client (safe — it's a public key)
+VAPID_PRIVATE_KEY=              # server-side only
+VAPID_SUBJECT=mailto:team@matthewsandclark.co.za
+```
+
+**Server-side send (in a Server Action or Route Handler):**
+```js
+import webpush from 'web-push'
+
+webpush.setVapidDetails(
+  process.env.VAPID_SUBJECT,
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+)
+
+await webpush.sendNotification(
+  subscription, // PushSubscription object stored in Neon push_subscriptions table
+  JSON.stringify({ title: 'New WhatsApp message', body: preview })
+)
+```
+
+**Service worker (`public/sw.js`):**
+```js
+self.addEventListener('push', (event) => {
+  const data = event.data.json()
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icon-192x192.png',
+      badge: '/badge.png',
+    })
+  )
+})
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  event.waitUntil(clients.openWindow('/admin'))
+})
+```
+
+**Push subscriptions storage:** Store `PushSubscription` JSON objects in the Neon `push_subscriptions` table (keyed by team member ID). Each team member's browser registers once; the subscription is updated on each service worker re-registration.
+
+**Browser support (2026):** Chrome, Firefox, Edge (all platforms), Safari 16.4+ on macOS/iOS when installed to home screen. This covers the M&C team's devices.
+
+**Confidence:** HIGH — verified against Next.js PWA official docs (fetched 2026-06-22), npm registry, and web-push GitHub releases.
+
+---
+
+### 4. Claude API — AI Message Analysis
+
+**Package:** `@anthropic-ai/sdk@^0.104.2`
+
+| Item | Value |
+|------|-------|
+| npm package | `@anthropic-ai/sdk` |
+| Version | `0.104.2` (latest as of June 2026, published ~3 days before research date) |
+| Model | `claude-sonnet-4-6` (same model running this project) |
+| Pricing (Sonnet 4.6) | $3 / MTok input, $15 / MTok output |
+| Batch API discount | 50% off — $1.50 / MTok input, $7.50 / MTok output |
+| Prompt cache discount | Up to 90% off on repeated system prompts |
+| Context window | 1M tokens |
+| Max output | 64k tokens |
+
+**Why `claude-sonnet-4-6` and not a cheaper model:**
+- Haiku 4.5 is faster/cheaper but warmth scoring and objection detection require nuanced reading of conversational South African English. Inference quality matters here.
+- Opus 4.8 is overkill for classification/scoring tasks and costs 5x more per token.
+- Sonnet 4.6 is the documented sweet spot for "best combination of speed and intelligence."
+- Using the same model that runs this project avoids introducing a new model to reason about.
+
+**Two usage modes for this milestone:**
+
+**A. Streaming — for real-time analysis when a team member opens a thread:**
+```js
+import Anthropic from '@anthropic-ai/sdk'
+const client = new Anthropic()
+
+const stream = await client.messages.stream({
+  model: 'claude-sonnet-4-6',
+  max_tokens: 512,
+  system: [
+    {
+      type: 'text',
+      text: ANALYSIS_SYSTEM_PROMPT, // cache the repeated system prompt
+      cache_control: { type: 'ephemeral' },
+    },
+  ],
+  messages: [{ role: 'user', content: conversationText }],
+})
+// Pipe stream to client via ReadableStream / Server-Sent Events
+```
+
+**B. Batch API — for background analysis of overnight or historical messages:**
+```js
+const batch = await client.beta.messages.batches.create({
+  requests: messageGroups.map((g) => ({
+    custom_id: `thread-${g.threadId}`,
+    params: {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 256,
+      messages: [{ role: 'user', content: g.text }],
+    },
+  })),
+})
+// Most batches finish in < 1 hour; poll batch.id for completion status
+```
+
+**Prompt caching for repeated system prompts:**
+With prompt caching on the shared analysis system prompt (~500 tokens), repeated calls cost ~10% of the base input token price for the cached portion. At scale this is the most meaningful cost lever.
+
+**What the analysis system prompt should cover (for roadmap phases):**
+- Warmth scoring (1-5 scale)
+- Objection type detection (price, timing, partner approval, competitor)
+- Suggested CRM status update (WARM, HOT, COLD, LOST, BOOKED)
+- Follow-up timing recommendation
+
+**Environment variables needed:**
+```
+ANTHROPIC_API_KEY=   # from console.anthropic.com
+```
+
+**Confidence:** HIGH — model IDs verified against Anthropic official docs (fetched 2026-06-22). SDK version from npm search (published June 2026).
+
+---
+
+## Complete Installation
 
 ```bash
-# Social platform API — no client libraries needed, use native fetch
-
-# Video probe (ffprobe only, not full ffmpeg)
-npm install fluent-ffmpeg ffprobe-static
-npm install -D @types/fluent-ffmpeg
-
-# Vercel Blob — already installed
-# Upstash KV — already installed
+# New packages for v1.2 (add to existing project)
+npm install @neondatabase/serverless web-push @anthropic-ai/sdk
 ```
 
----
+No new packages for Meta Cloud API — uses `node:crypto` (built-in) and `fetch` (built-in in Next.js 15 / Node 18+).
 
-## Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Instagram API client | Raw fetch | `instagram-graph-api` npm package | Adds 80KB+ for thin wrapper; fetch + typed interfaces is sufficient |
-| TikTok API client | Raw fetch | None credible exists | No official Node.js SDK; community packages are outdated |
-| Video validation | ffprobe-static + fluent-ffmpeg | Full ffmpeg-static | ffprobe-only is ~25 MB smaller; no transcoding needed |
-| Video validation | ffprobe-static + fluent-ffmpeg | Remote probe service (e.g. AWS MediaInfo) | Adds SaaS dependency and latency; unnecessary for metadata-only check |
-| Scheduling | Vercel Cron + Upstash KV | Vercel Queues | Vercel Queues is in preview and overkill for 1-post-at-a-time dispatching |
-| Scheduling | Vercel Cron + Upstash KV | External cron service (e.g. Trigger.dev) | Adds SaaS dependency; Vercel Cron is sufficient on Pro plan |
-| Obsidian export | Generated markdown string | `obsidian` npm package | No such package exists with meaningful functionality |
-| Obsidian export dest | GitHub API write | Local filesystem write from Vercel | Vercel functions have ephemeral filesystem; GitHub write survives restarts |
+**Schema migrations for Neon:** Skip drizzle-kit. Write a `lib/neon-migrate.js` script with `CREATE TABLE IF NOT EXISTS` statements and run it once. The schema is small enough that a CLI is unnecessary overhead.
 
 ---
 
-## Key Vercel Constraints Summary
+## Integration Notes
 
-| Constraint | Value | Impact |
-|-----------|-------|--------|
-| Function size (uncompressed) | 250 MB | ffprobe-static adds ~25-30 MB; monitor total |
-| Request body limit | 4.5 MB | Videos cannot be sent via request body — upload to Blob first |
-| Cron min frequency (Hobby) | Once per day | **Pro plan required** for 15-min posting dispatcher |
-| Cron min frequency (Pro) | Once per minute | Sufficient |
-| Function max duration (Hobby) | 300s | No concern for probe or API calls |
-| Blob TTL | None native | Cron-based cleanup required |
-| Blob public URL | `*.public.blob.vercel-storage.com` | Usable as video_url for both IG and TikTok |
+### Fits cleanly into existing patterns
 
----
+| New capability | Integration point |
+|----------------|-------------------|
+| WhatsApp webhook | `app/api/webhooks/whatsapp/route.js` — same pattern as existing `app/api/lead/route.js` |
+| Neon queries | `lib/db.js` — same import-and-call pattern as existing `lib/kv.js` |
+| Web Push send | Called from same webhook handler that already fires Telegram notifications |
+| Claude analysis | Called from `app/api/admin/` route handlers — same auth pattern as existing admin routes |
 
-## Token Storage Pattern (Upstash KV)
+### Dual-notification pattern
 
-Store social API tokens in KV with explicit expiry tracking:
+The existing Telegram notification system should NOT be replaced. The recommended pattern:
 
 ```
-kv key: "social:instagram:token"
-value: { token: "...", expires_at: <unix ms>, refreshed_at: <unix ms> }
-
-kv key: "social:tiktok:access_token"
-value: { token: "...", expires_at: <unix ms> }
-
-kv key: "social:tiktok:refresh_token"
-value: { token: "...", expires_at: <unix ms> }  // 365 day TTL
+Inbound WhatsApp message
+  → store in Neon (primary record)
+  → fire Telegram notification (existing pattern — immediate, reliable)
+  → fire Web Push to subscribed team members (new — for phone home screen alerts)
+  → queue Claude analysis async (warmth score appears when admin opens thread)
 ```
 
-A token-refresh cron (or check-on-use with proactive refresh window) handles both platforms.
+### Meta mTLS CA change (important)
+
+Meta rotated its Certificate Authority for webhook mTLS on 2026-03-31. Vercel's Node runtime uses the system trust store, which was updated. No action required for new setups — but verify webhook delivery is working after initial configuration, especially if any existing webhook infra predates April 2026.
+
+### Push subscription storage location
+
+Store `PushSubscription` JSON in the Neon `push_subscriptions` table. This is preferred over Upstash KV for this data because:
+- It is relational to team member records
+- Full-text search and join queries against conversation data may reference it
+- Keeps WhatsApp-related data co-located in one store
 
 ---
 
-## Confidence Assessment
+## What NOT To Add
 
-| Area | Confidence | Source |
-|------|-----------|--------|
-| Instagram Graph API v25.0 flow | HIGH | Official Meta developer docs (fetched directly) |
-| Instagram token expiry / refresh | HIGH | Official Meta reference + multiple corroborating sources |
-| Instagram analytics metrics | HIGH | Official docs + Dec 2025 Meta announcement |
-| TikTok Content API v2 endpoints | HIGH | Official TikTok developer docs (fetched directly) |
-| TikTok token TTL (24h access, 365d refresh) | HIGH | Official TikTok OAuth docs |
-| TikTok audit requirement | HIGH | Official docs + community reports |
-| Vercel Cron plan limits | HIGH | Official Vercel docs (fetched directly, updated March 2026) |
-| Vercel function size limit (250 MB) | HIGH | Official Vercel docs (fetched directly, updated May 2026) |
-| Vercel Blob no native TTL | HIGH | Official docs + community forum (August 2025) |
-| ffprobe-static on Vercel (serverExternalPackages fix) | MEDIUM | GitHub issue open, workaround reported but not officially confirmed resolved |
-| ffprobe binary size budget on Vercel | LOW | Needs measurement at implementation time |
-| TikTok PULL_FROM_URL domain verification for vercel-storage.com | LOW | Process confirmed, but specific domain approval is an open action |
+| Package / Service | Reason to exclude |
+|-------------------|-------------------|
+| `whatsapp-nodejs-sdk` (official Meta SDK) | Designed for single-process servers; Meta docs warn it is "not intended for multi-instance environments" — breaks on Vercel serverless |
+| `@great-detail/whatsapp` | Wraps a REST API that needs no wrapping; adds a dependency for zero benefit |
+| `prisma` / `@prisma/client` | Binary engine adds ~10MB, breaks cold start budget, incompatible with edge runtime |
+| `drizzle-orm` + `drizzle-kit` | Beneficial at scale; overkill for a 3-table conversation schema on a small team already comfortable with SQL |
+| `socket.io` / `pusher` | Real-time chat in the admin UI can use SWR polling or SSE. Adding a WebSocket server on Vercel serverless is either impossible or requires paid add-ons |
+| `next-pwa` / `serwist` | Full offline PWA is not needed. The CRM admin is always-online. These add webpack config complexity for unused offline caching |
+| `ai` (Vercel AI SDK) | Adds the full Vercel AI SDK as a peer dependency for a task that is two `@anthropic-ai/sdk` calls — unnecessary abstraction layer |
+| `@ai-sdk/anthropic` | Same reason as above |
+| Any third-party WhatsApp BSP | The project explicitly uses direct Cloud API (no BSP) to avoid per-message BSP fees and data routing through third parties |
+| Any push notification SaaS (OneSignal, Webpushr) | This is a 2-5 person internal tool. Managed services add recurring cost and external data dependencies |
 
 ---
 
-## Open Risks Requiring Phase-Specific Validation
+## Open Questions
 
-1. **ffprobe on Vercel** — The `serverExternalPackages` + `outputFileTracingIncludes` fix resolves the `__dirname` bug in theory, but the GitHub issue is still open. Validate in an isolated branch before committing to this approach. Fallback: probe via remote URL (`ffprobe.input(blobUrl)`) which avoids the binary path issue entirely.
+1. **Graph API version pinning:** v25.0 is current (introduced 2026-02-18). Meta depreciates Graph API versions on a rolling 2-year cycle. Pin the version string in `lib/whatsapp.js` as a named constant rather than hardcoding in every URL — makes future upgrades a one-line change.
 
-2. **TikTok app audit** — Direct Post requires audit approval (1-4 weeks). Build the Inbox fallback first and plan for a post-audit promotion to Direct Post.
+2. **Conversation schema design:** Not researched here — left for phase-specific research. Key questions: how to efficiently query "all threads for a phone number" and "all messages in a thread sorted by time" with full-text search on message body. Neon supports `pg_trgm` and `tsvector` for full-text search natively.
 
-3. **Vercel plan upgrade** — Confirm current plan before implementing cron-based scheduling. If on Hobby, the posting cron will fail at deployment.
+3. **Claude analysis trigger timing:** On every inbound message (adds latency and cost) vs. on thread open (cheaper, slightly stale) vs. batch overnight. Recommended default: trigger on thread open (streaming) + nightly batch for all active threads. Defer the per-message trigger to a later phase when usage patterns are understood.
 
-4. **TikTok PULL_FROM_URL domain** — `*.public.blob.vercel-storage.com` may need to be added to TikTok's domain verification list before PULL_FROM_URL works. Verify during TikTok app setup, not at implementation time.
+4. **`@anthropic-ai/sdk` version stability:** The SDK is at `0.104.2` and publishing frequently. Pin to a minor version range (`^0.104.0`) rather than exact to allow patch updates without manual intervention.
 
-5. **Instagram scheduled_publish_time** — The Graph API does not natively schedule Reels. The in-app cron + pre-created container approach is the correct pattern. Confirm container status does not expire if created hours before publish (Meta does not document container TTL — validate empirically).
+5. **iOS Web Push:** Safari 16.4+ on iOS supports Web Push only when the PWA is installed to the home screen (added to Home Screen). Team members need to install the admin PWA once. This is a UX setup step, not a code limitation.
 
 ---
 
 ## Sources
 
-- [Meta: Instagram Platform Content Publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing/)
-- [Meta: Instagram Refresh Access Token](https://developers.facebook.com/docs/instagram-platform/reference/refresh_access_token/)
-- [Meta: Instagram User Insights](https://developers.facebook.com/docs/instagram-platform/api-reference/instagram-user/insights/)
-- [TikTok: Content Posting API Overview](https://developers.tiktok.com/products/content-posting-api/)
-- [TikTok: Video Upload Reference](https://developers.tiktok.com/doc/content-posting-api-reference-upload-video)
-- [TikTok: Status Management](https://developers.tiktok.com/doc/content-posting-api-reference-get-video-status)
-- [TikTok: OAuth User Access Token Management](https://developers.tiktok.com/doc/oauth-user-access-token-management)
-- [Vercel: Cron Jobs](https://vercel.com/docs/cron-jobs)
-- [Vercel: Cron Jobs Usage and Pricing](https://vercel.com/docs/cron-jobs/usage-and-pricing) (updated March 2026)
-- [Vercel: Functions Limits](https://vercel.com/docs/functions/limitations) (updated May 2026)
-- [Vercel: @vercel/blob SDK](https://vercel.com/docs/vercel-blob/using-blob-sdk) (updated May 2026)
-- [Next.js: serverExternalPackages](https://nextjs.org/docs/app/api-reference/config/next-config-js/serverExternalPackages)
-- [GitHub: ffprobe-static path resolution bug in Next.js](https://github.com/vercel/next.js/issues/53791)
-- [Obsidian Properties / Frontmatter](https://curiouslychase.com/posts/obsidian-properties-markdown-frontmatter-enhanced/)
+- [Meta Graph API Changelog](https://developers.facebook.com/docs/graph-api/changelog/) — v25.0 introduced 2026-02-18
+- [WhatsApp Cloud API webhook implementation (pons.chat)](https://pons.chat/blog/whatsapp-cloud-api-webhook-nextjs) — GET/POST handler patterns verified
+- [Meta: Messages endpoint reference](https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages/) — send message API
+- [Neon Next.js guide (official)](https://neon.com/docs/guides/nextjs) — driver selection and serverless query pattern
+- [@neondatabase/serverless npm](https://www.npmjs.com/package/@neondatabase/serverless) — v1.1.0, ~554k weekly downloads
+- [Next.js PWA guide (official, updated 2026-02-11)](https://nextjs.org/docs/app/guides/progressive-web-apps) — web-push endorsement in official docs
+- [web-push npm](https://www.npmjs.com/package/web-push) — v3.6.7
+- [Anthropic models overview (official)](https://platform.claude.com/docs/en/about-claude/models/overview) — claude-sonnet-4-6 model ID, pricing, context window confirmed (fetched 2026-06-22)
+- [Anthropic batch processing docs (official)](https://platform.claude.com/docs/en/build-with-claude/batch-processing) — 50% cost reduction, less than 1hr completion
+- [@anthropic-ai/sdk npm](https://www.npmjs.com/package/@anthropic-ai/sdk) — v0.104.2 (published June 2026)

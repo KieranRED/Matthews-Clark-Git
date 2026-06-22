@@ -1,305 +1,288 @@
-# Feature Landscape: Social Content Scheduler
+# Feature Landscape: WhatsApp Business Integration
 
-**Domain:** Self-hosted social content scheduler + content intelligence system for a small business posting 1 Reel/day across Instagram + TikTok
-**Researched:** 2026-05-29
-**Milestone:** v1.0 Social Content Scheduler
+**Domain:** WhatsApp Business Cloud API integration for a premium car detailing studio CRM
+**Researched:** 2026-06-22
+**Milestone:** v1.2 WhatsApp Business Integration
 
 ---
 
-## Table Stakes
+## Overview
 
-Features that must exist for the scheduler to be worth using at all. Missing any of these makes the system worse than just posting manually from the phone.
+This document covers all 15 features in the milestone scope. Each feature is categorised as table stakes (must exist for the system to function), differentiator (what makes this worth building custom), or anti-feature (explicitly exclude). Feature dependencies map which features must exist before others can be built.
 
-| Feature | Why Expected | Complexity | Notes |
+A critical policy note before any feature detail: **Meta banned general-purpose AI chatbots from the WhatsApp Business Platform effective January 15, 2026.** AI that performs specific, structured business tasks (scoring, detection, status updates, alerting) is explicitly permitted. AI that acts as an open-ended conversational agent is prohibited. All AI features below qualify as business-specific task automation and are compliant.
+
+---
+
+## Feature Categories
+
+### Table Stakes
+
+These features are prerequisites. Without them, the rest of the system cannot function. They represent the minimum viable wiring layer.
+
+| Feature | Why Required | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Video upload with preview | Verify what you're posting before it goes live | Low | Upload to Vercel Blob, return playable URL for inline preview |
-| Per-platform caption field | TikTok and Instagram captions serve different audiences and algorithmic contexts | Low | Two separate text inputs. Copy from Instagram to TikTok as convenience only — not auto-sync |
-| Hashtag input | Part of how Reels/TikToks get discovered | Low | Separate from caption body, applied consistently to both platforms |
-| Scheduled date/time picker | The whole point of a scheduler | Low | Store in UTC, display in SAST (Africa/Johannesburg, UTC+2) |
-| Platform toggles | Not every post goes to both platforms | Low | Checkboxes: Instagram, TikTok — both on by default |
-| Queue / calendar view | See what's scheduled and when | Medium | Simple list sorted by scheduled_at is sufficient for 1 post/day. A calendar view is nice-to-have, not required |
-| Post status tracking | Know whether a post went live successfully | Low | Statuses: draft, scheduled, publishing, published, failed |
-| Error surfacing for failed posts | Silent failures destroy trust in the tool | Low | Show platform error message verbatim on failure. Telegram notification on failure |
-| Manual re-trigger for failures | Recovery path when a post fails | Low | "Retry" button that re-calls the publish API with the same container |
-| ffprobe quality check on upload | Know before scheduling whether the export will get recompressed by Instagram/TikTok | Medium | See Quality Check section for exact thresholds |
-| 7-day Vercel Blob auto-delete | Keep storage costs negligible | Low | Vercel Cron job, runs daily, deletes blobs where `deleteAfter` timestamp has passed |
+| **F01 — Meta Cloud API webhook receiver** | Every other feature depends on receiving and storing conversations | Medium | Must return HTTP 200 immediately and process async. Must validate X-Hub-Signature-256 HMAC. Must handle at-least-once delivery (idempotency by wamid). Needs Neon Postgres for durable conversation storage — Redis/KV is inappropriate for append-only message history. |
+| **F02 — Lead auto-linking by phone** | Conversations are useless without knowing which CRM lead they belong to | Low | Inbound webhook includes `wa_id` (E.164 phone number). Match against existing lead phone fields at ingest time. Unmatched conversations park in an "unlinked" queue for manual review. No human action required for matched conversations. |
+| **F05 — CRM WhatsApp tab** | Team cannot act on conversations without a UI to view them | High | Thread list (sorted by last_message_at) + inline chat view. Must show message direction (inbound/outbound), timestamps, delivery/read receipts, and media previews. Two distinct views: thread list sidebar + message thread. Must allow team to send outbound messages directly (within 24hr service window: free-form text; outside window: template only). |
+| **F03 — Team number management** | System cannot know which team member sent a message without registered numbers | Low | Admin UI to register eSIM business numbers with display names (e.g. "Matthew — Primary"). Each number maps to a WhatsApp phone_number_id in the WABA. Required before any per-number routing or attribution logic works. |
+| **F04 — Web Push notifications** | Team must know when a new message arrives — they cannot be polling the CRM tab all day | Medium | PWA service worker + Push API. Requires VAPID key pair. Notification payload: sender name/number, message preview, timestamp. Click-to-focus opens CRM to the relevant thread. Notification permission granted per device at first login. iOS 16.4+ supports PWA push; Android full support. |
 
----
+### Differentiators
 
-## Quality Check (Video Spec Verification)
-
-This is a differentiating feature for M&C specifically because they produce their own footage and export from DaVinci Resolve or Premiere. A bad export silently loses quality through double-compression.
-
-### Optimal Thresholds (ffprobe checks)
-
-| Check | Optimal | Flag Condition | Why |
-|-------|---------|---------------|-----|
-| Codec | H.264 | HEVC, VP9, AV1, ProRes, DNxHD | Instagram and TikTok accept H.264 natively. Other codecs trigger platform re-encode. HEVC is borderline acceptable but adds risk. |
-| Resolution | 1080x1920 (9:16) | Width != 1080, height != 1920, or aspect ratio != 9:16 | Off-ratio videos get letterboxed or cropped by the platform |
-| Frame rate | 24–30 fps | < 24 fps or > 30 fps | Platform re-encodes at 30 fps if over; < 24 looks choppy on mobile |
-| Bitrate | 4–10 Mbps | < 3 Mbps (too low) or > 15 Mbps (will be hard-capped) | Instagram recommends 4 Mbps minimum for Reels. TikTok recommends 6–8.5 Mbps at 30 fps |
-| Duration | 5–90 seconds | < 5s or > 90s | Outside this range, Instagram won't place in Reels tab |
-| Audio | AAC | Anything other than AAC | MP3 and other audio codecs trigger re-encode |
-| Container | MP4 with moov atom at front | MOV, MKV, AVI, or MP4 with moov atom at end | Instagram Graph API requires fast-start MP4 |
-| File size | < 100 MB | > 100 MB | Instagram Graph API hard limit |
-
-**Result display:** Show one of two states only:
-- **Optimised** (all checks pass) — green badge, post is ready
-- **Check export** (any check fails) — amber badge, show which specific checks failed and what the detected value was (e.g. "Bitrate: 2.1 Mbps — minimum 4 Mbps")
-
-**Do not block posting on a "Check export" badge.** The user may know what they're doing. Warn, don't block.
-
----
-
-## Differentiators
-
-Features that transform a scheduler into a content intelligence system. These are what make building this custom worth it over using Buffer.
+These features deliver intelligence and automation that generic WhatsApp inboxes do not. They are the primary reason to build this custom rather than using a third-party platform.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Analytics pull (48hr cron) | Passive performance data collection without manual reporting | Medium | Pull 48hrs after `published_at`. Instagram: views, reach, saved, shares, avg_watch_time, reels_skip_rate. TikTok: views, likes, comments, shares, completion rate, profile visits |
-| Content performance dashboard | See all posts ranked by signal in one screen | Medium | Three-column view: top performers, conversion posts, non-performers. Sortable by any pulled metric |
-| UTM attribution linking | Close the loop between a specific post and leads it generated | Medium | Each post gets a unique `utm_content` value (e.g. `post_2026-05-29_detailing-reel`). When a lead submits with that utm_content, it's attributed to that post |
-| Obsidian vault export | Extract learnable patterns across 50+ posts over time | Medium | See Obsidian Structure section. This is the highest long-term leverage feature |
-| Signal tagging | Label each post's performance character for pattern discovery | Low | Three mutually non-exclusive tags: `audience-growth`, `conversion`, `non-performer`. Applied automatically from analytics thresholds |
+| **F06 — AI warmth scoring (1–10)** | Objectively rank lead intent without reading every conversation | Medium | LLM (GPT-4o-mini recommended for cost) analyses full conversation thread on each new message. Outputs score 1–10 + one-sentence reason. Score stored per conversation and surfaced on lead card. Industry pattern: 1–3 = cold, 4–7 = warm, 8–10 = hot. Refresh on each new inbound message. |
+| **F07 — AI objection detection** | Catch price/timing/competitor objections before the lead goes cold | Medium | LLM classifies whether the latest message contains a detectable objection from a fixed taxonomy: `price`, `timing`, `competitor`, `none`. On objection detected: fire WhatsApp message to team numbers via the Cloud API (utility template, pre-approved). Alert includes lead name, objection type, and conversation excerpt. |
+| **F08 — AI lead status auto-updates** | Reduce admin overhead; pipeline stages stay current without manual updates | Medium | LLM infers CRM stage from conversation content: `new → contacted → qualified → quoted → won → lost`. Only advances if confidence is high. Stale or ambiguous conversations do not trigger updates. Requires existing CRM stage model — maps to whatever stage names are already in use. |
+| **F09 — AI follow-up timing inference** | Never miss a "call me Friday" signal buried in a long thread | Medium | LLM extracts explicit or implied timing commitments from messages (e.g. "I'll decide by end of week", "ping me after payday"). Outputs an ISO date. Stored as `follow_up_at` on the conversation. CRM surfaces these as a follow-up queue sorted by date. |
+| **F10 — No-contact alert** | Guarantee every new lead gets a human response within 1 hour | Low | Vercel Cron runs every 15 minutes. Checks for leads where first inbound message arrived > 60 minutes ago and no outbound message exists from any team number. Fires WhatsApp alert to team numbers via template. Tracks `alert_sent_at` to prevent repeat alerts for the same lead. |
+| **F11 — Morning briefing** | Team starts each day with full situational awareness without opening the CRM | Medium | Vercel Cron at 07:00 SAST (05:00 UTC). Generates summary: new leads since yesterday, leads awaiting response, high-warmth leads (score ≥ 7), upcoming follow-up dates (F09). Sends as WhatsApp message to all registered team numbers via approved template. Template must be pre-approved by Meta — plan 24–72hr review time. |
+| **F12 — Aftercare scheduling** | Premium detailing studios live on repeat business; automated follow-up is standard practice | Medium | On job marked as `delivered` in CRM, schedule a WhatsApp follow-up at +14 days (PPF/wrap inspection invitation). Stored as a scheduled outbound job. Vercel Cron checks daily for due aftercare messages. Message via approved utility template (not marketing — utility qualifies as post-sale service communication). |
+| **F13 — Broadcast campaigns** | Re-engage warm unconverted leads at scale without manual copy-paste | High | Manually triggered by admin from CRM. Audience: leads filtered by tag/stage/last-activity. Message: personalised template with `{{name}}`, `{{service}}` variables. Templating requires Meta pre-approval. Sending is rate-limited by WABA tier (default Tier 1: 1,000 unique recipients per 24 hours for a new account). Must include opt-out tracking. |
+| **F14 — Competitor intelligence logging** | Surface market pricing data that the team currently loses to memory | Low | On AI processing pass (same LLM call as warmth/objection), extract competitor name and any stated price if present. Store as structured JSON on the conversation. Admin screen aggregates by competitor: mention count, avg stated price, last mentioned date. No external data source required — purely extracted from conversation content. |
+| **F15 — Qualified lead scoring tied to utm_content** | Prove which specific ad ID generates revenue-worthy leads, not just form submissions | Medium | Existing CRM leads carry `utm_content` from form submission. When a lead is marked qualified (via AI status update or manual), record `qualified_at` and the `utm_content` value. Dashboard: qualified leads per utm_content, cost-per-qualified-lead (manual ad spend input or Meta Ads API). Depends on F02 (lead linking) and F08 (status updates). |
 
-### Signal Tagging Logic
+### Anti-Features
 
-Applied automatically when analytics are pulled:
+Explicitly out of scope. Each would add complexity, risk, or Meta policy exposure without proportional return.
 
-| Tag | Condition |
-|-----|-----------|
-| `audience-growth` | Views > median OR saves > median OR (follows from post > 0 on TikTok) |
-| `conversion` | Attributed UTM leads > 0 OR profile visits from post in top quartile |
-| `non-performer` | Views < 25th percentile AND saves = 0 AND completion rate < 30% |
-
-A post can carry multiple tags (e.g. high views + zero conversion = `audience-growth` only). A post with zero analytics after 48hrs gets `non-performer` by default.
-
-Thresholds are relative (median, quartiles) rather than absolute so they adjust as the account grows.
-
----
-
-## Obsidian Vault Structure
-
-**Goal:** Enable pattern discovery at volume. After 50+ posts, M&C should be able to open the vault and ask "what types of hooks produce conversion?" without manually auditing spreadsheets.
-
-### Folder Structure
-
-```
-Content-Intelligence/
-  Posts/
-    YYYY-MM-DD — [post-slug].md
-  Signals/
-    audience-growth.md
-    conversion.md
-    non-performer.md
-  Patterns/
-    (manually created by M&C when patterns emerge)
-  index.md
-```
-
-### Per-Post Note: Frontmatter
-
-Every post note must have machine-readable frontmatter so the vault is queryable by Obsidian Dataview (if installed) and by AI tools scanning the vault.
-
-```yaml
----
-title: "YYYY-MM-DD — [slug]"
-date: YYYY-MM-DD
-scheduled_at: "YYYY-MM-DDTHH:MM:00+02:00"
-platforms: [instagram, tiktok]
-service_type: "ceramic-coating | paint-correction | interior | full-detail | starlight | other"
-hook_type: "before-after | process | result | reaction | educational | behind-scenes"
-caption_theme: "[one-liner describing what the caption said]"
-signals: [audience-growth, conversion, non-performer]
-
-# Analytics (populated 48hrs after publish)
-instagram_views: 0
-instagram_reach: 0
-instagram_saves: 0
-instagram_shares: 0
-instagram_avg_watch_time_s: 0
-instagram_skip_rate_pct: 0
-tiktok_views: 0
-tiktok_likes: 0
-tiktok_shares: 0
-tiktok_comments: 0
-tiktok_completion_rate_pct: 0
-tiktok_profile_visits: 0
-
-# Attribution
-attributed_leads: 0
-utm_content: "post_YYYY-MM-DD_[slug]"
----
-```
-
-### Per-Post Note: Body
-
-The body is what makes the note useful for pattern analysis — it captures the human reasoning and creative choices that the metrics alone cannot explain.
-
-```markdown
-## Caption
-
-[Full caption text, verbatim]
-
-## Hashtags
-
-[Full hashtag list]
-
-## Creative Notes
-
-[What was the hook? What visual was used? What made this different from other posts? 1-3 sentences. Written by M&C at scheduling time.]
-
-## Performance
-
-[Populated on analytics pull. One-sentence interpretation: "High saves, low skip rate — detailing process content performs well with existing audience." M&C writes this.]
-
-## Links
-
-[[audience-growth]] [[conversion]] [[non-performer]]
-(whichever signal tags apply, linking to Signal files)
-```
-
-### Signal Files
-
-`audience-growth.md`, `conversion.md`, `non-performer.md` are index files that contain:
-- A brief definition of what the signal means
-- A Dataview query block (if M&C uses Dataview) to list all posts with that tag
-- A manually maintained "patterns emerging" section where M&C records observations
-
-These files are the synthesis layer — they turn individual post notes into actionable insight.
-
-### index.md
-
-Top-level index with:
-- Total posts logged
-- Current signal distribution (how many audience-growth vs conversion vs non-performer)
-- Link to each signal file
-- A manually updated "current hypothesis" section (e.g. "Process videos perform 2x better than results-only clips")
-
-### Export Mechanics
-
-The CRM exports one `.md` file per post when analytics are pulled. The export should:
-1. Create the file with full frontmatter on first export
-2. Update only the analytics fields and signals on subsequent re-exports (if analytics improve or signal tags change)
-3. Export to a configurable vault path (environment variable `OBSIDIAN_VAULT_PATH` pointing to the vault's `Content-Intelligence/Posts/` directory)
-4. Use the filename format `YYYY-MM-DD — [slug].md` where slug is the first 40 characters of the caption, lowercased, with spaces replaced by hyphens
-
-**Confidence: MEDIUM** — The export path approach is standard for local vault sync but assumes the server runs on the same machine as the vault, OR that the Obsidian vault is synced via Obsidian Sync/iCloud to a path accessible from the server's filesystem. For Vercel (serverless), this cannot write to a local filesystem. The correct implementation is: export the `.md` content as a downloadable file or ZIP that M&C manually drops into their vault, OR use the Obsidian Git plugin to push to a private GitHub repo where the CRM commits directly.
-
-**Recommended approach for Vercel deployment:** Export generates a ZIP of all un-exported (or all) post notes, downloadable from the CRM admin. M&C drops the files into their vault manually or configures Obsidian Git to pull from a private repo that the CRM pushes to.
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| General-purpose AI chatbot (auto-reply) | Prohibited by Meta policy from January 15, 2026. Risks account suspension. | AI analyses conversations passively and alerts the team — humans send replies |
+| WhatsApp-native message scheduling (built-in feature) | Native scheduling is for the WhatsApp app, not Cloud API. The API does not expose it. | Use Vercel Cron to trigger outbound messages at scheduled time |
+| Bulk messaging outside approved templates | Sending non-template messages outside the 24-hr service window violates Meta policy | Pre-approve utility and marketing templates before any broadcast or automated outbound |
+| Read receipt suppression workarounds | Any attempt to fake or suppress read receipts violates Meta ToS | Surface read/delivered status from webhook status events honestly |
+| Storing media blobs in Postgres | WhatsApp media URLs expire within ~20 minutes of webhook delivery | Store only the media_id and message type; download and re-host to Vercel Blob if preview is needed, or accept that older media is inaccessible |
+| Multi-WABA support | M&C operates one WhatsApp Business Account. Multi-WABA adds auth complexity with no current case | Single WABA, single system user token |
+| Per-message per-recipient cost tracking | Meta switched to per-message pricing July 1, 2025. Tracking every message cost requires Finance-level accounting logic | Log message counts; accept that exact billing lives in Meta Business Manager |
+| Competitor price scraping / external data | Requires scraping or third-party data APIs, adds legal/ToS risk | F14 extracts only what leads voluntarily share in conversation |
 
 ---
 
 ## Feature Dependencies
 
+Dependencies flow top-to-bottom. A feature with an arrow cannot be built before its upstream is complete.
+
 ```
-Video upload → ffprobe quality check (check runs server-side on upload)
-Video upload → Vercel Blob storage → 7-day TTL cron
-Scheduled date/time → Vercel Cron scheduler → Platform publish calls
-Platform publish → Post status tracking → Failure notification (Telegram)
-Published post → Analytics pull cron (runs 48hrs after published_at)
-Analytics pull → Signal tagging logic
-Analytics pull → Obsidian export
-Lead submission with UTM → Post attribution (utm_content match)
-Post attribution → conversion signal tag
-All post signals → Content performance dashboard
+F01 (Webhook receiver + Neon storage)
+  └── F02 (Lead auto-linking)
+        └── F05 (CRM WhatsApp tab)
+              └── F04 (Web Push notifications) — alerts link to threads
+        └── F06 (AI warmth scoring)
+        └── F07 (AI objection detection)
+              └── F04 (Web Push / WhatsApp team alert depends on F03)
+        └── F08 (AI lead status updates)
+              └── F15 (Qualified lead scoring — needs qualified status)
+        └── F09 (AI follow-up timing)
+        └── F14 (Competitor intelligence logging)
+  └── F10 (No-contact alert — needs inbound message timestamps)
+        └── F03 (Team number management — to know where to send alert)
+  └── F11 (Morning briefing — needs F06 warmth scores, F09 follow-ups)
+        └── F03 (Team number management — to know who to brief)
+  └── F12 (Aftercare scheduling — triggered from CRM job delivery status)
+  └── F13 (Broadcasts — needs conversation history to identify warm unconverted leads)
+        └── F02 (Lead linking — audience selection by lead attributes)
+
+F03 (Team number management)
+  → Required by F04, F07 alerts, F10, F11 before any outbound can route correctly
+
+ALL AI features (F06, F07, F08, F09, F14):
+  → Depend on F01 (conversation storage) for context window
+  → Can share a single LLM analysis job triggered on each new inbound message
+  → Running all five analyses in one LLM call is preferable (single prompt, structured JSON output)
+    to five separate API calls — reduces cost and latency
 ```
+
+**Critical path for MVP:**
+F01 → F02 → F03 → F04 → F05
+That sequence delivers usable WhatsApp inbox in the CRM with team notifications. Everything else layers on top.
+
+---
+
+## Complexity Notes by Feature
+
+### F01 — Webhook Receiver (Medium)
+
+The webhook endpoint must:
+1. Verify `X-Hub-Signature-256` before any processing
+2. Return HTTP 200 immediately — WhatsApp retries for 7 days on non-200 responses
+3. Enqueue payload for async processing (a simple Neon write is fast enough; a full queue is only needed at > 80 msg/sec, which M&C will never reach)
+4. Handle duplicate delivery: store `wamid` (WhatsApp message ID) as UNIQUE in Postgres
+5. Handle message types: text, image, audio, document, video, reaction, location, interactive
+
+Neon Postgres is the right storage choice here — Redis is inappropriate for conversation history (no relational queries, no message ordering, no full-text search). The existing Upstash KV stays for leads/jobs; Neon is additive for conversations only.
+
+Webhook verification requires a one-time GET challenge (hub.challenge response) before Meta begins sending events. This is a setup step, not a runtime concern.
+
+### F02 — Lead Auto-Linking (Low)
+
+The `wa_id` field in every webhook payload is the sender's phone number in E.164 format. Matching against the lead's stored phone number works if phone numbers are stored consistently. Edge cases:
+- South African numbers can arrive as `27XXXXXXXXX` (international) or stored as `0XXXXXXXXX` (local format) — normalisation to E.164 required on both sides at storage time
+- One phone number may map to multiple leads (rare but possible if same person submitted twice)
+- Unlinked conversations should surface in the UI for manual review, not silently drop
+
+### F03 — Team Number Management (Low)
+
+Straightforward admin CRUD. The WABA Phone Numbers API (`GET /WABA_ID/phone_numbers`) returns all registered numbers. The admin UI adds a `display_name` and `owner` field on top of what Meta already knows. No complex sync needed — M&C has 2–3 team numbers maximum.
+
+### F04 — Web Push (Medium)
+
+Web Push requires a service worker registered at the CRM admin origin. The implementation:
+1. Generate VAPID key pair (once, stored in env)
+2. On admin login, request Notification permission and POST subscription endpoint to save `PushSubscription` per device
+3. When inbound message arrives (F01 processing), call Web Push API to notify all subscribed devices
+
+iOS support requires the app to be added to Home Screen (iOS 16.4+ PWA push). If team uses Android, this is straightforward. The CRM should prompt "Add to Home Screen" on first admin login for iOS users.
+
+### F05 — CRM WhatsApp Tab (High)
+
+Highest UI complexity in the milestone. Requires:
+- Thread list with real-time updates (polling or SSE — avoid WebSocket on Vercel serverless)
+- Per-thread message view with direction styling (inbound left, outbound right)
+- 24-hour window enforcement: show whether free-form reply is available or template required
+- Media message handling: images/audio/video show inline; documents as download links
+- Outbound send form: text input + send button (within window), template picker (outside window)
+- Warmth score badge (from F06) on thread list items
+- Lead card link from each thread
+
+Server-Sent Events (SSE) is the recommended real-time pattern for Vercel — supports streaming responses natively. Full polling every 3 seconds is simpler and adequate for a 2–3 person team.
+
+### F06, F07, F08, F09, F14 — AI Analysis Suite (Medium each, but share infra)
+
+All five AI features can and should share a single LLM invocation triggered on each new inbound message. The prompt requests a structured JSON response with all five outputs simultaneously:
+
+```json
+{
+  "warmth_score": 7,
+  "warmth_reason": "Lead confirmed budget and asked for availability",
+  "objection": "price",
+  "objection_excerpt": "That's a bit more than I was expecting",
+  "crm_stage": "qualified",
+  "crm_stage_confidence": "high",
+  "follow_up_date": "2026-06-27",
+  "competitor": "Cape Coat Pro",
+  "competitor_price": "R8500"
+}
+```
+
+GPT-4o-mini is the right model: cheap enough to run on every message, capable enough for structured extraction from conversational text in South African English. Cost estimate at M&C's volume (estimated 20–50 conversations/day, ~5 messages each): < $1/day.
+
+The AI context window should include: the full conversation thread (all messages, ordered by timestamp), the lead's service type, and the lead's current CRM stage. More context = better extraction accuracy.
+
+### F10 — No-Contact Alert (Low)
+
+Simple Cron query:
+```sql
+SELECT * FROM conversations
+WHERE direction_first = 'inbound'
+  AND first_message_at < NOW() - INTERVAL '1 hour'
+  AND outbound_count = 0
+  AND alert_sent_at IS NULL
+```
+Fire template to team numbers. Set `alert_sent_at`. Done. The only complexity is ensuring the template is pre-approved before the feature goes live.
+
+### F11 — Morning Briefing (Medium)
+
+Complexity is in the summary generation, not the sending. Two approaches:
+1. **Template-based** (simpler, no LLM): compose structured template with variable substitution — lead counts, names, scores. Requires only a pre-approved template with variables.
+2. **LLM-generated** (richer, more expensive): LLM writes natural language summary from structured data. Requires a utility template with a single free-text body variable, which Meta may or may not approve.
+
+Recommendation: start with option 1 (template-based), upgrade to option 2 once volume justifies it.
+
+### F12 — Aftercare Scheduling (Medium)
+
+Complexity is the scheduling mechanism. Options:
+1. **Vercel Cron (simplest)**: daily cron queries for jobs where `delivered_at` + 14 days <= today and `aftercare_sent = false`. Fire template. Works reliably at M&C's scale.
+2. **Neon scheduled jobs (future)**: Neon's pg_cron extension can schedule per-row. Over-engineered for this use case.
+
+Aftercare messages are utility (post-sale service), not marketing. Utility templates have lower approval friction and are free within the 24-hour window. The lead has given explicit consent by being a paying customer.
+
+### F13 — Broadcasts (High)
+
+Highest operational complexity:
+1. Meta template pre-approval (24–72 hours, mandatory — cannot broadcast without it)
+2. Audience selection UI (filter by tags, stage, last contact date)
+3. Variable substitution per recipient (`{{name}}`, `{{service}}`, `{{last_contact}}`)
+4. Rate limit compliance: at Tier 1 (new WABA), 1,000 unique recipients per 24 hours. M&C's warm lead list is unlikely to exceed this soon.
+5. Opt-out tracking: must honour WhatsApp opt-outs. Store `opted_out_at` per lead.
+6. Per-message billing: marketing templates are billed per message under the July 2025 pricing model. Estimate: ~R3–5 per message (Meta's per-message rate for South Africa).
+
+### F15 — Qualified Lead Scoring tied to utm_content (Medium)
+
+Complexity is in the dashboard, not the data collection. The UTM is already captured on lead creation (existing system). The new work:
+1. Expose a "qualified leads by utm_content" view in the analytics dashboard
+2. Optionally: allow manual ad spend entry per utm_content value to compute cost-per-qualified-lead
+3. Meta Ads API integration for automatic spend pull is a significant scope expansion — treat as optional/future
+
+The most valuable output is a simple ranked table: `utm_content | qualified_leads | total_leads | qualified_rate%`.
+
+---
+
+## WhatsApp-Specific Constraints (All Features)
+
+These constraints cut across the entire milestone and must be factored into every feature:
+
+| Constraint | Impact |
+|------------|--------|
+| 24-hour service window | Outside 60 minutes after last inbound message, only pre-approved templates can be sent. F05 chat UI must enforce this. F10, F11, F12 must use templates. |
+| Template pre-approval | All outbound templates need Meta approval (24–72 hours typical). Start template submissions in Week 1 of the milestone. Required for: F07 alerts, F10 no-contact, F11 briefing, F12 aftercare, F13 broadcasts. |
+| Per-message pricing (from July 1, 2025) | Marketing templates billed per message. Utility templates free within service window. Authentication always billed. |
+| WABA messaging tier | New accounts start at Tier 1: 1,000 unique recipients per 24 hours across all phone numbers in the portfolio. Tier 2 (10,000) requires reaching 500 unique conversations in 7 days with a quality rating of Medium or High. |
+| Media URL expiry | WhatsApp media URLs in webhooks expire in ~20 minutes. Must download and re-host immediately on ingest, or store only message type and accept loss of older media. |
+| Message throughput default | 80 messages per second per phone number — far exceeds M&C's needs. Not a constraint at this scale. |
+| On-Premises API end-of-life | As of October 2025, only Cloud API is available for new registrations. The project is already on Cloud API path. |
+| WhatsApp number requirements | A number can only be registered to one WABA at a time. Team eSIM numbers being used personally must be migrated or new numbers acquired for business use. |
 
 ---
 
 ## MVP Recommendation
 
-Build in this order within the milestone:
+Build in this sequence:
 
-**Phase 1 — Core Scheduler**
-1. Video upload + ffprobe quality check (table stakes + differentiator in one)
-2. Post creation form (caption, hashtags, platforms, scheduled_at)
-3. Vercel Cron → Instagram publish (Graph API three-step flow)
-4. Post status tracking + failure Telegram notification
-5. 7-day Blob TTL cron
+**Phase 1 — Foundation (blocking everything else)**
+1. F01 — Webhook receiver + Neon conversation storage
+2. F02 — Lead auto-linking by phone
+3. F03 — Team number management
 
-**Phase 2 — TikTok + Analytics**
-6. TikTok Direct Post (or Inbox fallback if audit pending)
-7. Analytics pull cron (48hr post-publish)
-8. Signal tagging logic
-9. Content performance dashboard screen
+**Phase 2 — Team Visibility**
+4. F04 — Web Push notifications
+5. F05 — CRM WhatsApp tab (thread list + chat)
 
-**Phase 3 — Intelligence Layer**
-10. UTM attribution linking (post-to-lead)
-11. Obsidian vault export (ZIP download)
+**Phase 3 — AI Intelligence (single LLM job, five outputs)**
+6. F06, F07, F08, F09, F14 — All five AI analyses (one implementation, one prompt)
 
-**Rationale:** Instagram Graph API is faster to get live (no audit required for an existing Business account). TikTok requires an app audit that takes 2–6 weeks and can block Phase 2. Phase 3 delivers zero value until there are posts to analyse — defer until posts are accumulating.
+**Phase 4 — Automation Outbound**
+7. F10 — No-contact alert
+8. F11 — Morning briefing
+9. F12 — Aftercare scheduling
 
----
+**Phase 5 — Growth Layer**
+10. F13 — Broadcasts (requires template pre-approval lead time)
+11. F15 — Qualified lead scoring tied to utm_content
 
-## Anti-Features
-
-Features to explicitly not build. Each one would add complexity, maintenance burden, or create false confidence without adding proportional value for a 1-post-per-day operation.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| AI caption generation | Captions for premium car detailing are short, personal, and brand-voice-specific. AI captions produce generic output. | Write the caption manually at scheduling time — it takes 90 seconds |
-| Multi-account support | M&C has one Instagram and one TikTok. Multi-account adds auth complexity (multiple token stores, per-account rate limits) with no current use case | Hard-code single-account credentials in environment variables |
-| Content approval workflow | No team review is needed when the business owner and content creator are the same person | Single-user publish flow only |
-| Competitor benchmarking | Requires scraping or third-party data APIs, not available from official platform APIs without paid plans | Use own post performance trends only |
-| Hashtag research tools | Hashtag optimisation for detailing content is already known. Building a research tool is a feature in its own right | Include a static "best performing hashtags" list as a text file M&C maintains manually |
-| Instagram Stories scheduling | Stories require different API flow, different specs, different content strategy, and expire in 24hrs anyway | Reels only for v1.0. Stories are a separate milestone if ever needed |
-| Pinterest / YouTube Shorts / LinkedIn | No attribution evidence that M&C's audience is on these platforms | Instagram + TikTok only |
-| Real-time analytics (< 48hr pull) | Platform APIs impose rate limits and data is often unreliable before 48hrs post-publish. Views and reach continue accumulating for days | Pull once at 48hrs. Optional second pull at 7 days if needed later |
-| A/B testing different captions | Too low volume (1 post/day) for A/B data to reach significance | Build pattern awareness through Obsidian vault instead |
-| Suggested posting times based on analytics | Requires historical analytics data that doesn't exist yet. Premature optimisation | Post at a fixed time (e.g. 10:00 SAST) for v1.0. Revisit after 3+ months of data |
-| Bulk import / bulk scheduling | 1 post/day means one post is scheduled at a time. Bulk tooling adds UI complexity for zero workflow gain | Single-post creation form only |
-| Public embed / share links for scheduled posts | Unnecessary for an internal CRM tool | Keep all content scheduling behind admin auth |
-
----
-
-## Defer to Future Milestones
-
-| Feature | Reason to Defer |
-|---------|----------------|
-| TikTok Direct Post (if audit pending) | Use Inbox fallback in v1.0; upgrade to Direct Post once audit completes |
-| 7-day re-pull of analytics | Nice-to-have for seeing posts with delayed virality; requires tracking which posts have been re-pulled |
-| Obsidian Git push integration | Requires GitHub repo setup; ZIP download works for v1.0 |
-| Signal threshold auto-calibration | Needs 30+ posts before median/quartile thresholds are meaningful |
-| Instagram Story scheduling | Different API, different content strategy — separate milestone |
-| Content calendar view (visual) | List view sufficient for 1 post/day; add calendar UI after v1.0 is validated |
-
----
-
-## Platform API Constraints (HIGH Confidence)
-
-These are non-negotiable constraints from official platform documentation that the requirements must work around.
-
-**Instagram Graph API:**
-- Business account required (not Creator account) — HIGH confidence, official docs
-- `instagram_business_basic` + `instagram_business_content_publish` permissions required through Meta app review
-- Three-step publish flow: create container → poll for FINISHED → publish — HIGH confidence
-- Rate limit: 100 posts per rolling 24hrs (well above M&C's usage) — HIGH confidence
-- No music library access via API — HIGH confidence
-- Scheduling: Instagram Graph API has no native `scheduled_publish_time` for Reels in the standard Business API. Must implement as a Vercel Cron job that fires at the scheduled time — MEDIUM confidence (verify against latest Graph API docs before build)
-- Reels must be 5–90 seconds; outside this range they publish as feed video not Reels tab — HIGH confidence
-- Max file size 100 MB — HIGH confidence
-
-**TikTok Content Posting API:**
-- App audit required before Direct Post can publish publicly — HIGH confidence, official docs
-- Audit takes 2–6 weeks — MEDIUM confidence
-- No native server-side scheduling — HIGH confidence. Must implement as Vercel Cron
-- Inbox (draft) flow available without audit — HIGH confidence
-- Daily cap: 25 posts per account — well above M&C usage — HIGH confidence
-- Upload URL valid for 1 hour only — HIGH confidence (relevant for scheduled posts: do not generate upload URL until post time)
+**Template pre-approval must start in Week 1** regardless of which phase templates are needed for. Approval takes 1–3 business days but can block Phase 4 if submitted late.
 
 ---
 
 ## Sources
 
-- [Instagram Graph API Reels Publishing Guide — Postproxy](https://postproxy.dev/blog/instagram-reels-api-publishing-guide/)
-- [Instagram Media Insights — Meta for Developers](https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights/)
-- [TikTok Content Posting API — Direct Post Reference](https://developers.tiktok.com/doc/content-posting-api-reference-direct-post)
-- [TikTok Analytics Metrics — Sprout Social 2026](https://sproutsocial.com/insights/tiktok-metrics/)
-- [Social Media Video Specs — Sprout Social 2026](https://sproutsocial.com/insights/social-media-video-specs-guide/)
-- [Instagram Insights Metrics Deprecation April 2025 — Emplifi](https://docs.emplifi.io/platform/latest/home/instagram-insights-metrics-deprecation-april-2025)
-- [Social Media Analytics Small Business — Later](https://later.com/blog/social-media-analytics-small-business/)
-- [UTM Parameters Organic Social Posts — Attributer](https://attributer.io/blog/utm-parameters-organic-social-posts)
-- [TikTok Scheduling via API — Postproxy](https://postproxy.dev/how-to/schedule-tiktok-posts/)
-- [Mixpost — Self-Hosted Social Media Management](https://mixpost.app/) (reference for self-hosted scheduler patterns)
+- [WhatsApp Cloud API Webhook Overview — Meta for Developers](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview/)
+- [Guide to WhatsApp Webhooks: Features and Best Practices — Hookdeck](https://hookdeck.com/webhooks/platforms/guide-to-whatsapp-webhooks-features-and-best-practices)
+- [WhatsApp API Rate Limits Explained — WASenderApi](https://wasenderapi.com/blog/whatsapp-api-rate-limits-explained-how-to-scale-messaging-safely-in-2025)
+- [WhatsApp API Pricing Update: Effective July 1, 2025 — YCloud](https://www.ycloud.com/blog/whatsapp-api-pricing-update)
+- [WhatsApp Business Multiple Numbers — Blueticks](https://blueticks.co/blog/whatsapp-business-multiple-numbers)
+- [Not All Chatbots Are Banned: WhatsApp's 2026 AI Policy Explained — respond.io](https://respond.io/blog/whatsapp-general-purpose-chatbots-ban)
+- [WhatsApp changes its terms to bar general-purpose chatbots — TechCrunch](https://techcrunch.com/2025/10/18/whatssapp-changes-its-terms-to-bar-general-purpose-chatbots-from-its-platform/)
+- [How to Automatically Qualify Leads in WhatsApp with AI — Aurora Inbox](https://www.aurorainbox.com/en/2026/02/25/automatically-qualify-leads-whatsapp/)
+- [WhatsApp AI Agent for Lead Management — respond.io](https://respond.io/blog/whatsapp-ai-chatbot-for-lead-management)
+- [WhatsApp Automation: Cut Response Times — JustCall](https://justcall.io/blog/whatsapp-automation-to-improve-customer-engagement.html)
+- [Setting Up SLA/Response-Time Alerts for WhatsApp — Bow Chat](https://bow.chat/use-cases/sla-response-time-alerts-whatsapp)
+- [WhatsApp Schedule Message — Infobip](https://www.infobip.com/blog/whatsapp-schedule-message)
+- [UTM Tracking for WhatsApp Campaigns — Kommo](https://www.kommo.com/support/messenger-apps/whatsapp-analytics-utms/)
+- [WhatsApp Conversion Tracking Attribution Issues — Digital MicroEnterprise](https://digitalmicroenterprise.com/whatsapp-conversion-tracking)
+- [WhatsApp Business API: 24-Hour Window and Templates — smsmode](https://www.smsmode.com/en/whatsapp-business-api-customer-care-window-ou-templates-comment-les-utiliser/)
+- [Messaging Per Second (MPS) for WhatsApp — Insider One Academy](https://academy.insiderone.com/docs/messaging-per-second-mps-for-whatsapp)
+- [Connect Next.js to Neon — Neon Docs](https://neon.com/docs/guides/nextjs)
