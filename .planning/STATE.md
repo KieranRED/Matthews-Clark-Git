@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: WhatsApp Business Integration
-status: executing
-stopped_at: Completed 09-02-PLAN.md (Neon data layer + whatsappStore)
-last_updated: "2026-06-22T15:54:43.831Z"
+status: verifying
+stopped_at: Completed 09-03-PLAN.md (webhook route + WABA subscribe)
+last_updated: "2026-06-22T16:03:45.523Z"
 last_activity: 2026-06-22
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-22)
 
 Phase: 09 (Webhook Foundation) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-22
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
@@ -55,6 +55,9 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [Phase 09]: wamid TEXT UNIQUE NOT NULL — dedup safety net for Meta at-least-once delivery semantics
 - [Phase 09]: Relative imports in whatsappStore.js for node --test compatibility (@/ alias only resolves under Next.js bundler)
 - [Phase 09]: Source-text assertions in whatsappStore tests — Node v20 lacks mock.module; readFile + String.includes covers SQL idempotency without live DB
+- [Phase 09]: export const runtime='nodejs' on webhook routes — crypto.createHmac not in Edge
+- [Phase 09]: after() from next/server as primary async mechanism — defers Neon writes until after 200 is flushed (FOUND-03)
+- [Phase 09]: WABA subscribe endpoint returns POST + GET results — caller confirms subscription is active in one call (FOUND-06)
 
 ### Critical Pre-Code Tasks
 
@@ -70,6 +73,6 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Session Continuity
 
-Last session: 2026-06-22T15:54:43.828Z
-Stopped at: Completed 09-02-PLAN.md (Neon data layer + whatsappStore)
+Last session: 2026-06-22T16:03:45.519Z
+Stopped at: Completed 09-03-PLAN.md (webhook route + WABA subscribe)
 Resume file: None
