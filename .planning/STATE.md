@@ -1,73 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-current_plan: 2
-status: executing
-stopped_at: Completed 08-03-PLAN.md — ready for 08-04
-last_updated: "2026-06-12T16:44:59.420Z"
+milestone: v1.2
+milestone_name: WhatsApp Business Integration
+current_plan: 0
+status: defining requirements
+stopped_at: Milestone v1.2 started — defining requirements
+last_updated: "2026-06-22T00:00:00.000Z"
 progress:
-  total_phases: 3
-  completed_phases: 2
-  total_plans: 11
-  completed_plans: 10
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 08 (gpt-image-2-studio-render) — EXECUTING
-Plan: 4 of 4
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-06-22 — Milestone v1.2 started
 
-- **Phase:** 08
-- **Current Plan:** 2
-- **Status:** Ready to execute
+## Accumulated Context
 
-## Progress
-
-[██████████████████████████████] 4/4 plans complete
-
-## Decisions
-
-- [Phase 08-01]: Studio bay asset provided as studio-bay.PNG (1086x1448 portrait PNG) — 08-02 route references public/wrap-studio/studio-bay.PNG
-- [Phase 08-01]: OPENAI_API_KEY confirmed seeded in .env.local and Vercel project settings
-- baActive/setBaActive hoisted to app.jsx, passed to WrapStage — BA toggle logic in the app shell
-- car-base--original at z-index 0 unclipped so it reveals naturally as left side of before/after slider
-- RCOL-09 deferred — panel assignments tracked for quote flow, simultaneous visual rendering requires canvas segmentation (future phase)
-- fxFor() accepts plain hex string (defaults to gloss) for backward compat with app.jsx swatch system
-- metallic-noise SVG filter inlined in stage DOM — zero dependency, referenced via url(#metallic-noise)
-- Canvas composite replaced with CSS mask-image div layers to enable blend modes + SVG filters
-- @imgly CDN replaced with server-side /api/wrap-remove-bg using @imgly/background-removal-node — ONNX binaries cannot be webpack-bundled
-- dataURLs over blob URLs — persist across page reload in localStorage
-- Babel Standalone for zero-build JSX transpile in public/ static assets
-- Before/after slider clipping moved to car-wrap level — fixes lag and background bleed
-- user-select:none + draggable:false on slider elements prevents text/image selection during drag
-- [Phase 07-quote-crm-share]: wrap-quote route uses M&C Telegram only — no Izimoto notification per research brief
-- [Phase 07-quote-crm-share]: QuoteModal form state is local — lifecycle tied to modal mount/unmount
-- [Phase 07-quote-crm-share]: Download helper registered on window from Stage — Stage owns displayUrl, not app.jsx
-- [Phase 07-quote-crm-share]: base64url encoding for ?s= share param — safe for URL embedding without percent-encoding
-- [Phase 08-gpt-image-2-studio-render]: model is gpt-image-1 (exact string) — images.edit() not images.generate()
-- [Phase 08-gpt-image-2-studio-render]: Rate cap is per-IP daily via kvIncr+kvExpire(90000s) — KV failure is non-fatal
-- [Phase 08]: renderUrl is separate state from displayUrl/carUrl — CSS preview untouched on failure, never overwritten
-- [Phase 08]: Client session render cap of 3 (sessionRenderCount) as first-line defence before per-IP KV cap
-
-## Performance Metrics
-
-| Phase | Plan | Duration | Tasks | Files |
-|-------|------|----------|-------|-------|
-| 06-upload-recolour-engine | 01 | 15min | 4 | 5 |
-| 06-upload-recolour-engine | 02 | 8min | 2 | 2 |
-| 06-upload-recolour-engine | 03 | 5min | 2 | 3 |
-| 06-upload-recolour-engine | 04 | UAT | 1 | 0 |
-| Phase 07-quote-crm-share P01 | 5min | 1 tasks | 1 files |
-| Phase 07-quote-crm-share P02 | 5min | 1 tasks | 1 files |
-| Phase 07-quote-crm-share P03 | 10min | 2 tasks | 2 files |
-| 08-gpt-image-2-studio-render | 01 | 10min | 3 | 5 |
-| Phase 08-gpt-image-2-studio-render P02 | 5min | 1 tasks | 1 files |
-| Phase 08 P03 | 8min | 2 tasks | 2 files |
-
-## Session
-
-- **Last session:** 2026-06-12T16:44:59.417Z
-- **Stopped at:** Completed 08-03-PLAN.md — ready for 08-04
+- WhatsApp numbers will be eSIM-based team business numbers registered via Meta Cloud API (NOT WhatsApp Business App — mutually exclusive with webhooks)
+- Meta sandbox test number available immediately — dev can start without waiting for eSIMs
+- Neon Postgres (Vercel Marketplace) for conversation storage — Redis not suited for full-text conversation queries
+- Web Push (PWA, add-to-home-screen) for inbound message notifications — service worker based
+- Chat UI lives as a new tab in existing CRM admin at /admin/whatsapp
+- All existing Telegram alerts and CRM behaviour unchanged — WhatsApp layer is purely additive
+- Team members message leads from the CRM chat UI (not WhatsApp app) — lead sees messages from their eSIM number
+- Claude (Anthropic API) powers AI intelligence features — warmth scoring, objection detection, status auto-updates
