@@ -71,7 +71,7 @@ Plans:
 
 ## Phase Checklist
 
-- [ ] **Phase 09: Webhook Foundation** - Neon schema, webhook receiver, phone normalisation, WABA subscription, lead auto-linking
+- [x] **Phase 09: Webhook Foundation** - Neon schema, webhook receiver, phone normalisation, WABA subscription, lead auto-linking (completed 2026-06-22)
 - [ ] **Phase 10: Web Push Notifications** - Service worker, VAPID, subscribe flow, push dispatch, Telegram fallback
 - [ ] **Phase 11: CRM Chat UI** - WhatsApp tab, thread list, chat view, send, claim flow, 24hr indicator, template composer
 - [ ] **Phase 12: Team Number Management** - Admin UI to register and name eSIM numbers
@@ -181,7 +181,7 @@ Plans:
 | 06. Upload + Recolour Engine | v1.1 | 4/4 | Complete | 2026-06-22 |
 | 07. Quote, CRM Integration & Share | v1.1 | 3/3 | Complete | 2026-06-22 |
 | 08. GPT-Image-2 Studio Render | v1.1 | 1/4 | In progress | - |
-| 09. Webhook Foundation | v1.2 | 2/3 | In Progress|  |
+| 09. Webhook Foundation | v1.2 | 2/3 | Complete    | 2026-06-22 |
 | 10. Web Push Notifications | v1.2 | 0/? | Not started | - |
 | 11. CRM Chat UI | v1.2 | 0/? | Not started | - |
 | 12. Team Number Management | v1.2 | 0/? | Not started | - |
