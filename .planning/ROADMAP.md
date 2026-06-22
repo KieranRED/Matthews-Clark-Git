@@ -93,7 +93,7 @@ Plans:
   5. Sending `POST /{WABA_ID}/subscribed_apps` after webhook config causes messages to flow (WABA subscription gap resolved)
 **Plans**: 3 plans
 Plans:
-- [ ] 09-01-PLAN.md — Install @neondatabase/serverless + 7-table migration + runner (FOUND-07)
+- [x] 09-01-PLAN.md — Install @neondatabase/serverless + 7-table migration + runner (FOUND-07)
 - [ ] 09-02-PLAN.md — lib/neon.js + lib/whatsappStore.js: store, normalise, auto-link (FOUND-01/04/05)
 - [ ] 09-03-PLAN.md — Webhook route (HMAC + after()) + WABA subscribe + env (FOUND-01/02/03/06)
 **UI hint**: no

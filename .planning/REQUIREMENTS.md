@@ -15,7 +15,7 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 - [ ] **FOUND-04**: System normalises all phone numbers to E.164 format (`27XXXXXXXXX`) at write time to match WhatsApp's delivery format against CRM lead records
 - [ ] **FOUND-05**: System automatically links a WhatsApp conversation to a CRM lead by matching the normalised phone number (using existing `clientByPhone` KV index)
 - [ ] **FOUND-06**: System explicitly calls `POST /{WABA_ID}/subscribed_apps` after webhook configuration to activate message delivery (Meta no longer auto-creates this)
-- [ ] **FOUND-07**: Neon Postgres schema is created with tables: `whatsapp_messages`, `whatsapp_threads`, `team_numbers`, `push_subscriptions`, `lead_intelligence`, `aftercare_events`, `broadcast_campaigns`
+- [x] **FOUND-07**: Neon Postgres schema is created with tables: `whatsapp_messages`, `whatsapp_threads`, `team_numbers`, `push_subscriptions`, `lead_intelligence`, `aftercare_events`, `broadcast_campaigns`
 
 ### Notifications (NOTIF)
 
@@ -105,7 +105,7 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 | FOUND-04 | Phase 09 | Pending |
 | FOUND-05 | Phase 09 | Pending |
 | FOUND-06 | Phase 09 | Pending |
-| FOUND-07 | Phase 09 | Pending |
+| FOUND-07 | Phase 09 | Complete |
 | NOTIF-01 | Phase 10 | Pending |
 | NOTIF-02 | Phase 10 | Pending |
 | NOTIF-03 | Phase 10 | Pending |

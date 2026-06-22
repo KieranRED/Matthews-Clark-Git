@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: WhatsApp Business Integration
-current_phase: 9
-current_plan: 0
-status: ready to plan
-stopped_at: Roadmap created — Phase 09 ready to plan
-last_updated: "2026-06-22T00:00:00.000Z"
+status: executing
+stopped_at: Completed 09-01-PLAN.md (DB schema + migration runner)
+last_updated: "2026-06-22T15:44:17.624Z"
+last_activity: 2026-06-22
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 0
 ---
 
 # Project State
@@ -25,16 +25,17 @@ See: .planning/PROJECT.md (updated 2026-06-22)
 
 ## Current Position
 
-Phase: 09 of 15 (Webhook Foundation)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-06-22 — v1.2 roadmap created, Phase 09 ready to plan
+Phase: 09 (Webhook Foundation) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-22
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed (v1.2): 0
 - Average duration: —
 - Total execution time: —
@@ -50,6 +51,8 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [Setup]: Single Claude call per conversation covers all 5 AI signals — never split into separate calls
 - [Setup]: CRM WhatsApp tab = 3 surgical edits to shell.jsx, app.jsx, shell-desktop.jsx — no new Next.js page
 - [Setup]: Meta Cloud API direct (plain fetch + node:crypto) — zero npm packages for Meta integration
+- [Phase 09]: Use DATABASE_URL_UNPOOLED for migration runner — DDL incompatible with Neon PgBouncer pooler
+- [Phase 09]: wamid TEXT UNIQUE NOT NULL — dedup safety net for Meta at-least-once delivery semantics
 
 ### Critical Pre-Code Tasks
 
@@ -65,6 +68,6 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Session Continuity
 
-Last session: 2026-06-22
-Stopped at: Roadmap written. Run `/gsd:plan-phase 9` to begin planning Phase 09.
+Last session: 2026-06-22T15:44:17.621Z
+Stopped at: Completed 09-01-PLAN.md (DB schema + migration runner)
 Resume file: None
