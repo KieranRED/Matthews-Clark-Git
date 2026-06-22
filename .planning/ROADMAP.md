@@ -69,7 +69,7 @@ Plans:
 
 **Milestone Goal:** Add a WhatsApp conversation layer to the CRM — logging all team conversations, linking them to CRM leads, firing AI-powered alerts, and surfacing conversation intelligence on lead cards. Meta Cloud API direct (no BSP), Neon Postgres for storage, Web Push for team notifications.
 
-## Phase Checklist (v1.2)
+## Phase Checklist
 
 - [ ] **Phase 09: Webhook Foundation** - Neon schema, webhook receiver, phone normalisation, WABA subscription, lead auto-linking
 - [ ] **Phase 10: Web Push Notifications** - Service worker, VAPID, subscribe flow, push dispatch, Telegram fallback
@@ -91,7 +91,11 @@ Plans:
   3. Webhook returns HTTP 200 within 500ms regardless of Neon or downstream latency
   4. The inbound message's thread is auto-linked to the matching CRM lead by normalised phone number (27XXXXXXXXX format)
   5. Sending `POST /{WABA_ID}/subscribed_apps` after webhook config causes messages to flow (WABA subscription gap resolved)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 09-01-PLAN.md — Install @neondatabase/serverless + 7-table migration + runner (FOUND-07)
+- [ ] 09-02-PLAN.md — lib/neon.js + lib/whatsappStore.js: store, normalise, auto-link (FOUND-01/04/05)
+- [ ] 09-03-PLAN.md — Webhook route (HMAC + after()) + WABA subscribe + env (FOUND-01/02/03/06)
 **UI hint**: no
 
 ### Phase 10: Web Push Notifications
@@ -177,7 +181,7 @@ Plans:
 | 06. Upload + Recolour Engine | v1.1 | 4/4 | Complete | 2026-06-22 |
 | 07. Quote, CRM Integration & Share | v1.1 | 3/3 | Complete | 2026-06-22 |
 | 08. GPT-Image-2 Studio Render | v1.1 | 1/4 | In progress | - |
-| 09. Webhook Foundation | v1.2 | 0/? | Not started | - |
+| 09. Webhook Foundation | v1.2 | 0/3 | Planned | - |
 | 10. Web Push Notifications | v1.2 | 0/? | Not started | - |
 | 11. CRM Chat UI | v1.2 | 0/? | Not started | - |
 | 12. Team Number Management | v1.2 | 0/? | Not started | - |
