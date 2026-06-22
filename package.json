@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate": "node scripts/run-migration.mjs"
   },
   "browserslist": {
     "production": [
@@ -24,6 +25,7 @@
   },
   "dependencies": {
     "@imgly/background-removal-node": "^1.4.5",
+    "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.3.3",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
