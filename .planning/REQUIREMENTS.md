@@ -97,7 +97,52 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 
 ## Traceability
 
-*(To be filled by roadmapper)*
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FOUND-01 | Phase 09 | Pending |
+| FOUND-02 | Phase 09 | Pending |
+| FOUND-03 | Phase 09 | Pending |
+| FOUND-04 | Phase 09 | Pending |
+| FOUND-05 | Phase 09 | Pending |
+| FOUND-06 | Phase 09 | Pending |
+| FOUND-07 | Phase 09 | Pending |
+| NOTIF-01 | Phase 10 | Pending |
+| NOTIF-02 | Phase 10 | Pending |
+| NOTIF-03 | Phase 10 | Pending |
+| NOTIF-04 | Phase 10 | Pending |
+| NOTIF-05 | Phase 10 | Pending |
+| CHAT-01 | Phase 11 | Pending |
+| CHAT-02 | Phase 11 | Pending |
+| CHAT-03 | Phase 11 | Pending |
+| CHAT-04 | Phase 11 | Pending |
+| CHAT-05 | Phase 11 | Pending |
+| CHAT-06 | Phase 11 | Pending |
+| CHAT-07 | Phase 11 | Pending |
+| CHAT-08 | Phase 11 | Pending |
+| CHAT-09 | Phase 11 | Pending |
+| CHAT-10 | Phase 11 | Pending |
+| TEAM-01 | Phase 12 | Pending |
+| TEAM-02 | Phase 12 | Pending |
+| TEAM-03 | Phase 12 | Pending |
+| TEAM-04 | Phase 12 | Pending |
+| AI-01 | Phase 13 | Pending |
+| AI-02 | Phase 13 | Pending |
+| AI-03 | Phase 13 | Pending |
+| AI-04 | Phase 13 | Pending |
+| AI-05 | Phase 13 | Pending |
+| AI-06 | Phase 13 | Pending |
+| AI-07 | Phase 13 | Pending |
+| AUTO-01 | Phase 14 | Pending |
+| AUTO-02 | Phase 14 | Pending |
+| AUTO-03 | Phase 14 | Pending |
+| AUTO-04 | Phase 14 | Pending |
+| BCAST-01 | Phase 15 | Pending |
+| BCAST-02 | Phase 15 | Pending |
+| BCAST-03 | Phase 15 | Pending |
+| BCAST-04 | Phase 15 | Pending |
+| BCAST-05 | Phase 15 | Pending |
+
+**Coverage:** 42/42 requirements mapped (7 FOUND + 5 NOTIF + 10 CHAT + 4 TEAM + 7 AI + 4 AUTO + 5 BCAST)
 
 ---
 
