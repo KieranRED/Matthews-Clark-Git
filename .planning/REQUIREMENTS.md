@@ -9,12 +9,12 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 
 ### Foundation (FOUND)
 
-- [ ] **FOUND-01**: System receives and stores all inbound WhatsApp messages via Meta Cloud API webhook, verifying HMAC signature before processing
-- [ ] **FOUND-02**: System receives and stores all outbound WhatsApp messages sent by team members via the CRM chat UI
-- [ ] **FOUND-03**: Webhook returns HTTP 200 immediately and defers all processing (Neon write, push dispatch, AI queue) asynchronously to avoid Meta retries
-- [ ] **FOUND-04**: System normalises all phone numbers to E.164 format (`27XXXXXXXXX`) at write time to match WhatsApp's delivery format against CRM lead records
-- [ ] **FOUND-05**: System automatically links a WhatsApp conversation to a CRM lead by matching the normalised phone number (using existing `clientByPhone` KV index)
-- [ ] **FOUND-06**: System explicitly calls `POST /{WABA_ID}/subscribed_apps` after webhook configuration to activate message delivery (Meta no longer auto-creates this)
+- [x] **FOUND-01**: System receives and stores all inbound WhatsApp messages via Meta Cloud API webhook, verifying HMAC signature before processing
+- [x] **FOUND-02**: System receives and stores all outbound WhatsApp messages sent by team members via the CRM chat UI
+- [x] **FOUND-03**: Webhook returns HTTP 200 immediately and defers all processing (Neon write, push dispatch, AI queue) asynchronously to avoid Meta retries
+- [x] **FOUND-04**: System normalises all phone numbers to E.164 format (`27XXXXXXXXX`) at write time to match WhatsApp's delivery format against CRM lead records
+- [x] **FOUND-05**: System automatically links a WhatsApp conversation to a CRM lead by matching the normalised phone number (using existing `clientByPhone` KV index)
+- [x] **FOUND-06**: System explicitly calls `POST /{WABA_ID}/subscribed_apps` after webhook configuration to activate message delivery (Meta no longer auto-creates this)
 - [x] **FOUND-07**: Neon Postgres schema is created with tables: `whatsapp_messages`, `whatsapp_threads`, `team_numbers`, `push_subscriptions`, `lead_intelligence`, `aftercare_events`, `broadcast_campaigns`
 
 ### Notifications (NOTIF)
@@ -99,12 +99,12 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 09 | Pending |
-| FOUND-02 | Phase 09 | Pending |
-| FOUND-03 | Phase 09 | Pending |
-| FOUND-04 | Phase 09 | Pending |
-| FOUND-05 | Phase 09 | Pending |
-| FOUND-06 | Phase 09 | Pending |
+| FOUND-01 | Phase 09 | Complete |
+| FOUND-02 | Phase 09 | Complete |
+| FOUND-03 | Phase 09 | Complete |
+| FOUND-04 | Phase 09 | Complete |
+| FOUND-05 | Phase 09 | Complete |
+| FOUND-06 | Phase 09 | Complete |
 | FOUND-07 | Phase 09 | Complete |
 | NOTIF-01 | Phase 10 | Pending |
 | NOTIF-02 | Phase 10 | Pending |

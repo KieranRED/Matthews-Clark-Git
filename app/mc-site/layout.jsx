@@ -1,5 +1,7 @@
 import Script from 'next/script';
 
+import Pixels from '@/components/Pixels/Pixels';
+
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -201,6 +203,7 @@ export default function McSiteLayout({ children }) {
           so the browser reuses the preload cache entry instead of fetching twice. */}
       <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js" />
       {children}
+      <Pixels />
       <Script src="/site/site.js" strategy="afterInteractive" />
     </>
   );

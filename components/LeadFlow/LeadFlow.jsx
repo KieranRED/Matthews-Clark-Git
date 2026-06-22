@@ -75,11 +75,31 @@ function normalizePhoneForValidation(input) {
   return digits;
 }
 
-function detectSourceFromUtm({ utmSource, utmMedium, referrer }) {
+// Paid-traffic signals: a Google click id, a paid utm_medium, or an "ads"/"paid"
+// token in source/medium. (fbclid/ttclid alone are NOT reliable — they appear on
+// organic clicks too — so they don't classify a lead as paid on their own.)
+function isPaidTraffic({ utmSource, utmMedium, gclid }) {
+  if (gclid) return true;
+  const m = String(utmMedium || "").toLowerCase();
+  const s = String(utmSource || "").toLowerCase();
+  if (/(^|[^a-z])(cpc|ppc|paid|paidsocial|paid[-_ ]?social|sem|display)([^a-z]|$)/.test(m)) return true;
+  if (/\bads?\b/.test(s) || /\bads?\b/.test(m)) return true;
+  return false;
+}
+
+function detectSourceFromUtm({ utmSource, utmMedium, referrer, gclid }) {
+  if (isPaidTraffic({ utmSource, utmMedium, gclid })) return "ADS";
   const hay = `${utmSource || ""} ${utmMedium || ""} ${referrer || ""}`.toLowerCase();
   if (hay.includes("tiktok")) return "TIKTOK";
   if (hay.includes("instagram") || /\big\b/.test(hay)) return "INSTAGRAM";
   return "WEBSITE";
+}
+
+// Read a browser cookie by name (client only).
+function readCookie(name) {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 function StepFrame({ children, n, total, onBack, accent }) {
@@ -523,8 +543,8 @@ function StepPpfDetails({ value, onChange, onNext }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
         <ToggleRow
-          label="Door jambs"
-          sub="Include door jambs (adds time + cost)"
+          label="Entry and Touch Points"
+          sub="Include entry and touch points (adds time + cost)"
           value={Boolean(v.doorJambs)}
           onChange={(doorJambs) => onChange?.({ ...v, doorJambs })}
         />
@@ -1181,6 +1201,26 @@ async function submitLead(payload) {
   throw new Error(err?.error || "Failed to submit.");
 }
 
+// Fire browser-side conversion events. `eventId` matches the server (Conversions
+// API) event so the two dedupe into one. No-ops if a pixel isn't loaded.
+function fireLeadPixels({ eventId, services }) {
+  const contentName = Array.isArray(services) && services.length ? services.join(",") : undefined;
+  try {
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      window.fbq("track", "Lead", { content_category: contentName }, { eventID: eventId });
+    }
+  } catch {
+    /* pixel optional */
+  }
+  try {
+    if (typeof window !== "undefined" && window.ttq && typeof window.ttq.track === "function") {
+      window.ttq.track("SubmitForm", { content_type: "lead", content_name: contentName }, { event_id: eventId });
+    }
+  } catch {
+    /* pixel optional */
+  }
+}
+
 export default function LeadFlow() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -1188,6 +1228,8 @@ export default function LeadFlow() {
   const [submitState, setSubmitState] = useState({ status: "idle", error: null });
   const [source, setSource] = useState("WEBSITE");
   const [utm, setUtm] = useState({ source: null, medium: null, campaign: null, content: null, term: null });
+  // Ad-click identifiers for conversion attribution (Meta/TikTok/Google).
+  const [clickIds, setClickIds] = useState({ fbclid: null, ttclid: null, gclid: null, fbp: null, fbc: null });
   const [knownClient, setKnownClient] = useState(null);
   const [data, setData] = useState({
     name: "",
@@ -1212,7 +1254,19 @@ export default function LeadFlow() {
       term: sp.get("utm_term")
     };
     setUtm(nextUtm);
-    setSource(detectSourceFromUtm({ utmSource: nextUtm.source, utmMedium: nextUtm.medium, referrer: document?.referrer || "" }));
+
+    // Capture ad-click ids for conversion attribution. Meta sets _fbp/_fbc cookies;
+    // if _fbc is absent but an fbclid is present, build it per Meta's spec.
+    const fbclid = sp.get("fbclid");
+    const ttclid = sp.get("ttclid");
+    const gclid = sp.get("gclid");
+    let fbc = readCookie("_fbc");
+    if (!fbc && fbclid) fbc = `fb.1.${Date.now()}.${fbclid}`;
+    setClickIds({ fbclid, ttclid, gclid, fbp: readCookie("_fbp"), fbc });
+
+    setSource(
+      detectSourceFromUtm({ utmSource: nextUtm.source, utmMedium: nextUtm.medium, referrer: document?.referrer || "", gclid })
+    );
   }, []);
 
   const orderedServices = useMemo(() => {
@@ -1279,11 +1333,22 @@ export default function LeadFlow() {
     setSubmitState({ status: "loading", error: null });
     setStep(screens.length + 1);
 
+    // Shared id so the browser pixel event and the server (Conversions API) event
+    // dedupe into one conversion.
+    const eventId =
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `lead-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    // Fire immediately on submit — before the API round-trip — so attribution
+    // is captured at the moment of user intent regardless of network latency.
+    fireLeadPixels({ eventId, services: nextData.services });
+
     try {
       await submitLead({
         ...nextData,
         source,
         utm,
+        clickIds,
+        eventId,
         pageUrl: typeof window !== "undefined" ? window.location.href : null,
         referrer: typeof document !== "undefined" ? document.referrer : null
       });

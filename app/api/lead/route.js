@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { saveLead, upsertClientForLead } from "@/lib/leadStore";
 import { telegramSendMessage } from "@/lib/telegram";
 import { hmacToken } from "@/lib/linkToken";
+import { sendLeadConversions } from "@/lib/adsCapi";
 
 const LeadSchema = z.object({
   name: z.string().trim().min(1),
@@ -79,7 +80,7 @@ const LeadSchema = z.object({
   })
     .optional(),
   timeframe: z.enum(["this-week", "this-month", "no-rush"]),
-  source: z.enum(["TIKTOK", "INSTAGRAM", "WEBSITE"]).optional(),
+  source: z.enum(["TIKTOK", "INSTAGRAM", "WEBSITE", "ADS"]).optional(),
   utm: z
     .object({
       source: z.string().trim().min(1).max(120).nullable().optional(),
@@ -89,6 +90,18 @@ const LeadSchema = z.object({
       term: z.string().trim().min(1).max(120).nullable().optional()
     })
     .optional(),
+  // Ad-click identifiers for conversion attribution (Meta/TikTok/Google).
+  clickIds: z
+    .object({
+      fbclid: z.string().max(512).nullable().optional(),
+      ttclid: z.string().max(512).nullable().optional(),
+      gclid: z.string().max(512).nullable().optional(),
+      fbp: z.string().max(256).nullable().optional(),
+      fbc: z.string().max(256).nullable().optional()
+    })
+    .optional(),
+  // Shared event id so the browser pixel and the server (CAPI) event dedupe.
+  eventId: z.string().max(128).nullable().optional(),
   pageUrl: z.string().url().nullable().optional(),
   referrer: z.string().nullable().optional()
 });
@@ -349,6 +362,14 @@ export async function POST(request) {
 
   // Always capture in logs (Vercel runtime logs are the simplest "inbox" to start with).
   console.log("[lead]", { createdAt, ...leadRecord });
+
+  // Server-side conversion tracking (Meta/TikTok CAPI). Env-gated and never fatal.
+  try {
+    const capi = await sendLeadConversions({ lead: leadRecord, request });
+    if (Object.keys(capi).length) console.log("[lead][capi]", { leadId: leadRecord.id, ...capi });
+  } catch (err) {
+    console.error("[lead][capi-failed]", err);
+  }
 
   const quoteLink = quoteLinkFor({ request, leadId: leadRecord.id });
   const consultLink = consultLinkFor({ request, leadId: leadRecord.id });
