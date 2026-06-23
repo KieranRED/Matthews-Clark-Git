@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: WhatsApp Business Integration
-status: verifying
-stopped_at: Completed 09-03-PLAN.md (webhook route + WABA subscribe)
-last_updated: "2026-06-22T16:12:49.939Z"
-last_activity: 2026-06-22
+status: executing
+stopped_at: Completed 10-01-PLAN.md (web-push install + VAPID env vars)
+last_updated: "2026-06-23T11:39:33.584Z"
+last_activity: 2026-06-23
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 4
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-22)
 
 **Core value:** A single platform that runs the M&C business — no spreadsheets, no duct-taped SaaS stack
-**Current focus:** Phase 09 — Webhook Foundation
+**Current focus:** Phase 10 — web-push-notifications
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-06-22
+Phase: 10 (web-push-notifications) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-06-23
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [Phase 09]: export const runtime='nodejs' on webhook routes — crypto.createHmac not in Edge
 - [Phase 09]: after() from next/server as primary async mechanism — defers Neon writes until after 200 is flushed (FOUND-03)
 - [Phase 09]: WABA subscribe endpoint returns POST + GET results — caller confirms subscription is active in one call (FOUND-06)
+- [Phase 10]: web-push@^3.6.7 as sole VAPID library; VAPID subject must be mailto: not https://localhost (Safari/iOS requirement)
 
 ### Critical Pre-Code Tasks
 
@@ -73,6 +74,6 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Session Continuity
 
-Last session: 2026-06-22T16:03:45.519Z
-Stopped at: Completed 09-03-PLAN.md (webhook route + WABA subscribe)
+Last session: 2026-06-23T11:39:33.580Z
+Stopped at: Completed 10-01-PLAN.md (web-push install + VAPID env vars)
 Resume file: None
