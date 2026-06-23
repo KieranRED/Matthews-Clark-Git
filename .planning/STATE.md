@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: WhatsApp Business Integration
 status: executing
-stopped_at: Completed 10-01-PLAN.md (web-push install + VAPID env vars)
-last_updated: "2026-06-23T11:39:33.584Z"
+stopped_at: Completed 10-02-PLAN.md (server-side push layer)
+last_updated: "2026-06-23T11:50:06.266Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-06-22)
 ## Current Position
 
 Phase: 10 (web-push-notifications) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-23
 
@@ -59,6 +59,8 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [Phase 09]: after() from next/server as primary async mechanism — defers Neon writes until after 200 is flushed (FOUND-03)
 - [Phase 09]: WABA subscribe endpoint returns POST + GET results — caller confirms subscription is active in one call (FOUND-06)
 - [Phase 10]: web-push@^3.6.7 as sole VAPID library; VAPID subject must be mailto: not https://localhost (Safari/iOS requirement)
+- [Phase 10-web-push-notifications]: teamMemberId == wa_id: KV key is push:sub:{wa_id}; Plan 10-03 subscribe button must POST the team member's wa_id
+- [Phase 10-web-push-notifications]: dispatchToTeam has per-member try/catch so one bad member cannot abort the fan-out; sendPushNotification returns gone=true on 410/404 to trigger kvDel pruning
 
 ### Critical Pre-Code Tasks
 
@@ -74,6 +76,6 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Session Continuity
 
-Last session: 2026-06-23T11:39:33.580Z
-Stopped at: Completed 10-01-PLAN.md (web-push install + VAPID env vars)
+Last session: 2026-06-23T11:50:06.263Z
+Stopped at: Completed 10-02-PLAN.md (server-side push layer)
 Resume file: None

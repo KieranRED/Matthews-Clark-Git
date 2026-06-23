@@ -111,7 +111,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 10-01-PLAN.md — Install web-push + VAPID env vars (NOTIF-01 infra)
-- [ ] 10-02-PLAN.md — lib/pushStore.js + subscribe API + webhook dispatch + Telegram fallback (NOTIF-02/04/05)
+- [x] 10-02-PLAN.md — lib/pushStore.js + subscribe API + webhook dispatch + Telegram fallback (NOTIF-02/04/05)
 - [ ] 10-03-PLAN.md — public/sw.js + SwRegistrar + subscribe button in Settings (NOTIF-01/02/03)
 **UI hint**: yes
 
@@ -186,7 +186,7 @@ Plans:
 | 07. Quote, CRM Integration & Share | v1.1 | 3/3 | Complete | 2026-06-22 |
 | 08. GPT-Image-2 Studio Render | v1.1 | 1/4 | In progress | - |
 | 09. Webhook Foundation | v1.2 | 2/3 | Complete    | 2026-06-22 |
-| 10. Web Push Notifications | v1.2 | 1/3 | In Progress|  |
+| 10. Web Push Notifications | v1.2 | 2/3 | In Progress|  |
 | 11. CRM Chat UI | v1.2 | 0/? | Not started | - |
 | 12. Team Number Management | v1.2 | 0/? | Not started | - |
 | 13. AI Intelligence | v1.2 | 0/? | Not started | - |
