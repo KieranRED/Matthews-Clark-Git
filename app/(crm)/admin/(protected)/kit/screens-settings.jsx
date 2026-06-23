@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Icon } from "./icons";
+import PushSubscribeRow from "./push-subscribe";
 
 function statLine(member) {
   const s = member?.stats || {};
@@ -15,6 +16,8 @@ function statLine(member) {
 export default function SettingsScreen({ index, onEditTeam }) {
   const team = useMemo(() => (index?.TEAM || []).slice().sort((a, b) => String(a?.role || "").localeCompare(String(b?.role || ""))), [index]);
   const [tgBusy, setTgBusy] = useState(false);
+  // teamMemberId for push subscriptions: prefer wa_id (viewer.waId), fall back to username.
+  const teamMemberId = index?.VIEWER?.waId || index?.VIEWER?.username || null;
 
   async function handleLogout() {
     try {
@@ -155,6 +158,9 @@ export default function SettingsScreen({ index, onEditTeam }) {
                 </Tag>
               );
             })}
+            {s.title === "INTEGRATIONS" ? (
+              <PushSubscribeRow teamMemberId={teamMemberId} />
+            ) : null}
           </div>
         </div>
       ))}

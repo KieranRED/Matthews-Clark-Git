@@ -62,6 +62,22 @@ export default function AdminCrmKitApp() {
 
   const closeOverlay = () => setOverlay(null);
 
+  // Register the service worker for Web Push notifications.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(console.error);
+  }, []);
+
+  // Relay SW navigate postMessages so notificationclick focus+navigate works.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMsg = (e) => {
+      if (e.data?.type === "navigate" && e.data.url) window.location.assign(e.data.url);
+    };
+    navigator.serviceWorker.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker.removeEventListener("message", onMsg);
+  }, []);
+
   // Per-user accent: Izimoto users get purple.
   useEffect(() => {
     const accent = index?.VIEWER?.accent || null;
