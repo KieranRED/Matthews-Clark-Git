@@ -27,9 +27,12 @@ export async function GET(request) {
         name: viewer.name,
         username: viewer.username,
         role: viewer.role,
-        accent: viewer.role && String(viewer.role).startsWith("izimoto") ? "#9B51E0" : "#1F4FFF"
+        accent: viewer.role && String(viewer.role).startsWith("izimoto") ? "#9B51E0" : "#1F4FFF",
+        // waId: the team member's WhatsApp phone number (wa_id in team_numbers).
+        // Stored as viewer.phone in teamStore. Used as teamMemberId for push:sub:{waId} in KV.
+        waId: viewer.phone || null
       }
-    : { username: session.username, role: null, accent: "#1F4FFF" };
+    : { username: session.username, role: null, accent: "#1F4FFF", waId: null };
 
   return Response.json({ ok: true, data: { ...data, viewer: safeViewer } });
 }
