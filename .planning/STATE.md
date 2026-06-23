@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: WhatsApp Business Integration
 status: executing
-stopped_at: Completed 10-02-PLAN.md (server-side push layer)
-last_updated: "2026-06-23T11:50:06.266Z"
+stopped_at: Paused at 10-03-PLAN.md Task 4 (human-verify checkpoint — awaiting PWA verification)
+last_updated: "2026-06-23T11:56:32Z"
 last_activity: 2026-06-23
 progress:
   total_phases: 7
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-22)
 
 Phase: 10 (web-push-notifications) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Paused at checkpoint — awaiting human verification
 Last activity: 2026-06-23
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
@@ -61,6 +61,8 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 - [Phase 10]: web-push@^3.6.7 as sole VAPID library; VAPID subject must be mailto: not https://localhost (Safari/iOS requirement)
 - [Phase 10-web-push-notifications]: teamMemberId == wa_id: KV key is push:sub:{wa_id}; Plan 10-03 subscribe button must POST the team member's wa_id
 - [Phase 10-web-push-notifications]: dispatchToTeam has per-member try/catch so one bad member cannot abort the fan-out; sendPushNotification returns gone=true on 410/404 to trigger kvDel pruning
+- [Phase 10-03]: teamMemberId sourced from viewer.waId (= viewer.phone from teamStore), falls back to username; crm-kit API now exposes waId
+- [Phase 10-03]: icon path is /icons/icon-192.png (exists at public/icons/ not public/ root)
 
 ### Critical Pre-Code Tasks
 
@@ -76,6 +78,6 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Session Continuity
 
-Last session: 2026-06-23T11:50:06.263Z
-Stopped at: Completed 10-02-PLAN.md (server-side push layer)
+Last session: 2026-06-23T11:56:32Z
+Stopped at: Paused at 10-03-PLAN.md Task 4 checkpoint (human-verify)
 Resume file: None
