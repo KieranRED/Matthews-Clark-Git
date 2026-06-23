@@ -25,7 +25,7 @@ A single platform that runs the business — no spreadsheets, no duct-taped SaaS
 
 ## Current State
 
-Phase 09 complete (2026-06-22) — Neon schema, webhook receiver, phone normalisation, lead auto-linking, and WABA subscribe endpoint all shipped. Awaiting live Meta WABA provisioning for end-to-end testing. Phase 10 (Web Push) next.
+Phase 10 complete (2026-06-23) — Web Push notification layer shipped: VAPID push dispatch, KV subscription storage, Telegram fallback, service worker, standalone-gated subscribe row in Settings. Live testing deferred pending Meta WABA provisioning. Phase 11 (CRM Chat UI) next.
 
 ## Current Milestone: v1.2 WhatsApp Business Integration
 
