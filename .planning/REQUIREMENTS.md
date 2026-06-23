@@ -20,10 +20,10 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 ### Notifications (NOTIF)
 
 - [x] **NOTIF-01**: Team member can subscribe to Web Push notifications from the CRM admin (subscribe button only shown when running as installed PWA — `display-mode: standalone`)
-- [ ] **NOTIF-02**: System sends a Web Push notification to all subscribed team members when an inbound WhatsApp message arrives
+- [x] **NOTIF-02**: System sends a Web Push notification to all subscribed team members when an inbound WhatsApp message arrives
 - [ ] **NOTIF-03**: Tapping the push notification opens the CRM WhatsApp tab at the relevant conversation thread
-- [ ] **NOTIF-04**: System falls back to Telegram notification for team members who are not subscribed to Web Push
-- [ ] **NOTIF-05**: Push subscriptions are stored in KV (fast path) and associated with a team member record
+- [x] **NOTIF-04**: System falls back to Telegram notification for team members who are not subscribed to Web Push
+- [x] **NOTIF-05**: Push subscriptions are stored in KV (fast path) and associated with a team member record
 
 ### CRM Chat UI (CHAT)
 
@@ -107,10 +107,10 @@ Add a WhatsApp conversation layer to the CRM that logs all team conversations, l
 | FOUND-06 | Phase 09 | Complete |
 | FOUND-07 | Phase 09 | Complete |
 | NOTIF-01 | Phase 10 | Complete |
-| NOTIF-02 | Phase 10 | Pending |
+| NOTIF-02 | Phase 10 | Complete |
 | NOTIF-03 | Phase 10 | Pending |
-| NOTIF-04 | Phase 10 | Pending |
-| NOTIF-05 | Phase 10 | Pending |
+| NOTIF-04 | Phase 10 | Complete |
+| NOTIF-05 | Phase 10 | Complete |
 | CHAT-01 | Phase 11 | Pending |
 | CHAT-02 | Phase 11 | Pending |
 | CHAT-03 | Phase 11 | Pending |
