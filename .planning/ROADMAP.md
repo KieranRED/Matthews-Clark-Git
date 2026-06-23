@@ -41,8 +41,8 @@ Plans:
 
 Plans:
 - [x] 08-01-PLAN.md — Wave 0 infra: install openai, OPENAI_API_KEY, kvExpire helper, studio bay asset
-- [x] 08-02-PLAN.md — /api/wrap-render route: gpt-image-1 images.edit + per-IP rate limit (RENDER-02/03/04)
-- [x] 08-03-PLAN.md — Canvas helper + renderUrl state + real startRender fetch + BA slider (RENDER-01/05/06)
+- [ ] 08-02-PLAN.md — /api/wrap-render route: gpt-image-1 images.edit + per-IP rate limit (RENDER-02/03/04)
+- [ ] 08-03-PLAN.md — Canvas helper + renderUrl state + real startRender fetch + BA slider (RENDER-01/05/06)
 - [ ] 08-04-PLAN.md — Human-verify live studio render end-to-end (RENDER-04/06)
 
 | Plan | Name | Status | Plans | Summaries |
@@ -108,7 +108,11 @@ Plans:
   3. Tapping the notification opens the CRM directly to the relevant conversation thread
   4. A team member without a push subscription receives the same inbound alert via Telegram instead
   5. Push subscription endpoints are stored in KV (not Neon) and associated with the correct team member record
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 10-01-PLAN.md — Install web-push + VAPID env vars (NOTIF-01 infra)
+- [ ] 10-02-PLAN.md — lib/pushStore.js + subscribe API + webhook dispatch + Telegram fallback (NOTIF-02/04/05)
+- [ ] 10-03-PLAN.md — public/sw.js + SwRegistrar + subscribe button in Settings (NOTIF-01/02/03)
 **UI hint**: yes
 
 ### Phase 11: CRM Chat UI
@@ -182,7 +186,7 @@ Plans:
 | 07. Quote, CRM Integration & Share | v1.1 | 3/3 | Complete | 2026-06-22 |
 | 08. GPT-Image-2 Studio Render | v1.1 | 1/4 | In progress | - |
 | 09. Webhook Foundation | v1.2 | 2/3 | Complete    | 2026-06-22 |
-| 10. Web Push Notifications | v1.2 | 0/? | Not started | - |
+| 10. Web Push Notifications | v1.2 | 0/3 | Planned | - |
 | 11. CRM Chat UI | v1.2 | 0/? | Not started | - |
 | 12. Team Number Management | v1.2 | 0/? | Not started | - |
 | 13. AI Intelligence | v1.2 | 0/? | Not started | - |
