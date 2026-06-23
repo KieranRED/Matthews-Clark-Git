@@ -18,6 +18,7 @@ export const runtime = "nodejs"; // crypto.createHmac is not available in Edge
 import { after } from "next/server";
 import crypto from "node:crypto";
 import { processInboundMessage } from "@/lib/whatsappStore";
+import { dispatchToTeam } from "@/lib/pushStore";
 
 // ---------------------------------------------------------------------------
 // GET — hub.challenge verification
@@ -118,7 +119,7 @@ async function handlePayload(payload) {
 
       // Inbound messages
       for (const msg of value?.messages ?? []) {
-        await processInboundMessage({
+        const result = await processInboundMessage({
           wamid: msg.id,
           from: msg.from,
           to: teamPhone,
@@ -127,6 +128,13 @@ async function handlePayload(payload) {
           timestampMs: Number(msg.timestamp) * 1000,
           contactName,
         });
+
+        // Dispatch push/Telegram notification to team (NOTIF-02)
+        // Runs inside after() deferral — does not delay the 200 response (FOUND-03)
+        if (result?.threadId) {
+          const preview = (msg.type === "text" ? msg.text?.body : `[${msg.type}]`) || "";
+          await dispatchToTeam({ threadId: result.threadId, contactName, preview });
+        }
       }
 
       // Delivery receipts — log only in Phase 09 (outbound send is Phase 11)
