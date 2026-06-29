@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getLead, updateLead } from "@/lib/leadStore";
 import { telegramSendMessage } from "@/lib/telegram";
 import { verifyToken } from "@/lib/linkToken";
+import { SERVICES } from "@/lib/crmKitAdapter";
 
 const QuoteSchema = z
   .object({
@@ -32,7 +33,7 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
-const SERVICE_IDS = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit", "starlight", "interior"];
+const SERVICE_IDS = SERVICES.map((s) => s.id).filter((id) => id !== "unsure");
 
 function escapeHtml(input) {
   return String(input || "")

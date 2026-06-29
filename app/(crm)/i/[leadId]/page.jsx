@@ -35,6 +35,7 @@ function buildInvoiceModel({ leadId, lead }) {
     safeNum(lead?.clientQuoteTotalExVat) ??
     safeNum(lead?.clientQuoteAmountExVat) ??
     (clientByService ? Object.values(clientByService).reduce((s, v) => s + (safeNum(v) ?? 0), 0) : null);
+  const baseClientTotalExVat = clientTotalExVat;
 
   const rawStored = String(lead?.invoiceNumber || "").trim();
   const extractedDigits = rawStored.replace(/[^\d]/g, "");
@@ -62,6 +63,26 @@ function buildInvoiceModel({ leadId, lead }) {
     })
     .filter(Boolean);
 
+  const oneOffLines = (Array.isArray(lead?.upsells) ? lead.upsells : [])
+    .map((item) => {
+      const clientEx = safeNum(item?.amountExVat);
+      if (!(clientEx > 0)) return null;
+      const id = String(item?.id || item?.label || "one-off").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60) || "one-off";
+      return {
+        kind: "one_off",
+        sid: `one_off:${id}`,
+        label: String(item?.label || "One-off service"),
+        notes: item?.notes ? String(item.notes) : null,
+        serviceId: item?.serviceId || null,
+        clientEx: round2(clientEx)
+      };
+    })
+    .filter(Boolean);
+
+  const oneOffTotalExVat = round2(oneOffLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
+  const fullClientTotalExVat =
+    baseClientTotalExVat != null ? round2(baseClientTotalExVat + oneOffTotalExVat) : oneOffTotalExVat > 0 ? oneOffTotalExVat : null;
+
   return {
     invoiceNo: invoiceDigits || legacyShort,
     invoiceNumberDisplay,
@@ -80,8 +101,8 @@ function buildInvoiceModel({ leadId, lead }) {
       branch: process.env.INVOICE_BANK_BRANCH || "250655"
     },
     vendor: { exVat: vendorExVat, incVat: vendorIncVat, vatRate, vatAmount: vendorVatAmount },
-    clientTotalExVat,
-    lines,
+    clientTotalExVat: fullClientTotalExVat,
+    lines: [...lines, ...oneOffLines],
     // For now M&C is not VAT registered: we show client totals ex VAT.
     clientVatRate: 0
   };

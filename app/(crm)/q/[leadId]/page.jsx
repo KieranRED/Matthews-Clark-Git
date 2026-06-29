@@ -11,6 +11,11 @@ export const metadata = {
 const SERVICE_LABELS = {
   ppf: "PPF", wrap: "Wrap", tint: "Tint", ceramic: "Ceramic / Graphene",
   correct: "Paint Correction", detail: "Detail", wheel: "Wheels",
+  pc_street_gloss: "Paint Correction - Street Gloss",
+  pc_bronze: "Paint Correction - Bronze",
+  pc_silver: "Paint Correction - Silver",
+  pc_gold: "Paint Correction - Gold",
+  pc_diamond: "Paint Correction - Diamond",
   kit: "Bodykit", starlight: "Starlight Headliner", interior: "Custom Interiors", unsure: "Not sure"
 };
 

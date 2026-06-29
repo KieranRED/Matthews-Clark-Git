@@ -5,10 +5,11 @@ import { adminCookieName, verifyAdminSession } from "@/lib/adminAuth";
 import { getLead, updateLead } from "@/lib/leadStore";
 import { telegramSendMessage } from "@/lib/telegram";
 import { hmacToken } from "@/lib/linkToken";
+import { SERVICES } from "@/lib/crmKitAdapter";
 
 export const dynamic = "force-dynamic";
 
-const SERVICE_IDS = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit"];
+const SERVICE_IDS = SERVICES.map((s) => s.id).filter((id) => id !== "unsure");
 
 const BodySchema = z
   .object({

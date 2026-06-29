@@ -16,6 +16,11 @@ const SERVICE_LABELS = {
   tint: "Tint",
   ceramic: "Ceramic",
   correct: "Paint correction",
+  pc_street_gloss: "Paint correction - Street Gloss",
+  pc_bronze: "Paint correction - Bronze",
+  pc_silver: "Paint correction - Silver",
+  pc_gold: "Paint correction - Gold",
+  pc_diamond: "Paint correction - Diamond",
   detail: "Detail",
   wheel: "Wheels (Powder / Refurb)",
   kit: "Bodykit"

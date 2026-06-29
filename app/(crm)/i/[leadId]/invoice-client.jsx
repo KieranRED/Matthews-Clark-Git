@@ -8,6 +8,11 @@ const SERVICE_LABELS = {
   tint: "Tint",
   ceramic: "Ceramic / Graphene",
   correct: "Paint correction",
+  pc_street_gloss: "Paint correction - Street Gloss",
+  pc_bronze: "Paint correction - Bronze",
+  pc_silver: "Paint correction - Silver",
+  pc_gold: "Paint correction - Gold",
+  pc_diamond: "Paint correction - Diamond",
   detail: "Detail",
   wheel: "Wheels (Powder / Refurb)",
   kit: "Bodykit"
@@ -181,6 +186,15 @@ export default function InvoiceClient({ model }) {
     const details = model?.serviceDetails && typeof model.serviceDetails === "object" ? model.serviceDetails : null;
     return rows
       .map((ln) => {
+        if (ln?.kind === "one_off") {
+          const amt = Number(ln?.clientEx ?? 0);
+          if (!Number.isFinite(amt) || amt <= 0) return null;
+          const bullets = [];
+          if (ln.serviceId) bullets.push(`Based on: ${serviceLabel(ln.serviceId)}.`);
+          if (ln.notes) bullets.push(`Notes: ${String(ln.notes)}`);
+          if (!bullets.length) bullets.push("Custom scope confirmed by Matthews & Clark.");
+          return { sid: String(ln?.sid || "one_off"), title: String(ln?.label || "One-off service"), bullets, amt };
+        }
         const sid = String(ln?.sid || "");
         const content = serviceInvoiceContent(details, sid);
         const amt = Number(ln?.clientEx ?? 0);

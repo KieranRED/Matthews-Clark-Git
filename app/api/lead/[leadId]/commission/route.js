@@ -4,10 +4,11 @@ import { getLead, updateLead } from "@/lib/leadStore";
 import { verifyToken } from "@/lib/linkToken";
 import { allocateInvoiceDigits } from "@/lib/invoiceSeq";
 import { telegramSendMessage } from "@/lib/telegram";
+import { SERVICES } from "@/lib/crmKitAdapter";
 
 export const dynamic = "force-dynamic";
 
-const SERVICE_IDS = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit"];
+const SERVICE_IDS = SERVICES.map((s) => s.id).filter((id) => id !== "unsure");
 
 const ModeSchema = z.enum(["percent", "fixed", "total"]);
 

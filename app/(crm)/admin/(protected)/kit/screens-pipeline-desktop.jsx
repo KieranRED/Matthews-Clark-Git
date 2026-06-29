@@ -21,6 +21,8 @@ const STAGE_META = {
 const SERVICE_LABELS = {
   ppf: "PPF", wrap: "Wrap", tint: "Tint", ceramic: "Ceramic",
   correct: "Correction", detail: "Detail", wheel: "Wheels",
+  pc_street_gloss: "Street Gloss", pc_bronze: "Bronze", pc_silver: "Silver",
+  pc_gold: "Gold", pc_diamond: "Diamond",
   kit: "Bodykit", starlight: "Starlight", interior: "Interior",
 };
 
