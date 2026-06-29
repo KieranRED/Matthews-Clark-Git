@@ -19,7 +19,7 @@ scheduling jobs, adding invoice service lines, and managing tasks.
 | `dashboard_summary` | Counts + pipeline-by-status snapshot |
 | `create_lead` | Create a lead and link/create the matching client |
 | `create_job_for_lead` | Create a scheduled job from an existing lead |
-| `add_invoice_service_line` | Add a custom or catalog-based one-off service line to an invoice |
+| `add_invoice_service_line` | Add a custom or catalog-based invoice service line (`additive` or `replacement`) |
 | `update_invoice_service_line` / `delete_invoice_service_line` | Edit or remove existing one-off invoice service lines |
 | `update_lead_services` / `update_service_details` | Correct lead service selections and service detail fields |
 | `update_lead_status` / `update_lead_field` / `add_lead_note` | Maintain lead pipeline data |

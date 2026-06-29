@@ -74,14 +74,25 @@ function buildInvoiceModel({ leadId, lead }) {
         label: String(item?.label || "One-off service"),
         notes: item?.notes ? String(item.notes) : null,
         serviceId: item?.serviceId || null,
+        billingMode: item?.billingMode === "replacement" ? "replacement" : "additive",
         clientEx: round2(clientEx)
       };
     })
     .filter(Boolean);
 
-  const oneOffTotalExVat = round2(oneOffLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
+  const replacementLines = oneOffLines.filter((ln) => ln.billingMode === "replacement");
+  const additiveOneOffLines = oneOffLines.filter((ln) => ln.billingMode !== "replacement");
+  const invoiceLines = replacementLines.length ? [...replacementLines, ...additiveOneOffLines] : [...lines, ...additiveOneOffLines];
+  const oneOffTotalExVat = round2(additiveOneOffLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
+  const replacementTotalExVat = round2(replacementLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
   const fullClientTotalExVat =
-    baseClientTotalExVat != null ? round2(baseClientTotalExVat + oneOffTotalExVat) : oneOffTotalExVat > 0 ? oneOffTotalExVat : null;
+    replacementLines.length
+      ? round2(replacementTotalExVat + oneOffTotalExVat)
+      : baseClientTotalExVat != null
+        ? round2(baseClientTotalExVat + oneOffTotalExVat)
+        : oneOffTotalExVat > 0
+          ? oneOffTotalExVat
+          : null;
 
   return {
     invoiceNo: invoiceDigits || legacyShort,
@@ -102,7 +113,7 @@ function buildInvoiceModel({ leadId, lead }) {
     },
     vendor: { exVat: vendorExVat, incVat: vendorIncVat, vatRate, vatAmount: vendorVatAmount },
     clientTotalExVat: fullClientTotalExVat,
-    lines: [...lines, ...oneOffLines],
+    lines: invoiceLines,
     // For now M&C is not VAT registered: we show client totals ex VAT.
     clientVatRate: 0
   };

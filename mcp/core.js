@@ -529,10 +529,11 @@ export function registerTools(server) {
       label: z.string().min(1).max(200).optional().describe("Line item label. Required for fully custom lines; optional when serviceId is supplied"),
       serviceId: z.enum(SERVICE_IDS).optional().describe("Existing service catalog id this line is based on, if any"),
       notes: z.string().max(2000).optional(),
+      billingMode: z.enum(["additive", "replacement"]).default("additive").describe("additive adds this line on top of the base invoice; replacement makes this line replace the base invoice package total"),
       vendorCostExVat: z.number().finite().min(0).optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking"),
       createInvoiceIfMissing: z.boolean().default(true).describe("Allocate an invoice number and mark the invoice due if the lead has no invoice yet")
     },
-    async ({ leadId, amountExVat, label, serviceId, notes, vendorCostExVat, createInvoiceIfMissing }) => {
+    async ({ leadId, amountExVat, label, serviceId, notes, billingMode, vendorCostExVat, createInvoiceIfMissing }) => {
       const lead = await getLead(leadId);
       if (!lead) return jsonResult({ error: "Lead not found", leadId });
       const now = new Date().toISOString();
@@ -546,6 +547,7 @@ export function registerTools(server) {
         serviceId: serviceId || null,
         amountExVat: round2(amountExVat),
         notes: notes || null,
+        billingMode,
         requestId,
         addedAt: now,
         addedBy: "mcp",
@@ -595,9 +597,10 @@ export function registerTools(server) {
       amountExVat: z.number().finite().positive().optional().describe("New client price ex VAT/ZAR"),
       serviceId: z.enum(SERVICE_IDS).nullable().optional().describe("Catalog service this line is based on, or null for a fully custom invoice line"),
       notes: z.string().max(4000).nullable().optional().describe("New invoice brief. New lines render as separate bullets; no 'Notes:' label is shown."),
+      billingMode: z.enum(["additive", "replacement"]).optional().describe("additive adds this line on top of the base invoice; replacement makes this line replace the base invoice package total"),
       vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
     },
-    async ({ leadId, lineId, label, amountExVat, serviceId, notes, vendorCostExVat }) => {
+    async ({ leadId, lineId, label, amountExVat, serviceId, notes, billingMode, vendorCostExVat }) => {
       const lead = await getLead(leadId);
       if (!lead) return jsonResult({ error: "Lead not found", leadId });
       const existingLine = findInvoiceLine(lead, lineId);
@@ -616,6 +619,7 @@ export function registerTools(server) {
       if (amountExVat !== undefined) nextLine.amountExVat = round2(amountExVat);
       if (serviceId !== undefined) nextLine.serviceId = serviceId || null;
       if (notes !== undefined) nextLine.notes = notes || null;
+      if (billingMode !== undefined) nextLine.billingMode = billingMode;
 
       const patch = {
         upsells: existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line)),
