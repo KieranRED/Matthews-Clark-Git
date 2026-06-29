@@ -3,7 +3,8 @@
 Exposes the CRM (leads, clients, jobs, tasks, team, content) to Claude via the
 Model Context Protocol. Most read tools are safe lookup/reporting helpers; write
 tools are available for controlled CRM maintenance such as creating leads,
-scheduling jobs, adding invoice service lines, and managing tasks.
+scheduling jobs, adding custom service/package lines, adding true upsells, and
+managing tasks.
 
 ## Tools
 
@@ -19,8 +20,11 @@ scheduling jobs, adding invoice service lines, and managing tasks.
 | `dashboard_summary` | Counts + pipeline-by-status snapshot |
 | `create_lead` | Create a lead and link/create the matching client |
 | `create_job_for_lead` | Create a scheduled job from an existing lead |
-| `add_invoice_service_line` | Add a custom or catalog-based invoice service line (`additive` or `replacement`) |
-| `update_invoice_service_line` / `delete_invoice_service_line` | Edit or remove existing one-off invoice service lines |
+| `add_custom_service_line` | Add a one-off custom service/package line (`additive` or `replacement`) |
+| `update_custom_service_line` / `delete_custom_service_line` | Edit or remove custom service/package lines |
+| `add_upsell_line` | Add a true additive upsell/add-on line; optional vendor cost reduces commission |
+| `update_upsell_line` / `delete_upsell_line` | Edit or remove true upsell/add-on lines |
+| `add_invoice_service_line` / `update_invoice_service_line` / `delete_invoice_service_line` | Compatibility aliases for custom service/package lines |
 | `update_lead_services` / `update_service_details` | Correct lead service selections and service detail fields |
 | `update_lead_status` / `update_lead_field` / `add_lead_note` | Maintain lead pipeline data |
 | `create_task` / `update_task` / `complete_task` | Manage CRM tasks |

@@ -77,13 +77,60 @@ function vehicleFromLead(lead) {
   };
 }
 
+function isLegacyCustomServiceLine(line) {
+  if (!line || typeof line !== "object") return false;
+  return (
+    line.kind === "custom_service" ||
+    line.billingMode === "replacement" ||
+    line.source === "mcp" ||
+    line.source === "mcp_custom_service"
+  );
+}
+
+function customServiceLines(lead) {
+  return Array.isArray(lead?.customServices) ? lead.customServices : [];
+}
+
+function legacyCustomServiceLines(lead) {
+  return (Array.isArray(lead?.upsells) ? lead.upsells : []).filter(isLegacyCustomServiceLine);
+}
+
 function invoiceLines(lead) {
-  return Array.isArray(lead?.upsells) ? lead.upsells : [];
+  return [...customServiceLines(lead), ...legacyCustomServiceLines(lead)];
+}
+
+function upsellLines(lead) {
+  return (Array.isArray(lead?.upsells) ? lead.upsells : []).filter((line) => !isLegacyCustomServiceLine(line));
 }
 
 function findInvoiceLine(lead, lineId) {
+  return findInvoiceLineLocation(lead, lineId)?.line || null;
+}
+
+function findInvoiceLineLocation(lead, lineId) {
   const id = String(lineId || "");
-  return invoiceLines(lead).find((line) => String(line?.id || "") === id) || null;
+  const custom = customServiceLines(lead).find((line) => String(line?.id || "") === id);
+  if (custom) return { collection: "customServices", line: custom };
+  const legacy = legacyCustomServiceLines(lead).find((line) => String(line?.id || "") === id);
+  if (legacy) return { collection: "legacyUpsells", line: legacy };
+  return null;
+}
+
+function findUpsellLine(lead, lineId) {
+  const id = String(lineId || "");
+  return upsellLines(lead).find((line) => String(line?.id || "") === id) || null;
+}
+
+function patchInvoiceLineCollection(lead, location, lineId, nextLine) {
+  const id = String(lineId || "");
+  if (location?.collection === "customServices") {
+    return {
+      customServices: customServiceLines(lead).map((line) => (String(line?.id || "") === id ? nextLine : line))
+    };
+  }
+  return {
+    upsells: (Array.isArray(lead?.upsells) ? lead.upsells : []).map((line) => (String(line?.id || "") === id ? nextLine : line))
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -324,6 +371,313 @@ export function registerTools(server) {
   const EDITABLE_FIELDS = ["name", "phone", "car", "timeframe", "source", "lane"];
   const DETAIL_SERVICES = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit"];
 
+  const customServiceLineSchema = {
+    leadId: z.string().min(1).describe("Lead ID whose invoice should receive the custom service/package line"),
+    amountExVat: z.number().finite().positive().describe("Client price ex VAT/ZAR for this custom line"),
+    label: z.string().min(1).max(200).optional().describe("Line item label. Required for fully custom lines; optional when serviceId is supplied"),
+    serviceId: z.enum(SERVICE_IDS).optional().describe("Existing service catalog id this custom line is loosely based on, if any"),
+    notes: z.string().max(4000).optional().describe("Invoice brief. New lines render as separate bullets; no 'Notes:' label is shown."),
+    billingMode: z.enum(["additive", "replacement"]).default("additive").describe("additive adds this custom line on top of the base invoice; replacement makes this custom line replace the base invoice package total"),
+    vendorCostExVat: z.number().finite().min(0).optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking"),
+    createInvoiceIfMissing: z.boolean().default(true).describe("Allocate an invoice number and mark the invoice due if the lead has no invoice yet")
+  };
+
+  const updateCustomServiceLineSchema = {
+    leadId: z.string().min(1).describe("Lead ID whose custom invoice line should be edited"),
+    lineId: z.string().min(1).describe("Custom service line id, from lead.customServices[].id. Legacy MCP lines in lead.upsells are also supported."),
+    label: z.string().min(1).max(200).optional().describe("New line item label"),
+    amountExVat: z.number().finite().positive().optional().describe("New client price ex VAT/ZAR"),
+    serviceId: z.enum(SERVICE_IDS).nullable().optional().describe("Catalog service this custom line is based on, or null for a fully custom invoice line"),
+    notes: z.string().max(4000).nullable().optional().describe("New invoice brief. New lines render as separate bullets; no 'Notes:' label is shown."),
+    billingMode: z.enum(["additive", "replacement"]).optional().describe("additive adds this line on top of the base invoice; replacement makes this line replace the base invoice package total"),
+    vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
+  };
+
+  const upsellLineSchema = {
+    leadId: z.string().min(1).describe("Lead ID whose invoice should receive the upsell line"),
+    amountExVat: z.number().finite().positive().describe("Additional client price ex VAT/ZAR for this upsell"),
+    label: z.string().min(1).max(200).optional().describe("Upsell line item label. Required for fully custom upsells; optional when serviceId is supplied"),
+    serviceId: z.enum(SERVICE_IDS).optional().describe("Existing service catalog id this upsell is based on, if any"),
+    notes: z.string().max(2000).optional(),
+    vendorCostExVat: z.number().finite().min(0).optional().describe("Optional Izimoto/vendor cost ex VAT to deduct from upsell commission"),
+    createInvoiceIfMissing: z.boolean().default(true).describe("Allocate an invoice number and mark the invoice due if the lead has no invoice yet")
+  };
+
+  const updateUpsellLineSchema = {
+    leadId: z.string().min(1).describe("Lead ID whose upsell line should be edited"),
+    lineId: z.string().min(1).describe("Upsell line id, from lead.upsells[].id"),
+    label: z.string().min(1).max(200).optional().describe("New upsell label"),
+    amountExVat: z.number().finite().positive().optional().describe("New additional client price ex VAT/ZAR"),
+    serviceId: z.enum(SERVICE_IDS).nullable().optional().describe("Catalog service this upsell is based on, or null for a fully custom upsell"),
+    notes: z.string().max(2000).nullable().optional(),
+    vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
+  };
+
+  async function maybeInvoicePatch(lead, leadId, now, createInvoiceIfMissing) {
+    if (!createInvoiceIfMissing || lead.invoiceCreatedAt || lead.quoteBuiltAt) return {};
+    return {
+      invoiceCreatedAt: now,
+      invoiceNumber: lead.invoiceNumber || (await allocateInvoiceDigits()) || String(leadId).replace(/[^0-9]/g, "").slice(-5).padStart(5, "0"),
+      invoiceStatus: lead.invoiceStatus || "due"
+    };
+  }
+
+  async function addCustomServiceLine({ leadId, amountExVat, label, serviceId, notes, billingMode, vendorCostExVat, createInvoiceIfMissing }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const now = new Date().toISOString();
+    const lineLabel = String(label || (serviceId ? serviceLabel(serviceId) : "")).trim();
+    if (!lineLabel) return jsonResult({ error: "Missing label for custom service line" });
+
+    const requestId = vendorCostExVat != null && vendorCostExVat > 0 ? crypto.randomUUID() : null;
+    const line = {
+      id: crypto.randomUUID(),
+      kind: "custom_service",
+      label: lineLabel,
+      serviceId: serviceId || null,
+      amountExVat: round2(amountExVat),
+      notes: notes || null,
+      billingMode,
+      requestId,
+      addedAt: now,
+      addedBy: "mcp",
+      source: "mcp_custom_service"
+    };
+
+    const patch = {
+      customServices: [...customServiceLines(lead), line],
+      updatedAt: now,
+      ...(await maybeInvoicePatch(lead, leadId, now, createInvoiceIfMissing))
+    };
+
+    if (requestId) {
+      patch.upsellRequests = [
+        ...(Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []),
+        {
+          id: requestId,
+          type: "custom_service",
+          service: serviceId || "custom",
+          label: lineLabel,
+          notes: notes || null,
+          vendorExVat: round2(vendorCostExVat),
+          status: "confirmed",
+          requestedAt: now,
+          requestedBy: "mcp",
+          confirmedAt: now
+        }
+      ];
+    }
+
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, line, invoiceCreatedAt: updated?.invoiceCreatedAt || null, invoiceNumber: updated?.invoiceNumber || null });
+  }
+
+  async function updateCustomServiceLine({ leadId, lineId, label, amountExVat, serviceId, notes, billingMode, vendorCostExVat }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const location = findInvoiceLineLocation(lead, lineId);
+    const existingLine = location?.line || null;
+    if (!existingLine) return jsonResult({ error: "Custom service line not found", leadId, lineId });
+
+    const now = new Date().toISOString();
+    let requestId = existingLine.requestId || null;
+    const nextLine = {
+      ...existingLine,
+      kind: "custom_service",
+      source: existingLine.source || "mcp_custom_service",
+      updatedAt: now,
+      updatedBy: "mcp"
+    };
+    if (label !== undefined) nextLine.label = label;
+    if (amountExVat !== undefined) nextLine.amountExVat = round2(amountExVat);
+    if (serviceId !== undefined) nextLine.serviceId = serviceId || null;
+    if (notes !== undefined) nextLine.notes = notes || null;
+    if (billingMode !== undefined) nextLine.billingMode = billingMode;
+
+    const patch = { updatedAt: now };
+
+    if (vendorCostExVat !== undefined) {
+      const requests = Array.isArray(lead.upsellRequests) ? lead.upsellRequests : [];
+      if (vendorCostExVat == null) {
+        patch.upsellRequests = requests.filter((req) => !requestId || String(req?.id || "") !== String(requestId));
+        nextLine.requestId = null;
+      } else {
+        if (!requestId) requestId = crypto.randomUUID();
+        nextLine.requestId = requestId;
+        const requestRecord = {
+          id: requestId,
+          type: "custom_service",
+          service: nextLine.serviceId || "custom",
+          label: nextLine.label,
+          notes: nextLine.notes || null,
+          vendorExVat: round2(vendorCostExVat),
+          status: "confirmed",
+          requestedAt: now,
+          requestedBy: "mcp",
+          confirmedAt: now,
+          updatedAt: now
+        };
+        const found = requests.some((req) => String(req?.id || "") === String(requestId));
+        patch.upsellRequests = found
+          ? requests.map((req) => (String(req?.id || "") === String(requestId) ? { ...req, ...requestRecord } : req))
+          : [...requests, requestRecord];
+      }
+    }
+
+    Object.assign(patch, patchInvoiceLineCollection(lead, location, lineId, nextLine));
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, line: findInvoiceLine(updated, lineId) });
+  }
+
+  async function deleteCustomServiceLine({ leadId, lineId }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const location = findInvoiceLineLocation(lead, lineId);
+    const existingLine = location?.line || null;
+    if (!existingLine) return jsonResult({ error: "Custom service line not found", leadId, lineId });
+
+    const requestId = existingLine.requestId || null;
+    const id = String(lineId || "");
+    const patch = {
+      ...(location.collection === "customServices"
+        ? { customServices: customServiceLines(lead).filter((line) => String(line?.id || "") !== id) }
+        : { upsells: (Array.isArray(lead?.upsells) ? lead.upsells : []).filter((line) => String(line?.id || "") !== id) }),
+      updatedAt: new Date().toISOString()
+    };
+    if (requestId) {
+      patch.upsellRequests = (Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []).filter(
+        (req) => String(req?.id || "") !== String(requestId)
+      );
+    }
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, deletedLine: existingLine, remainingLines: invoiceLines(updated).length });
+  }
+
+  async function addUpsellLine({ leadId, amountExVat, label, serviceId, notes, vendorCostExVat, createInvoiceIfMissing }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const now = new Date().toISOString();
+    const lineLabel = String(label || (serviceId ? serviceLabel(serviceId) : "")).trim();
+    if (!lineLabel) return jsonResult({ error: "Missing label for upsell line" });
+
+    const requestId = vendorCostExVat != null && vendorCostExVat > 0 ? crypto.randomUUID() : null;
+    const line = {
+      id: crypto.randomUUID(),
+      kind: "upsell",
+      label: lineLabel,
+      serviceId: serviceId || null,
+      amountExVat: round2(amountExVat),
+      notes: notes || null,
+      billingMode: "additive",
+      requestId,
+      addedAt: now,
+      addedBy: "mcp",
+      source: "mcp_upsell"
+    };
+
+    const patch = {
+      upsells: [...(Array.isArray(lead.upsells) ? lead.upsells : []), line],
+      updatedAt: now,
+      ...(await maybeInvoicePatch(lead, leadId, now, createInvoiceIfMissing))
+    };
+
+    if (requestId) {
+      patch.upsellRequests = [
+        ...(Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []),
+        {
+          id: requestId,
+          type: "upsell",
+          service: serviceId || "custom",
+          label: lineLabel,
+          notes: notes || null,
+          vendorExVat: round2(vendorCostExVat),
+          status: "confirmed",
+          requestedAt: now,
+          requestedBy: "mcp",
+          confirmedAt: now
+        }
+      ];
+    }
+
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, line, invoiceCreatedAt: updated?.invoiceCreatedAt || null, invoiceNumber: updated?.invoiceNumber || null });
+  }
+
+  async function updateUpsellLine({ leadId, lineId, label, amountExVat, serviceId, notes, vendorCostExVat }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const existingLine = findUpsellLine(lead, lineId);
+    if (!existingLine) return jsonResult({ error: "Upsell line not found", leadId, lineId });
+
+    const now = new Date().toISOString();
+    let requestId = existingLine.requestId || null;
+    const nextLine = {
+      ...existingLine,
+      kind: "upsell",
+      billingMode: "additive",
+      source: existingLine.source || "mcp_upsell",
+      updatedAt: now,
+      updatedBy: "mcp"
+    };
+    if (label !== undefined) nextLine.label = label;
+    if (amountExVat !== undefined) nextLine.amountExVat = round2(amountExVat);
+    if (serviceId !== undefined) nextLine.serviceId = serviceId || null;
+    if (notes !== undefined) nextLine.notes = notes || null;
+
+    const patch = { updatedAt: now };
+    if (vendorCostExVat !== undefined) {
+      const requests = Array.isArray(lead.upsellRequests) ? lead.upsellRequests : [];
+      if (vendorCostExVat == null) {
+        patch.upsellRequests = requests.filter((req) => !requestId || String(req?.id || "") !== String(requestId));
+        nextLine.requestId = null;
+      } else {
+        if (!requestId) requestId = crypto.randomUUID();
+        nextLine.requestId = requestId;
+        const requestRecord = {
+          id: requestId,
+          type: "upsell",
+          service: nextLine.serviceId || "custom",
+          label: nextLine.label,
+          notes: nextLine.notes || null,
+          vendorExVat: round2(vendorCostExVat),
+          status: "confirmed",
+          requestedAt: now,
+          requestedBy: "mcp",
+          confirmedAt: now,
+          updatedAt: now
+        };
+        const found = requests.some((req) => String(req?.id || "") === String(requestId));
+        patch.upsellRequests = found
+          ? requests.map((req) => (String(req?.id || "") === String(requestId) ? { ...req, ...requestRecord } : req))
+          : [...requests, requestRecord];
+      }
+    }
+
+    patch.upsells = (Array.isArray(lead.upsells) ? lead.upsells : []).map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line));
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, line: findUpsellLine(updated, lineId) });
+  }
+
+  async function deleteUpsellLine({ leadId, lineId }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+    const existingLine = findUpsellLine(lead, lineId);
+    if (!existingLine) return jsonResult({ error: "Upsell line not found", leadId, lineId });
+
+    const requestId = existingLine.requestId || null;
+    const patch = {
+      upsells: (Array.isArray(lead.upsells) ? lead.upsells : []).filter((line) => String(line?.id || "") !== String(lineId)),
+      updatedAt: new Date().toISOString()
+    };
+    if (requestId) {
+      patch.upsellRequests = (Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []).filter(
+        (req) => String(req?.id || "") !== String(requestId)
+      );
+    }
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({ ok: true, leadId, deletedLine: existingLine, remainingUpsells: upsellLines(updated).length });
+  }
+
   server.tool(
     "create_lead",
     "Create a new CRM lead and link/create the matching client by phone/email. Use this when a new enquiry arrives outside the website lead form.",
@@ -521,171 +875,75 @@ export function registerTools(server) {
   );
 
   server.tool(
-    "add_invoice_service_line",
-    "Add a priced one-off service line to a lead's invoice. The line can be fully custom or based on an existing service catalog id.",
+    "add_custom_service_line",
+    "Add a one-off custom service/package line to a lead's invoice. Use this for bespoke packages such as Gold Recovery; it can be additive or replace the base package total.",
+    customServiceLineSchema,
+    addCustomServiceLine
+  );
+
+  server.tool(
+    "update_custom_service_line",
+    "Edit an existing one-off custom service/package line. Use serviceId: null to remove any catalog association; invoice content renders from the custom brief.",
+    updateCustomServiceLineSchema,
+    updateCustomServiceLine
+  );
+
+  server.tool(
+    "delete_custom_service_line",
+    "Delete an existing one-off custom service/package line from a lead. Legacy MCP-created custom lines stored in lead.upsells are also supported.",
     {
-      leadId: z.string().min(1).describe("Lead ID whose invoice should receive the service line"),
-      amountExVat: z.number().finite().positive().describe("Client price ex VAT/ZAR for this line"),
-      label: z.string().min(1).max(200).optional().describe("Line item label. Required for fully custom lines; optional when serviceId is supplied"),
-      serviceId: z.enum(SERVICE_IDS).optional().describe("Existing service catalog id this line is based on, if any"),
-      notes: z.string().max(2000).optional(),
-      billingMode: z.enum(["additive", "replacement"]).default("additive").describe("additive adds this line on top of the base invoice; replacement makes this line replace the base invoice package total"),
-      vendorCostExVat: z.number().finite().min(0).optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking"),
-      createInvoiceIfMissing: z.boolean().default(true).describe("Allocate an invoice number and mark the invoice due if the lead has no invoice yet")
+      leadId: z.string().min(1).describe("Lead ID whose custom service line should be deleted"),
+      lineId: z.string().min(1).describe("Custom service line id, from lead.customServices[].id")
     },
-    async ({ leadId, amountExVat, label, serviceId, notes, billingMode, vendorCostExVat, createInvoiceIfMissing }) => {
-      const lead = await getLead(leadId);
-      if (!lead) return jsonResult({ error: "Lead not found", leadId });
-      const now = new Date().toISOString();
-      const lineLabel = String(label || (serviceId ? serviceLabel(serviceId) : "")).trim();
-      if (!lineLabel) return jsonResult({ error: "Missing label for custom invoice line" });
+    deleteCustomServiceLine
+  );
 
-      const requestId = vendorCostExVat != null && vendorCostExVat > 0 ? crypto.randomUUID() : null;
-      const line = {
-        id: crypto.randomUUID(),
-        label: lineLabel,
-        serviceId: serviceId || null,
-        amountExVat: round2(amountExVat),
-        notes: notes || null,
-        billingMode,
-        requestId,
-        addedAt: now,
-        addedBy: "mcp",
-        source: "mcp"
-      };
+  server.tool(
+    "add_upsell_line",
+    "Add a true upsell/add-on line to a lead's invoice. Upsells are always additive; optional Izimoto/vendor cost is deducted from upsell commission.",
+    upsellLineSchema,
+    addUpsellLine
+  );
 
-      const patch = {
-        upsells: [...(Array.isArray(lead.upsells) ? lead.upsells : []), line],
-        updatedAt: now
-      };
+  server.tool(
+    "update_upsell_line",
+    "Edit an existing true upsell/add-on line. Upsells are always additive and do not replace the base package.",
+    updateUpsellLineSchema,
+    updateUpsellLine
+  );
 
-      if (requestId) {
-        patch.upsellRequests = [
-          ...(Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []),
-          {
-            id: requestId,
-            service: serviceId || "custom",
-            label: lineLabel,
-            notes: notes || null,
-            vendorExVat: round2(vendorCostExVat),
-            status: "confirmed",
-            requestedAt: now,
-            requestedBy: "mcp",
-            confirmedAt: now
-          }
-        ];
-      }
+  server.tool(
+    "delete_upsell_line",
+    "Delete an existing true upsell/add-on line from lead.upsells and its linked vendor-cost request if one exists.",
+    {
+      leadId: z.string().min(1).describe("Lead ID whose upsell line should be deleted"),
+      lineId: z.string().min(1).describe("Upsell line id, from lead.upsells[].id")
+    },
+    deleteUpsellLine
+  );
 
-      if (createInvoiceIfMissing && !lead.invoiceCreatedAt && !lead.quoteBuiltAt) {
-        patch.invoiceCreatedAt = now;
-        patch.invoiceNumber = lead.invoiceNumber || (await allocateInvoiceDigits()) || String(leadId).replace(/[^0-9]/g, "").slice(-5).padStart(5, "0");
-        patch.invoiceStatus = lead.invoiceStatus || "due";
-      }
-
-      const updated = await updateLead(leadId, patch);
-      return jsonResult({ ok: true, leadId, line, invoiceCreatedAt: updated?.invoiceCreatedAt || null, invoiceNumber: updated?.invoiceNumber || null });
-    }
+  server.tool(
+    "add_invoice_service_line",
+    "Compatibility alias for add_custom_service_line. Creates a one-off custom service/package line, not a true upsell.",
+    customServiceLineSchema,
+    addCustomServiceLine
   );
 
   server.tool(
     "update_invoice_service_line",
-    "Edit an existing one-off invoice service line on a lead. Use serviceId: null to remove catalog-based wording such as 'Based on: ...' from the rendered invoice.",
-    {
-      leadId: z.string().min(1).describe("Lead ID whose invoice line should be edited"),
-      lineId: z.string().min(1).describe("Invoice service line id, from lead.upsells[].id"),
-      label: z.string().min(1).max(200).optional().describe("New line item label"),
-      amountExVat: z.number().finite().positive().optional().describe("New client price ex VAT/ZAR"),
-      serviceId: z.enum(SERVICE_IDS).nullable().optional().describe("Catalog service this line is based on, or null for a fully custom invoice line"),
-      notes: z.string().max(4000).nullable().optional().describe("New invoice brief. New lines render as separate bullets; no 'Notes:' label is shown."),
-      billingMode: z.enum(["additive", "replacement"]).optional().describe("additive adds this line on top of the base invoice; replacement makes this line replace the base invoice package total"),
-      vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
-    },
-    async ({ leadId, lineId, label, amountExVat, serviceId, notes, billingMode, vendorCostExVat }) => {
-      const lead = await getLead(leadId);
-      if (!lead) return jsonResult({ error: "Lead not found", leadId });
-      const existingLine = findInvoiceLine(lead, lineId);
-      if (!existingLine) return jsonResult({ error: "Invoice service line not found", leadId, lineId });
-
-      const now = new Date().toISOString();
-      const existing = invoiceLines(lead);
-      let requestId = existingLine.requestId || null;
-
-      const nextLine = {
-        ...existingLine,
-        updatedAt: now,
-        updatedBy: "mcp"
-      };
-      if (label !== undefined) nextLine.label = label;
-      if (amountExVat !== undefined) nextLine.amountExVat = round2(amountExVat);
-      if (serviceId !== undefined) nextLine.serviceId = serviceId || null;
-      if (notes !== undefined) nextLine.notes = notes || null;
-      if (billingMode !== undefined) nextLine.billingMode = billingMode;
-
-      const patch = {
-        upsells: existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line)),
-        updatedAt: now
-      };
-
-      if (vendorCostExVat !== undefined) {
-        const requests = Array.isArray(lead.upsellRequests) ? lead.upsellRequests : [];
-        if (vendorCostExVat == null) {
-          patch.upsellRequests = requests.filter((req) => !requestId || String(req?.id || "") !== String(requestId));
-          nextLine.requestId = null;
-          patch.upsells = existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line));
-        } else {
-          if (!requestId) requestId = crypto.randomUUID();
-          nextLine.requestId = requestId;
-          const requestRecord = {
-            id: requestId,
-            service: nextLine.serviceId || "custom",
-            label: nextLine.label,
-            notes: nextLine.notes || null,
-            vendorExVat: round2(vendorCostExVat),
-            status: "confirmed",
-            requestedAt: now,
-            requestedBy: "mcp",
-            confirmedAt: now,
-            updatedAt: now
-          };
-          const found = requests.some((req) => String(req?.id || "") === String(requestId));
-          patch.upsellRequests = found
-            ? requests.map((req) => (String(req?.id || "") === String(requestId) ? { ...req, ...requestRecord } : req))
-            : [...requests, requestRecord];
-          patch.upsells = existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line));
-        }
-      }
-
-      const updated = await updateLead(leadId, patch);
-      return jsonResult({ ok: true, leadId, line: findInvoiceLine(updated, lineId) });
-    }
+    "Compatibility alias for update_custom_service_line. Edits one-off custom service/package lines, including legacy MCP lines.",
+    updateCustomServiceLineSchema,
+    updateCustomServiceLine
   );
 
   server.tool(
     "delete_invoice_service_line",
-    "Delete an existing one-off invoice service line from a lead. This removes the line from lead.upsells and its linked vendor-cost request if one exists.",
+    "Compatibility alias for delete_custom_service_line. Deletes one-off custom service/package lines, including legacy MCP lines.",
     {
-      leadId: z.string().min(1).describe("Lead ID whose invoice line should be deleted"),
-      lineId: z.string().min(1).describe("Invoice service line id, from lead.upsells[].id")
+      leadId: z.string().min(1).describe("Lead ID whose custom service line should be deleted"),
+      lineId: z.string().min(1).describe("Custom service line id, from lead.customServices[].id")
     },
-    async ({ leadId, lineId }) => {
-      const lead = await getLead(leadId);
-      if (!lead) return jsonResult({ error: "Lead not found", leadId });
-      const existingLine = findInvoiceLine(lead, lineId);
-      if (!existingLine) return jsonResult({ error: "Invoice service line not found", leadId, lineId });
-
-      const requestId = existingLine.requestId || null;
-      const patch = {
-        upsells: invoiceLines(lead).filter((line) => String(line?.id || "") !== String(lineId)),
-        updatedAt: new Date().toISOString()
-      };
-      if (requestId) {
-        patch.upsellRequests = (Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []).filter(
-          (req) => String(req?.id || "") !== String(requestId)
-        );
-      }
-      const updated = await updateLead(leadId, patch);
-      return jsonResult({ ok: true, leadId, deletedLine: existingLine, remainingLines: invoiceLines(updated).length });
-    }
+    deleteCustomServiceLine
   );
 
   // -- write: tasks ----------------------------------------------------------

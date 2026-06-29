@@ -19,6 +19,16 @@ function round2(n) {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 }
 
+function isLegacyCustomServiceLine(line) {
+  if (!line || typeof line !== "object") return false;
+  return (
+    line.kind === "custom_service" ||
+    line.billingMode === "replacement" ||
+    line.source === "mcp" ||
+    line.source === "mcp_custom_service"
+  );
+}
+
 function buildInvoiceModel({ leadId, lead }) {
   const vendorByService =
     lead?.vendorQuoteByServiceExVat && typeof lead.vendorQuoteByServiceExVat === "object" ? lead.vendorQuoteByServiceExVat : null;
@@ -63,14 +73,19 @@ function buildInvoiceModel({ leadId, lead }) {
     })
     .filter(Boolean);
 
-  const oneOffLines = (Array.isArray(lead?.upsells) ? lead.upsells : [])
+  const storedCustomServices = Array.isArray(lead?.customServices) ? lead.customServices : [];
+  const storedUpsells = Array.isArray(lead?.upsells) ? lead.upsells : [];
+  const legacyCustomServices = storedUpsells.filter(isLegacyCustomServiceLine);
+  const trueUpsells = storedUpsells.filter((item) => !isLegacyCustomServiceLine(item));
+
+  const customServiceLines = [...storedCustomServices, ...legacyCustomServices]
     .map((item) => {
       const clientEx = safeNum(item?.amountExVat);
       if (!(clientEx > 0)) return null;
       const id = String(item?.id || item?.label || "one-off").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60) || "one-off";
       return {
-        kind: "one_off",
-        sid: `one_off:${id}`,
+        kind: "custom_service",
+        sid: `custom_service:${id}`,
         label: String(item?.label || "One-off service"),
         notes: item?.notes ? String(item.notes) : null,
         serviceId: item?.serviceId || null,
@@ -80,18 +95,36 @@ function buildInvoiceModel({ leadId, lead }) {
     })
     .filter(Boolean);
 
-  const replacementLines = oneOffLines.filter((ln) => ln.billingMode === "replacement");
-  const additiveOneOffLines = oneOffLines.filter((ln) => ln.billingMode !== "replacement");
-  const invoiceLines = replacementLines.length ? [...replacementLines, ...additiveOneOffLines] : [...lines, ...additiveOneOffLines];
-  const oneOffTotalExVat = round2(additiveOneOffLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
+  const upsellLines = trueUpsells
+    .map((item) => {
+      const clientEx = safeNum(item?.amountExVat);
+      if (!(clientEx > 0)) return null;
+      const id = String(item?.id || item?.label || "upsell").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 60) || "upsell";
+      return {
+        kind: "upsell",
+        sid: `upsell:${id}`,
+        label: String(item?.label || "Upsell"),
+        notes: item?.notes ? String(item.notes) : null,
+        serviceId: item?.serviceId || null,
+        billingMode: "additive",
+        clientEx: round2(clientEx)
+      };
+    })
+    .filter(Boolean);
+
+  const replacementLines = customServiceLines.filter((ln) => ln.billingMode === "replacement");
+  const additiveCustomLines = customServiceLines.filter((ln) => ln.billingMode !== "replacement");
+  const additiveExtraLines = [...additiveCustomLines, ...upsellLines];
+  const invoiceLines = replacementLines.length ? [...replacementLines, ...additiveExtraLines] : [...lines, ...additiveExtraLines];
+  const extraTotalExVat = round2(additiveExtraLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
   const replacementTotalExVat = round2(replacementLines.reduce((s, ln) => s + (safeNum(ln.clientEx) ?? 0), 0));
   const fullClientTotalExVat =
     replacementLines.length
-      ? round2(replacementTotalExVat + oneOffTotalExVat)
+      ? round2(replacementTotalExVat + extraTotalExVat)
       : baseClientTotalExVat != null
-        ? round2(baseClientTotalExVat + oneOffTotalExVat)
-        : oneOffTotalExVat > 0
-          ? oneOffTotalExVat
+        ? round2(baseClientTotalExVat + extraTotalExVat)
+        : extraTotalExVat > 0
+          ? extraTotalExVat
           : null;
 
   return {

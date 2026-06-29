@@ -193,14 +193,15 @@ export default function InvoiceClient({ model }) {
     const details = model?.serviceDetails && typeof model.serviceDetails === "object" ? model.serviceDetails : null;
     return rows
       .map((ln) => {
-        if (ln?.kind === "one_off") {
+        if (ln?.kind === "one_off" || ln?.kind === "custom_service" || ln?.kind === "upsell") {
           const amt = Number(ln?.clientEx ?? 0);
           if (!Number.isFinite(amt) || amt <= 0) return null;
           const bullets = [];
-          if (ln.serviceId) bullets.push(`Based on: ${serviceLabel(ln.serviceId)}.`);
           bullets.push(...briefBullets(ln.notes));
-          if (!bullets.length) bullets.push("Custom scope confirmed by Matthews & Clark.");
-          return { sid: String(ln?.sid || "one_off"), title: String(ln?.label || "One-off service"), bullets, amt };
+          if (!bullets.length) {
+            bullets.push(ln?.kind === "upsell" ? "Additional scope confirmed by Matthews & Clark." : "Custom scope confirmed by Matthews & Clark.");
+          }
+          return { sid: String(ln?.sid || "custom_service"), title: String(ln?.label || "One-off service"), bullets, amt };
         }
         const sid = String(ln?.sid || "");
         const content = serviceInvoiceContent(details, sid);

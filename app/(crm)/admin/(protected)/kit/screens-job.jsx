@@ -40,6 +40,16 @@ function serviceLabel(id) {
   return SERVICE_LABELS[key] || key;
 }
 
+function isLegacyCustomServiceLine(line) {
+  if (!line || typeof line !== "object") return false;
+  return (
+    line.kind === "custom_service" ||
+    line.billingMode === "replacement" ||
+    line.source === "mcp" ||
+    line.source === "mcp_custom_service"
+  );
+}
+
 function serviceSummary(lead, sid) {
   const d = lead?.serviceDetails?.[sid] || null;
   if (!d || typeof d !== "object") return "";
@@ -251,8 +261,13 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
   const [upsellDetailDraft, setUpsellDetailDraft] = useState({});
   const [upsellNotesDraft, setUpsellNotesDraft] = useState("");
   const [upsellCustomLabelDraft, setUpsellCustomLabelDraft] = useState("");
-  // Confirmed upsell line items on the invoice
-  const upsells = Array.isArray(lead?.upsells) ? lead.upsells : [];
+  // Confirmed custom service/package and upsell line items on the invoice
+  const rawUpsells = Array.isArray(lead?.upsells) ? lead.upsells : [];
+  const customServices = [
+    ...(Array.isArray(lead?.customServices) ? lead.customServices : []),
+    ...rawUpsells.filter(isLegacyCustomServiceLine)
+  ];
+  const upsells = rawUpsells.filter((item) => !isLegacyCustomServiceLine(item));
   // Upsell requests (pending/priced)
   const upsellRequests = Array.isArray(lead?.upsellRequests) ? lead.upsellRequests : [];
   // Markup state for priced requests: { [requestId]: amountStr }
@@ -1461,6 +1476,27 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
 
                 {/* Upsells */}
                 <div style={{ paddingTop: 16, borderTop: "1px solid var(--bd-1)" }}>
+                  {customServices.length > 0 && (
+                    <div style={{ marginBottom: 14 }}>
+                      <div className="eyebrow" style={{ marginBottom: 8 }}>CUSTOM SERVICES</div>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        {customServices.map((u) => (
+                          <div key={u.id} style={{ padding: "10px 12px", background: "var(--bg-2)", borderRadius: 10, border: "1px solid var(--bd-1)" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg-1)" }}>{u.label}</div>
+                                <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--fg-3)", marginTop: 2 }}>
+                                  {moneyZAR(u.amountExVat)} ex VAT · {u.billingMode === "replacement" ? "replaces base package" : "additive"}
+                                </div>
+                              </div>
+                            </div>
+                            {u.notes && <div style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 6, whiteSpace: "pre-wrap" }}>{u.notes}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="eyebrow" style={{ marginBottom: 8 }}>UPSELLS</div>
 
                   {/* Confirmed upsell line items */}
