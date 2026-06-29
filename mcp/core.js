@@ -77,6 +77,15 @@ function vehicleFromLead(lead) {
   };
 }
 
+function invoiceLines(lead) {
+  return Array.isArray(lead?.upsells) ? lead.upsells : [];
+}
+
+function findInvoiceLine(lead, lineId) {
+  const id = String(lineId || "");
+  return invoiceLines(lead).find((line) => String(line?.id || "") === id) || null;
+}
+
 // ---------------------------------------------------------------------------
 // tool registration
 // ---------------------------------------------------------------------------
@@ -573,6 +582,105 @@ export function registerTools(server) {
 
       const updated = await updateLead(leadId, patch);
       return jsonResult({ ok: true, leadId, line, invoiceCreatedAt: updated?.invoiceCreatedAt || null, invoiceNumber: updated?.invoiceNumber || null });
+    }
+  );
+
+  server.tool(
+    "update_invoice_service_line",
+    "Edit an existing one-off invoice service line on a lead. Use serviceId: null to remove catalog-based wording such as 'Based on: ...' from the rendered invoice.",
+    {
+      leadId: z.string().min(1).describe("Lead ID whose invoice line should be edited"),
+      lineId: z.string().min(1).describe("Invoice service line id, from lead.upsells[].id"),
+      label: z.string().min(1).max(200).optional().describe("New line item label"),
+      amountExVat: z.number().finite().positive().optional().describe("New client price ex VAT/ZAR"),
+      serviceId: z.enum(SERVICE_IDS).nullable().optional().describe("Catalog service this line is based on, or null for a fully custom invoice line"),
+      notes: z.string().max(4000).nullable().optional().describe("New invoice brief. New lines render as separate bullets; no 'Notes:' label is shown."),
+      vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
+    },
+    async ({ leadId, lineId, label, amountExVat, serviceId, notes, vendorCostExVat }) => {
+      const lead = await getLead(leadId);
+      if (!lead) return jsonResult({ error: "Lead not found", leadId });
+      const existingLine = findInvoiceLine(lead, lineId);
+      if (!existingLine) return jsonResult({ error: "Invoice service line not found", leadId, lineId });
+
+      const now = new Date().toISOString();
+      const existing = invoiceLines(lead);
+      let requestId = existingLine.requestId || null;
+
+      const nextLine = {
+        ...existingLine,
+        updatedAt: now,
+        updatedBy: "mcp"
+      };
+      if (label !== undefined) nextLine.label = label;
+      if (amountExVat !== undefined) nextLine.amountExVat = round2(amountExVat);
+      if (serviceId !== undefined) nextLine.serviceId = serviceId || null;
+      if (notes !== undefined) nextLine.notes = notes || null;
+
+      const patch = {
+        upsells: existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line)),
+        updatedAt: now
+      };
+
+      if (vendorCostExVat !== undefined) {
+        const requests = Array.isArray(lead.upsellRequests) ? lead.upsellRequests : [];
+        if (vendorCostExVat == null) {
+          patch.upsellRequests = requests.filter((req) => !requestId || String(req?.id || "") !== String(requestId));
+          nextLine.requestId = null;
+          patch.upsells = existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line));
+        } else {
+          if (!requestId) requestId = crypto.randomUUID();
+          nextLine.requestId = requestId;
+          const requestRecord = {
+            id: requestId,
+            service: nextLine.serviceId || "custom",
+            label: nextLine.label,
+            notes: nextLine.notes || null,
+            vendorExVat: round2(vendorCostExVat),
+            status: "confirmed",
+            requestedAt: now,
+            requestedBy: "mcp",
+            confirmedAt: now,
+            updatedAt: now
+          };
+          const found = requests.some((req) => String(req?.id || "") === String(requestId));
+          patch.upsellRequests = found
+            ? requests.map((req) => (String(req?.id || "") === String(requestId) ? { ...req, ...requestRecord } : req))
+            : [...requests, requestRecord];
+          patch.upsells = existing.map((line) => (String(line?.id || "") === String(lineId) ? nextLine : line));
+        }
+      }
+
+      const updated = await updateLead(leadId, patch);
+      return jsonResult({ ok: true, leadId, line: findInvoiceLine(updated, lineId) });
+    }
+  );
+
+  server.tool(
+    "delete_invoice_service_line",
+    "Delete an existing one-off invoice service line from a lead. This removes the line from lead.upsells and its linked vendor-cost request if one exists.",
+    {
+      leadId: z.string().min(1).describe("Lead ID whose invoice line should be deleted"),
+      lineId: z.string().min(1).describe("Invoice service line id, from lead.upsells[].id")
+    },
+    async ({ leadId, lineId }) => {
+      const lead = await getLead(leadId);
+      if (!lead) return jsonResult({ error: "Lead not found", leadId });
+      const existingLine = findInvoiceLine(lead, lineId);
+      if (!existingLine) return jsonResult({ error: "Invoice service line not found", leadId, lineId });
+
+      const requestId = existingLine.requestId || null;
+      const patch = {
+        upsells: invoiceLines(lead).filter((line) => String(line?.id || "") !== String(lineId)),
+        updatedAt: new Date().toISOString()
+      };
+      if (requestId) {
+        patch.upsellRequests = (Array.isArray(lead.upsellRequests) ? lead.upsellRequests : []).filter(
+          (req) => String(req?.id || "") !== String(requestId)
+        );
+      }
+      const updated = await updateLead(leadId, patch);
+      return jsonResult({ ok: true, leadId, deletedLine: existingLine, remainingLines: invoiceLines(updated).length });
     }
   );
 

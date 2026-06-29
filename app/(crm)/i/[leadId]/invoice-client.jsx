@@ -41,6 +41,13 @@ function niceTitle(s) {
   return String(s || "").trim();
 }
 
+function briefBullets(input) {
+  return String(input || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/^[-*•]\s*/, ""))
+    .filter(Boolean);
+}
+
 function serviceInvoiceContent(serviceDetails, sid) {
   const d = serviceDetails?.[sid] || null;
   if (!d || typeof d !== "object") {
@@ -191,7 +198,7 @@ export default function InvoiceClient({ model }) {
           if (!Number.isFinite(amt) || amt <= 0) return null;
           const bullets = [];
           if (ln.serviceId) bullets.push(`Based on: ${serviceLabel(ln.serviceId)}.`);
-          if (ln.notes) bullets.push(`Notes: ${String(ln.notes)}`);
+          bullets.push(...briefBullets(ln.notes));
           if (!bullets.length) bullets.push("Custom scope confirmed by Matthews & Clark.");
           return { sid: String(ln?.sid || "one_off"), title: String(ln?.label || "One-off service"), bullets, amt };
         }
