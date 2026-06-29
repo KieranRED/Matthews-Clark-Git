@@ -19,6 +19,7 @@ managing tasks.
 | `list_content_posts` / `get_content_post` | Social/content posts |
 | `dashboard_summary` | Counts + pipeline-by-status snapshot |
 | `create_lead` | Create a lead and link/create the matching client |
+| `set_vendor_pricing` | Set Izimoto/vendor pricing from ex VAT or inc VAT amounts and unlock invoice details |
 | `create_job_for_lead` | Create a scheduled job from an existing lead |
 | `add_custom_service_line` | Add a one-off custom service/package line (`additive` or `replacement`) |
 | `update_custom_service_line` / `delete_custom_service_line` | Edit or remove custom service/package lines |

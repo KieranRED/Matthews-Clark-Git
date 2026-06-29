@@ -413,6 +413,22 @@ export function registerTools(server) {
     vendorCostExVat: z.number().finite().min(0).nullable().optional().describe("Optional Izimoto/vendor cost ex VAT for commission tracking, or null to remove the tracked cost")
   };
 
+  const vendorPricingSchema = {
+    leadId: z.string().min(1).describe("Lead ID whose vendor pricing should be set"),
+    amountsByServiceExVat: z.record(z.string().trim().min(1), z.number().finite().min(0)).optional().describe("Vendor costs by service id, already ex VAT"),
+    amountsByServiceIncVat: z.record(z.string().trim().min(1), z.number().finite().min(0)).optional().describe("Vendor costs by service id, inc VAT. The tool converts these to ex VAT for storage."),
+    totalExVat: z.number().finite().min(0).optional().describe("Single vendor total ex VAT. If the lead has multiple services, provide serviceId to say which service this total belongs to."),
+    totalIncVat: z.number().finite().min(0).optional().describe("Single vendor total inc VAT. The tool converts this to ex VAT. If the lead has multiple services, provide serviceId."),
+    serviceId: z.enum(SERVICE_IDS).optional().describe("Service id to attach a single totalExVat/totalIncVat amount to"),
+    vatRate: z.number().finite().min(0).max(1).optional().describe("VAT rate for inc/ex conversion. Defaults to lead vendorVatRate, VAT_RATE, or 0.15."),
+    commissionPercent: z.number().finite().min(0).max(500).optional().describe("Percent markup on vendor inc VAT used to build the client invoice if unlockInvoice is true"),
+    clientQuoteByServiceExVat: z.record(z.string().trim().min(1), z.number().finite().min(0)).optional().describe("Optional exact client invoice amounts ex VAT by service. If omitted, commissionPercent is used."),
+    clientTotalExVat: z.number().finite().min(0).optional().describe("Optional exact total client invoice amount ex VAT. Only auto-applies when there is one priced service."),
+    unlockInvoice: z.boolean().default(true).describe("When true, also finalizes quote fields and creates/keeps the invoice number so invoice details/open invoice are unlocked."),
+    replaceExisting: z.boolean().default(true).describe("When true, replaces existing vendor pricing; when false, merges into existing service pricing."),
+    note: z.string().max(1000).optional()
+  };
+
   async function maybeInvoicePatch(lead, leadId, now, createInvoiceIfMissing) {
     if (!createInvoiceIfMissing || lead.invoiceCreatedAt || lead.quoteBuiltAt) return {};
     return {
@@ -420,6 +436,157 @@ export function registerTools(server) {
       invoiceNumber: lead.invoiceNumber || (await allocateInvoiceDigits()) || String(leadId).replace(/[^0-9]/g, "").slice(-5).padStart(5, "0"),
       invoiceStatus: lead.invoiceStatus || "due"
     };
+  }
+
+  function serviceIdsForLead(lead) {
+    return (Array.isArray(lead?.services) ? lead.services : [])
+      .map((sid) => String(sid || ""))
+      .filter((sid) => sid && sid !== "unsure" && SERVICE_IDS.includes(sid));
+  }
+
+  function normalizeServiceAmountMap(input, vatRate, inputIncludesVat) {
+    const out = {};
+    if (!input || typeof input !== "object") return out;
+    for (const [sid, val] of Object.entries(input)) {
+      const key = String(sid || "");
+      if (!SERVICE_IDS.includes(key) || key === "unsure") continue;
+      const n = Number(val);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      out[key] = round2(inputIncludesVat ? n / (1 + vatRate) : n);
+    }
+    return out;
+  }
+
+  function addSingleVendorTotal({ lead, vendorQuoteByServiceExVat, serviceId, totalExVat, totalIncVat, vatRate }) {
+    const totalEx = totalExVat != null ? Number(totalExVat) : totalIncVat != null ? Number(totalIncVat) / (1 + vatRate) : null;
+    if (!Number.isFinite(totalEx) || totalEx <= 0) return { ok: true };
+
+    const servicesForLead = serviceIdsForLead(lead);
+    const targetService = serviceId || (servicesForLead.length === 1 ? servicesForLead[0] : null);
+    if (!targetService || targetService === "unsure") {
+      return {
+        ok: false,
+        error: "A single vendor total was supplied, but the lead has multiple/no services. Provide serviceId or amountsByServiceExVat/amountsByServiceIncVat."
+      };
+    }
+    vendorQuoteByServiceExVat[targetService] = round2(totalEx);
+    return { ok: true };
+  }
+
+  async function setVendorPricing({
+    leadId,
+    amountsByServiceExVat,
+    amountsByServiceIncVat,
+    totalExVat,
+    totalIncVat,
+    serviceId,
+    vatRate,
+    commissionPercent,
+    clientQuoteByServiceExVat,
+    clientTotalExVat,
+    unlockInvoice = true,
+    replaceExisting = true,
+    note
+  }) {
+    const lead = await getLead(leadId);
+    if (!lead) return jsonResult({ error: "Lead not found", leadId });
+
+    const baseVatRate = vatRate ?? round2(Number(lead.vendorVatRate ?? process.env.VAT_RATE ?? 0.15));
+    const safeVatRate = Number.isFinite(baseVatRate) && baseVatRate >= 0 ? baseVatRate : 0.15;
+    const vendorQuoteByServiceExVat = replaceExisting
+      ? {}
+      : { ...(lead.vendorQuoteByServiceExVat && typeof lead.vendorQuoteByServiceExVat === "object" ? lead.vendorQuoteByServiceExVat : {}) };
+
+    Object.assign(vendorQuoteByServiceExVat, normalizeServiceAmountMap(amountsByServiceExVat, safeVatRate, false));
+    Object.assign(vendorQuoteByServiceExVat, normalizeServiceAmountMap(amountsByServiceIncVat, safeVatRate, true));
+
+    const singleTotal = addSingleVendorTotal({ lead, vendorQuoteByServiceExVat, serviceId, totalExVat, totalIncVat, vatRate: safeVatRate });
+    if (!singleTotal.ok) return jsonResult({ error: singleTotal.error, leadId });
+
+    for (const [sid, val] of Object.entries(vendorQuoteByServiceExVat)) {
+      const n = Number(val);
+      if (!Number.isFinite(n) || n <= 0 || sid === "unsure" || !SERVICE_IDS.includes(sid)) {
+        delete vendorQuoteByServiceExVat[sid];
+      } else {
+        vendorQuoteByServiceExVat[sid] = round2(n);
+      }
+    }
+
+    if (!Object.keys(vendorQuoteByServiceExVat).length) {
+      return jsonResult({ error: "Missing vendor pricing. Provide at least one positive ex VAT or inc VAT amount.", leadId });
+    }
+
+    const vendorQuoteTotalExVat = round2(Object.values(vendorQuoteByServiceExVat).reduce((sum, val) => sum + Number(val || 0), 0));
+    const vendorQuoteTotalIncVat = round2(vendorQuoteTotalExVat * (1 + safeVatRate));
+    const vendorVatAmount = round2(vendorQuoteTotalIncVat - vendorQuoteTotalExVat);
+    const markupPercent = commissionPercent ?? Number(lead.commissionPercent ?? process.env.DEFAULT_COMMISSION_PERCENT ?? 0);
+    const safeCommissionPercent = Number.isFinite(markupPercent) && markupPercent >= 0 ? markupPercent : 0;
+    const exactClientByService = clientQuoteByServiceExVat && typeof clientQuoteByServiceExVat === "object" ? clientQuoteByServiceExVat : {};
+
+    const clientQuoteByService = {};
+    const pricedServiceIds = Object.keys(vendorQuoteByServiceExVat);
+    for (const [sid, vendorEx] of Object.entries(vendorQuoteByServiceExVat)) {
+      const exact = Number(exactClientByService[sid]);
+      const vendorInc = round2(Number(vendorEx || 0) * (1 + safeVatRate));
+      if (Number.isFinite(exact) && exact > 0) {
+        clientQuoteByService[sid] = round2(exact);
+      } else if (clientTotalExVat != null && pricedServiceIds.length === 1) {
+        clientQuoteByService[sid] = round2(clientTotalExVat);
+      } else {
+        clientQuoteByService[sid] = round2(vendorInc * (1 + safeCommissionPercent / 100));
+      }
+    }
+    const clientQuoteTotalExVat = round2(Object.values(clientQuoteByService).reduce((sum, val) => sum + Number(val || 0), 0));
+    const now = new Date().toISOString();
+
+    const patch = {
+      status: "quoted",
+      vendorQuoteByServiceExVat,
+      vendorQuoteTotalExVat,
+      vendorQuoteTotalIncVat,
+      vendorVatRate: safeVatRate,
+      vendorVatAmount,
+      vendorPricingDeferred: false,
+      commissionPercent: safeCommissionPercent,
+      clientQuoteByServiceExVat: clientQuoteByService,
+      clientQuoteTotalExVat,
+      clientQuoteAmountExVat: clientQuoteTotalExVat,
+      commissionByServiceMode: Object.fromEntries(pricedServiceIds.map((sid) => [sid, "percent"])),
+      commissionByServicePercent: Object.fromEntries(pricedServiceIds.map((sid) => [sid, safeCommissionPercent])),
+      quotedAt: lead.quotedAt || now,
+      quotedBy: lead.quotedBy || "mcp",
+      updatedAt: now
+    };
+
+    if (unlockInvoice) {
+      patch.quoteBuiltAt = now;
+      patch.quoteBuiltBy = "mcp";
+      patch.invoiceCreatedAt = lead.invoiceCreatedAt || now;
+      patch.invoiceNumber = lead.invoiceNumber || (await allocateInvoiceDigits()) || String(leadId).replace(/[^0-9]/g, "").slice(-5).padStart(5, "0");
+      patch.invoiceStatus = lead.invoiceStatus || "due";
+    }
+
+    if (note) {
+      patch.mcpNotes = [
+        ...(Array.isArray(lead.mcpNotes) ? lead.mcpNotes : []),
+        { text: note, createdAt: now, via: "mcp", type: "vendor_pricing" }
+      ];
+    }
+
+    const updated = await updateLead(leadId, patch);
+    return jsonResult({
+      ok: true,
+      leadId,
+      vendorQuoteByServiceExVat,
+      vendorQuoteTotalExVat,
+      vendorQuoteTotalIncVat,
+      vendorVatRate: safeVatRate,
+      clientQuoteByServiceExVat: clientQuoteByService,
+      clientQuoteTotalExVat,
+      invoiceUnlocked: Boolean(unlockInvoice),
+      invoiceCreatedAt: updated?.invoiceCreatedAt || null,
+      invoiceNumber: updated?.invoiceNumber || null
+    });
   }
 
   async function addCustomServiceLine({ leadId, amountExVat, label, serviceId, notes, billingMode, vendorCostExVat, createInvoiceIfMissing }) {
@@ -827,6 +994,13 @@ export function registerTools(server) {
   );
 
   // -- write: jobs / invoices ------------------------------------------------
+
+  server.tool(
+    "set_vendor_pricing",
+    "Set Izimoto/vendor pricing for a lead through MCP. Accepts vendor cost ex VAT or inc VAT, stores the canonical vendorQuoteByServiceExVat fields, and can unlock/finalize invoice details.",
+    vendorPricingSchema,
+    setVendorPricing
+  );
 
   server.tool(
     "create_job_for_lead",
