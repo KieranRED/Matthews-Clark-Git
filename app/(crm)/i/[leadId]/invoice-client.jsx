@@ -126,6 +126,17 @@ function serviceInvoiceContent(serviceDetails, sid) {
     return { title: "Paint Correction", bullets };
   }
 
+  if (String(sid).startsWith("pc_")) {
+    const packageName = d.packageName || serviceLabel(sid).replace(/^Paint correction - /i, "");
+    bullets.push("Paint is inspected under proper lighting before correction begins.");
+    if (d.protection) bullets.push(`Protection: ${String(d.protection)}.`);
+    if (d.durationDays) bullets.push(`Estimated workshop time: ${String(d.durationDays)} ${Number(d.durationDays) === 1 ? "day" : "days"}.`);
+    if (d.ceramic) bullets.push("Ceramic protection is included or selected for this package.");
+    bullets.push("Final correction depth is subject to paint thickness, clear-coat condition and defect severity.");
+    if (d.notes) bullets.push(`Notes: ${String(d.notes)}`);
+    return { title: `Paint Correction — ${niceTitle(packageName)}`, bullets };
+  }
+
   if (sid === "detail") {
     const kind = labelFor({ full: "Full detail", interior: "Interior only", exterior: "Exterior only", sale: "Sale prep" }, d.kind);
     bullets.push(`Detail type: ${kind}.`);

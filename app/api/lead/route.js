@@ -6,6 +6,20 @@ import { telegramSendMessage } from "@/lib/telegram";
 import { hmacToken } from "@/lib/linkToken";
 import { sendLeadConversions } from "@/lib/adsCapi";
 
+const PcPackageDetailSchema = z
+  .object({
+    packageId: z.string().optional(),
+    serviceId: z.string().optional(),
+    packageName: z.string().optional(),
+    packagePrice: z.number().optional(),
+    durationDays: z.number().optional(),
+    ceramic: z.boolean().optional(),
+    ceramicIncluded: z.boolean().optional(),
+    protection: z.string().optional(),
+    notes: z.string().optional()
+  })
+  .optional();
+
 const LeadSchema = z.object({
   name: z.string().trim().min(1),
   surname: z.string().trim().min(1),
@@ -58,6 +72,11 @@ const LeadSchema = z.object({
           notes: z.string().optional()
         })
         .optional(),
+      pc_street_gloss: PcPackageDetailSchema,
+      pc_bronze: PcPackageDetailSchema,
+      pc_silver: PcPackageDetailSchema,
+      pc_gold: PcPackageDetailSchema,
+      pc_diamond: PcPackageDetailSchema,
       detail: z
         .object({
           kind: z.string().optional(),
@@ -121,6 +140,15 @@ const SERVICE_LABELS = {
   pc_gold: "Paint correction - Gold",
   pc_diamond: "Paint correction - Diamond",
   unsure: "I'm not sure yet"
+};
+
+const PC_SERVICE_IDS = ["pc_street_gloss", "pc_bronze", "pc_silver", "pc_gold", "pc_diamond"];
+const PC_PACKAGE_LABELS = {
+  "stage-one": "Street Gloss",
+  bronze: "Bronze",
+  silver: "Silver",
+  gold: "Gold",
+  diamond: "Diamond"
 };
 
 const LANE_LABELS = {
@@ -224,6 +252,19 @@ function formatServiceDetailsHtml(lead) {
     lines.push("<b>PAINT CORRECTION</b>");
     lines.push(bullet("Stage", labelFor({ stage1: "Stage 1", stage2: "Stage 2", stage3: "Stage 3" }, c.stage)));
     if (c.notes) lines.push(bullet("Notes", c.notes));
+    lines.push("");
+  }
+
+  for (const sid of PC_SERVICE_IDS) {
+    if (!d[sid]) continue;
+    const p = d[sid] || {};
+    lines.push(`<b>${escapeHtml(SERVICE_LABELS[sid] || "PAINT CORRECTION PACKAGE")}</b>`);
+    lines.push(bullet("Package", p.packageName || PC_PACKAGE_LABELS[p.packageId] || p.packageId));
+    if (p.packagePrice) lines.push(bullet("Package value", `R ${Number(p.packagePrice).toLocaleString("en-ZA")}`));
+    if (p.durationDays) lines.push(bullet("Duration", `${p.durationDays} ${Number(p.durationDays) === 1 ? "day" : "days"}`));
+    lines.push(bullet("Protection", p.protection || (p.ceramic ? "Ceramic" : "No ceramic selected")));
+    lines.push(bullet("Ceramic", p.ceramic ? "Yes" : "No"));
+    if (p.notes) lines.push(bullet("Notes", p.notes));
     lines.push("");
   }
 

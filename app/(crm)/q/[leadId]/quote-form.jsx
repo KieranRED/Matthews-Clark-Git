@@ -71,6 +71,14 @@ function specRows(lead, serviceId) {
     if (d.notes) rows.push({ label: "Notes", value: String(d.notes) });
   }
 
+  else if (String(serviceId).startsWith("pc_")) {
+    if (d.packageName) rows.push({ label: "Package", value: String(d.packageName) });
+    if (d.protection) rows.push({ label: "Protection", value: String(d.protection) });
+    if (d.durationDays) rows.push({ label: "Duration", value: `${d.durationDays} ${Number(d.durationDays) === 1 ? "day" : "days"}` });
+    rows.push({ label: "Ceramic", value: d.ceramic ? "Yes" : "No" });
+    if (d.notes) rows.push({ label: "Notes", value: String(d.notes) });
+  }
+
   else if (serviceId === "detail") {
     const kindMap = { interior: "Interior detail only", exterior: "Exterior detail only", full: "Full detail — interior + exterior" };
     if (d.kind) rows.push({ label: "Type", value: kindMap[d.kind] || d.kind });

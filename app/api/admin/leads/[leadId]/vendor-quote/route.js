@@ -89,6 +89,14 @@ function leadServiceSummaryHtml(lead) {
       lines.push(`• <b>CORRECTION</b> — ${escapeHtml(det.stage || "—")}`);
       continue;
     }
+    if (String(sid).startsWith("pc_")) {
+      lines.push(
+        `• <b>PAINT CORRECTION</b> — ${escapeHtml(det.packageName || title)}${det.protection ? ` · ${escapeHtml(det.protection)}` : ""}${
+          det.durationDays ? ` · ${escapeHtml(`${det.durationDays}d`)}` : ""
+        }`
+      );
+      continue;
+    }
     if (sid === "detail") {
       lines.push(`• <b>DETAIL</b> — ${escapeHtml(det.kind || "—")}`);
       continue;

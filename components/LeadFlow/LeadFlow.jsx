@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { PC_EXPECT, PC_FINGERNAIL, PC_FOOTER, PC_PACKAGES, pcFmtMoney, pcPricing } from "@/app/paint-correction/pcData";
+
 import CarPanelPicker from "./CarPanelPicker";
 
 const SERVICES = [
   { id: "ppf", icon: "▤", label: "PPF", sub: "Clear, stealth, colour, carbon — choose coverage + panels" },
   { id: "wrap", icon: "▦", label: "Wrap", sub: "Full colour change or custom panels (roof, mirrors, bonnet…)" },
-  { id: "ceramic", icon: "◆", label: "Ceramic / Graphene", sub: "Protection + gloss — add wheels / glass / trim" },
-  { id: "correct", icon: "◍", label: "Paint correction", sub: "Swirls, holograms, scratches — choose stage" },
+  { id: "pc_package", icon: "◍", label: "Paint correction packages", sub: "Street Gloss to Diamond — ceramic bundled where it makes sense" },
   { id: "detail", icon: "◐", label: "Detail", sub: "Interior, exterior, or full detail" },
   { id: "tint", icon: "◧", label: "Tint", sub: "Choose windows + shade" },
   { id: "wheel", icon: "◓", label: "Wheels (Powder / Refurb)", sub: "Powder coating or refurb — colour + finish" },
@@ -16,7 +17,18 @@ const SERVICES = [
   { id: "unsure", icon: "?", label: "I'm not sure yet", sub: "We’ll help you choose the right package" }
 ];
 
-const SERVICE_ORDER = ["ppf", "wrap", "tint", "ceramic", "correct", "detail", "wheel", "kit"];
+const SERVICE_ORDER = ["ppf", "wrap", "tint", "pc_package", "detail", "wheel", "kit"];
+
+const PC_PACKAGE_TO_SERVICE = {
+  "stage-one": "pc_street_gloss",
+  bronze: "pc_bronze",
+  silver: "pc_silver",
+  gold: "pc_gold",
+  diamond: "pc_diamond"
+};
+
+const PC_SERVICE_TO_PACKAGE = Object.fromEntries(Object.entries(PC_PACKAGE_TO_SERVICE).map(([pkg, sid]) => [sid, pkg]));
+const PC_SERVICE_IDS = new Set(Object.values(PC_PACKAGE_TO_SERVICE));
 
 const LANES = [
   {
@@ -835,6 +847,144 @@ function StepCorrectionDetails({ value, onChange, onNext }) {
   );
 }
 
+function pcProtectionLabel(pkg, ceramicOn) {
+  if (ceramicOn && pkg.ceramic) return pkg.ceramic.label;
+  if (pkg.protection === "ceramic-3yr") return "3-year ceramic included";
+  if (pkg.protection === "ceramic-5yr") return "5-year ceramic included";
+  if (pkg.protection === "wax") return "Wax sealant";
+  return "No protection";
+}
+
+function normalizePcPackageDetail(pkg, current = {}) {
+  const ceramicIncluded = pkg.protection === "ceramic-3yr" || pkg.protection === "ceramic-5yr";
+  const ceramicOn = pkg.ceramic ? Boolean(current.ceramic) : ceramicIncluded;
+  const pricing = pcPricing(pkg, ceramicOn);
+  return {
+    ...current,
+    packageId: pkg.id,
+    serviceId: PC_PACKAGE_TO_SERVICE[pkg.id],
+    packageName: pkg.name,
+    packagePrice: pricing.price,
+    durationDays: pricing.durationDays,
+    ceramic: ceramicOn,
+    ceramicIncluded,
+    protection: pcProtectionLabel(pkg, ceramicOn)
+  };
+}
+
+function CompactPcExpectations({ pkg, ceramicOn }) {
+  const xp = PC_EXPECT[pkg.id];
+  if (!xp) return null;
+  let includes = [...pkg.chips];
+  if (ceramicOn && pkg.ceramic) {
+    includes = includes.filter((c) => !/wax/i.test(c));
+    includes.push(pkg.ceramic.label);
+  }
+  return (
+    <div className="lf-pc-xp" style={{ "--pc-metal": pkg.metal }}>
+      <div className="lf-pc-xp-head">
+        <div>
+          <div className="lf-pc-xp-k">EXPECTATIONS</div>
+          <div className="lf-pc-xp-title">{pkg.name}{ceramicOn ? " + CERAMIC" : ""}</div>
+        </div>
+        <div className="lf-pc-xp-score">
+          <span>REMOVES UP TO</span>
+          <b>{xp.label}</b>
+        </div>
+      </div>
+      <div className="lf-pc-meter">
+        <div className="lf-pc-meter-fill" style={{ width: `${xp.pct}%` }} />
+      </div>
+      <div className="lf-pc-xp-of">{xp.of} — final reading confirmed after inspection.</div>
+      <div className="lf-pc-xp-card">
+        <b>Sunlight test</b>
+        <span>{xp.sunlight}</span>
+      </div>
+      <div className="lf-pc-xp-card">
+        <b>Fingernail rule</b>
+        <span>{PC_FINGERNAIL}</span>
+      </div>
+      <div className="lf-pc-includes">
+        {includes.map((item) => (
+          <span key={item}>{item}</span>
+        ))}
+      </div>
+      <div className="lf-pc-xp-note">{xp.notThis}</div>
+    </div>
+  );
+}
+
+function StepPaintCorrectionPackageDetails({ value, onChange, onNext }) {
+  const v = value || {};
+  const selectedPkg = PC_PACKAGES.find((p) => p.id === v.packageId) || null;
+  const selectedDetail = selectedPkg ? normalizePcPackageDetail(selectedPkg, v) : v;
+  const ceramicOn = selectedPkg ? Boolean(selectedDetail.ceramic) : false;
+
+  const selectPackage = (pkg) => {
+    onChange?.(normalizePcPackageDetail(pkg, { notes: v.notes || "" }));
+  };
+
+  return (
+    <>
+      <div className="lf-q">
+        <div className="lf-q-eyebrow">CORRECTION + CERAMIC</div>
+        <h2 className="lf-q-title">
+          Choose the <span className="lf-acc">package.</span>
+        </h2>
+        <div className="lf-q-helper">Correction and protection are scoped together, using the new Matthews & Clark package tiers.</div>
+      </div>
+
+      <div className="lf-pc-packages">
+        {PC_PACKAGES.map((pkg) => {
+          const detail = normalizePcPackageDetail(pkg, pkg.id === selectedPkg?.id ? selectedDetail : {});
+          const on = selectedPkg?.id === pkg.id;
+          return (
+            <button
+              key={pkg.id}
+              type="button"
+              className={`lf-pc-package ${on ? "on" : ""}`}
+              style={{ "--pc-metal": pkg.metal }}
+              onClick={() => selectPackage(pkg)}
+            >
+              <span className="lf-pc-package-top">
+                <span className="lf-pc-package-name">{pkg.name}</span>
+                <span className="lf-pc-package-price">{pcFmtMoney(detail.packagePrice || pkg.price)}</span>
+              </span>
+              <span className="lf-pc-package-sub">{pkg.tagline}</span>
+              <span className="lf-pc-package-meta">{pkg.days} {pkg.days === 1 ? "day" : "days"} · {pcProtectionLabel(pkg, detail.ceramic)}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedPkg?.ceramic ? (
+        <ToggleRow
+          label="Add 18-month ceramic"
+          sub={`${selectedPkg.ceramic.label} · ${pcFmtMoney(selectedPkg.ceramic.addCollection)} upgrade`}
+          value={ceramicOn}
+          onChange={(ceramic) => onChange?.(normalizePcPackageDetail(selectedPkg, { ...selectedDetail, ceramic }))}
+        />
+      ) : null}
+
+      {selectedPkg ? <CompactPcExpectations pkg={selectedPkg} ceramicOn={ceramicOn} /> : null}
+
+      <textarea
+        className="lf-textarea"
+        placeholder="Notes (deep scratches, tree sap, respray, show-car prep…) Optional."
+        value={v.notes || ""}
+        onChange={(e) => onChange?.(selectedPkg ? normalizePcPackageDetail(selectedPkg, { ...selectedDetail, notes: e.target.value }) : { ...v, notes: e.target.value })}
+      />
+      <div className="lf-pc-footnote">{PC_FOOTER}</div>
+
+      <div className="lf-q-foot">
+        <BigButton onClick={onNext} disabled={!selectedPkg}>
+          NEXT
+        </BigButton>
+      </div>
+    </>
+  );
+}
+
 function StepDetailDetails({ value, onChange, onNext }) {
   const v = value || {};
   const kind = v.kind || "";
@@ -1031,7 +1181,7 @@ function StepTicket({ data, onShare, onRestart }) {
   const reply = pickReply(data.car);
   const services =
     data.services
-      .map((id) => SERVICES.find((s) => s.id === id)?.label)
+      .map((id) => serviceLabelForTicket(id, data.serviceDetails))
       .filter(Boolean)
       .join(" · ") || "—";
   const lane = LANES.find((l) => l.id === data.lane);
@@ -1221,6 +1371,45 @@ function fireLeadPixels({ eventId, services }) {
   }
 }
 
+function packageLabelFromDetail(detail) {
+  if (!detail || typeof detail !== "object") return "Paint correction package";
+  const pkg = PC_PACKAGES.find((p) => p.id === detail.packageId) || PC_PACKAGES.find((p) => PC_PACKAGE_TO_SERVICE[p.id] === detail.serviceId);
+  if (!pkg) return "Paint correction package";
+  return `${pkg.name}${detail.ceramic && pkg.ceramic ? " + Ceramic" : ""}`;
+}
+
+function serviceLabelForTicket(id, serviceDetails) {
+  if (id === "pc_package") return packageLabelFromDetail(serviceDetails?.pc_package);
+  if (PC_SERVICE_IDS.has(id)) {
+    const packageId = PC_SERVICE_TO_PACKAGE[id];
+    const pkg = PC_PACKAGES.find((p) => p.id === packageId);
+    return pkg ? `Paint correction - ${pkg.name}` : id;
+  }
+  return SERVICES.find((s) => s.id === id)?.label || id;
+}
+
+function normalizeLeadFormData(input) {
+  const out = {
+    ...input,
+    services: Array.isArray(input.services) ? [...input.services] : [],
+    serviceDetails: { ...(input.serviceDetails || {}) }
+  };
+
+  if (out.services.includes("pc_package")) {
+    const detail = out.serviceDetails.pc_package || {};
+    const serviceId = PC_PACKAGE_TO_SERVICE[detail.packageId];
+    out.services = out.services.map((id) => (id === "pc_package" ? serviceId : id)).filter(Boolean);
+    delete out.serviceDetails.pc_package;
+
+    if (serviceId) {
+      const pkg = PC_PACKAGES.find((p) => p.id === detail.packageId);
+      out.serviceDetails[serviceId] = pkg ? normalizePcPackageDetail(pkg, detail) : detail;
+    }
+  }
+
+  return out;
+}
+
 export default function LeadFlow() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(1);
@@ -1328,6 +1517,7 @@ export default function LeadFlow() {
 
   const doSubmit = async (timeframe) => {
     const nextData = { ...data, timeframe };
+    const submitData = normalizeLeadFormData(nextData);
     update({ timeframe });
     setDirection(1);
     setSubmitState({ status: "loading", error: null });
@@ -1340,11 +1530,11 @@ export default function LeadFlow() {
 
     // Fire immediately on submit — before the API round-trip — so attribution
     // is captured at the moment of user intent regardless of network latency.
-    fireLeadPixels({ eventId, services: nextData.services });
+    fireLeadPixels({ eventId, services: submitData.services });
 
     try {
       await submitLead({
-        ...nextData,
+        ...submitData,
         source,
         utm,
         clickIds,
@@ -1458,6 +1648,8 @@ export default function LeadFlow() {
             <StepWrapDetails {...common} />
           ) : serviceId === "tint" ? (
             <StepTintDetails {...common} />
+          ) : serviceId === "pc_package" ? (
+            <StepPaintCorrectionPackageDetails {...common} />
           ) : serviceId === "ceramic" ? (
             <StepCeramicDetails {...common} />
           ) : serviceId === "correct" ? (

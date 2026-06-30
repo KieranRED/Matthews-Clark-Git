@@ -59,6 +59,7 @@ function serviceSummary(lead, sid) {
   if (sid === "tint") return [d.windows, d.shade ? `${d.shade}%` : null].filter(Boolean).join(" · ");
   if (sid === "ceramic") return [d.package, d.wheels ? "wheels" : null, d.glass ? "glass" : null, d.trim ? "trim" : null].filter(Boolean).join(" · ");
   if (sid === "correct") return d.stage || "";
+  if (String(sid).startsWith("pc_")) return [d.packageName, d.protection, d.durationDays ? `${d.durationDays}d` : null].filter(Boolean).join(" · ");
   if (sid === "detail") return d.kind || "";
   return d.notes ? String(d.notes).slice(0, 120) : "";
 }
