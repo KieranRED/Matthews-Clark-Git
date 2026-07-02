@@ -14,6 +14,8 @@ const SERVICE_IDS = SERVICES.map((s) => s.id).filter((id) => id !== "unsure");
 const BodySchema = z
   .object({
     amountsByServiceExVat: z.record(z.string().trim().min(1), z.coerce.number().finite().min(0)).default({}),
+    allowZero: z.boolean().default(true),
+    deferred: z.boolean().default(false),
     // Optional: allow overriding VAT rate (default 0.15)
     vatRate: z.coerce.number().finite().min(0).max(1).optional()
   })
@@ -132,8 +134,13 @@ export async function POST(request, { params }) {
     const key = String(sid || "");
     if (!SERVICE_IDS.includes(key)) continue;
     const n = safeNum(val);
-    if (n == null || n <= 0) continue;
+    if (n == null || n < 0) continue;
+    if (n === 0 && !parsed.data.allowZero) continue;
     vendorQuoteByServiceExVat[key] = round2(n);
+  }
+  if (parsed.data.deferred && !Object.keys(vendorQuoteByServiceExVat).length) {
+    const services = Array.isArray(lead?.services) ? lead.services.filter((s) => SERVICE_IDS.includes(s)) : [];
+    for (const sid of services) vendorQuoteByServiceExVat[sid] = 0;
   }
   if (!Object.keys(vendorQuoteByServiceExVat).length) {
     return Response.json({ error: "Missing quote amount(s)" }, { status: 400 });
@@ -158,6 +165,7 @@ export async function POST(request, { params }) {
     vendorQuoteTotalIncVat,
     vendorVatRate: safeVatRate,
     vendorVatAmount,
+    vendorPricingDeferred: Boolean(parsed.data.deferred),
     commissionPercent,
     clientQuoteAmountExVat,
     quotedAt: now,

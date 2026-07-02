@@ -174,7 +174,7 @@ export default function JobDetailScreen({ index, params, onRefresh }) {
     return servicesForQuote
       .map((sid) => {
         const vendorEx = safeNum(vendorByService?.[sid]) ?? null;
-        if (!vendorEx) return null;
+        if (vendorEx == null) return null;
         const vendorInc = round2(vendorEx * (1 + vendorVatRate));
         const mode = String(commissionModeByService?.[sid] || "percent");
         if (mode === "total") {

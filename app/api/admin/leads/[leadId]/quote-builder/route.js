@@ -73,13 +73,13 @@ export async function POST(request, { params }) {
 
   for (const [sid, exVat] of Object.entries(vendorByService)) {
     const vendorEx = safeNum(exVat) ?? 0;
-    if (!(vendorEx > 0)) continue;
+    if (vendorEx < 0) continue;
     const vendorInc = round2(vendorEx * (1 + vatRate));
     const mode = String(commissionByServiceMode[sid] || "percent");
     let clientEx = vendorInc;
     if (mode === "total") {
       const total = safeNum(commissionByServiceTotalExVat[sid]);
-      if (total != null && total > 0) {
+      if (total != null && total >= 0) {
         if (total < vendorInc) {
           return Response.json({ error: `Total for ${sid.toUpperCase()} must be >= base (R ${vendorInc.toFixed(2)}).` }, { status: 400 });
         }
