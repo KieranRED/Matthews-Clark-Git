@@ -451,7 +451,7 @@ export function registerTools(server) {
       const key = String(sid || "");
       if (!SERVICE_IDS.includes(key) || key === "unsure") continue;
       const n = Number(val);
-      if (!Number.isFinite(n) || n <= 0) continue;
+      if (!Number.isFinite(n) || n < 0) continue;
       out[key] = round2(inputIncludesVat ? n / (1 + vatRate) : n);
     }
     return out;
@@ -459,7 +459,7 @@ export function registerTools(server) {
 
   function addSingleVendorTotal({ lead, vendorQuoteByServiceExVat, serviceId, totalExVat, totalIncVat, vatRate }) {
     const totalEx = totalExVat != null ? Number(totalExVat) : totalIncVat != null ? Number(totalIncVat) / (1 + vatRate) : null;
-    if (!Number.isFinite(totalEx) || totalEx <= 0) return { ok: true };
+    if (!Number.isFinite(totalEx) || totalEx < 0) return { ok: true };
 
     const servicesForLead = serviceIdsForLead(lead);
     const targetService = serviceId || (servicesForLead.length === 1 ? servicesForLead[0] : null);
@@ -505,7 +505,7 @@ export function registerTools(server) {
 
     for (const [sid, val] of Object.entries(vendorQuoteByServiceExVat)) {
       const n = Number(val);
-      if (!Number.isFinite(n) || n <= 0 || sid === "unsure" || !SERVICE_IDS.includes(sid)) {
+      if (!Number.isFinite(n) || n < 0 || sid === "unsure" || !SERVICE_IDS.includes(sid)) {
         delete vendorQuoteByServiceExVat[sid];
       } else {
         vendorQuoteByServiceExVat[sid] = round2(n);
@@ -513,7 +513,7 @@ export function registerTools(server) {
     }
 
     if (!Object.keys(vendorQuoteByServiceExVat).length) {
-      return jsonResult({ error: "Missing vendor pricing. Provide at least one positive ex VAT or inc VAT amount.", leadId });
+      return jsonResult({ error: "Missing vendor pricing. Provide at least one ex VAT or inc VAT amount (0 or greater).", leadId });
     }
 
     const vendorQuoteTotalExVat = round2(Object.values(vendorQuoteByServiceExVat).reduce((sum, val) => sum + Number(val || 0), 0));
