@@ -8,6 +8,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { track, firePageView, getSessionContext } from "@/lib/pcTrackClient";
+
 import {
   PC_PACKAGES,
   PC_BINS,
@@ -213,7 +215,7 @@ function PCHero({ onNext, utmContent }) {
         </div>
       </div>
       <div className="pc-hero-cta">
-        <PCButton onClick={onNext}>GET MY QUOTE</PCButton>
+        <PCButton onClick={() => { track("hero_cta_click"); onNext(); }}>GET MY QUOTE</PCButton>
         <div className="pc-hero-meta">
           <span>~60 SEC TO A QUOTE</span><span>·</span><span>BY APPOINTMENT</span><span>·</span><span>R1 000 HOLDS YOUR SLOT</span>
         </div>
@@ -223,6 +225,7 @@ function PCHero({ onNext, utmContent }) {
           rel="noopener noreferrer"
           className="pc-cost-sub"
           style={{ display: "block", textAlign: "center", marginTop: 12, textDecoration: "underline" }}
+          onClick={() => track("hero_whatsapp_click")}
         >
           Got a question first? WhatsApp {PC_CONTACT_NAME} →
         </a>
@@ -390,9 +393,12 @@ function PCResult({ rec, selectedId, ceramic, onSelect, onToggleCeramic, onNext,
   };
   const handleSelect = (id) => {
     const changed = id !== sel.id;
+    if (changed) track("tier_switched", { from: sel.id, to: id });
     onSelect(id);
     if (changed) scrollToTop();
   };
+
+  useEffect(() => { track("reveal_viewed", { recommendedTier: rec.recId }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <PCFrame n={n} total={total} onBack={onBack}>
@@ -514,6 +520,7 @@ function PCResult({ rec, selectedId, ceramic, onSelect, onToggleCeramic, onNext,
 // ═══════════════════════════════════════════════════════════════════════════
 function PCCarStep({ data, onChange, onNext, onBack, n, total }) {
   const valid = data.make.trim() && data.model.trim() && /^\d{4}$/.test((data.year || "").trim());
+  useEffect(() => { track("car_viewed"); }, []);
   return (
     <PCFrame n={n} total={total} onBack={onBack}>
       <div className="lf-q">
@@ -572,6 +579,8 @@ function PCCalendar({ durationDays, metal, booked, value, onChange, onNext, n, t
   }).length;
   const monthFull = !loading && availCount < 3;
 
+  useEffect(() => { track("calendar_viewed"); }, []);
+
   const cellClass = (d) => {
     if (!d) return "empty";
     const di = pcIsoDate(d);
@@ -599,10 +608,10 @@ function PCCalendar({ durationDays, metal, booked, value, onChange, onNext, n, t
         <div className="pc-cal-head">
           <div className="pc-cal-month">{view.toLocaleDateString("en-ZA", { month: "long", year: "numeric" })}</div>
           <div className="pc-cal-nav">
-            <button className="pc-cal-navbtn" disabled={!canPrev} onClick={() => setView(new Date(y, m - 1, 1))}>
+            <button className="pc-cal-navbtn" disabled={!canPrev} onClick={() => { track("month_nav", { direction: "prev" }); setView(new Date(y, m - 1, 1)); }}>
               <svg width="12" height="12" viewBox="0 0 14 14"><path d="M9 2L4 7l5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
             </button>
-            <button className="pc-cal-navbtn" onClick={() => setView(new Date(y, m + 1, 1))}>
+            <button className="pc-cal-navbtn" onClick={() => { track("month_nav", { direction: "next" }); setView(new Date(y, m + 1, 1)); }}>
               <svg width="12" height="12" viewBox="0 0 14 14"><path d="M5 2l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.6" /></svg>
             </button>
           </div>
@@ -614,7 +623,7 @@ function PCCalendar({ durationDays, metal, booked, value, onChange, onNext, n, t
             const clickable = cls === "avail";
             return (
               <button key={i} className={`pc-cal-cell ${cls}`} disabled={!clickable && !cls.includes("range")}
-                onClick={() => clickable && onChange(pcIsoDate(d))}>
+                onClick={() => { if (!clickable) return; track("date_selected", { date: pcIsoDate(d), daysOut: Math.round((d - today) / 86400000) }); onChange(pcIsoDate(d)); }}>
                 {d ? d.getDate() : ""}
               </button>
             );
@@ -690,6 +699,7 @@ function PCContact({ data, onChange, onNext, n, total, onBack, busy }) {
   const isDefaultDial = (data.dial || "+27") === "+27";
   const phoneValid = isDefaultDial ? pcIsValidSaMobile(data.phone) : data.phone.replace(/\D/g, "").length >= 7;
   const valid = data.name.trim() && phoneValid;
+  useEffect(() => { track("contact_viewed"); }, []);
   return (
     <PCFrame n={n} total={total} onBack={onBack}>
       <div className="lf-q">
@@ -707,7 +717,7 @@ function PCContact({ data, onChange, onNext, n, total, onBack, busy }) {
           <select className="pc-dial" value={data.dial || "+27"} onChange={(e) => onChange({ dial: e.target.value })} aria-label="Country code">
             {["+27", "+44", "+1", "+61", "+971", "+264", "+267"].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <input className="pc-text-input" type="tel" value={data.phone} onChange={(e) => onChange({ phone: pcFmtPhone(e.target.value) })} placeholder="82 123 4567" autoComplete="tel" />
+          <input className="pc-text-input" type="tel" value={data.phone} onChange={(e) => onChange({ phone: pcFmtPhone(e.target.value) })} onBlur={() => { if (data.phone && !phoneValid) track("phone_invalid"); }} placeholder="82 123 4567" autoComplete="tel" />
         </div>
         {isDefaultDial && phoneValid && (
           <div className="pc-cost-sub" style={{ marginTop: 6 }}>We’ll WhatsApp <b style={{ color: "#fff" }}>{pcFmtPhoneLocal(data.phone)}</b> — right?</div>
@@ -735,6 +745,9 @@ function PCCheckout({ data, onChange, onNext, pkg, ceramicOn, dropoff, pickup, n
   const { price, durationDays } = pcPricing(pkg, ceramicOn);
   const { hold: deposit, dueAtDropoff, dueAtPickup } = pcPaymentSchedule(price, durationDays);
 
+  useEffect(() => { track("confirm_viewed"); }, []);
+  const emailEnteredRef = useRef(false);
+
   return (
     <PCFrame n={n} total={total} onBack={onBack}>
       <div className="pc-result-wrap" style={{ margin: "-24px -24px -32px", padding: "4px 20px 28px", gap: 18 }}>
@@ -745,7 +758,7 @@ function PCCheckout({ data, onChange, onNext, pkg, ceramicOn, dropoff, pickup, n
 
         <div className="pc-field">
           <label className="pc-field-label">EMAIL — FOR YOUR INVOICE + BOOKING CONFIRMATION</label>
-          <input className="pc-text-input" type="email" value={data.email} onChange={(e) => onChange({ email: e.target.value })} placeholder="you@email.com (optional)" autoComplete="email" />
+          <input className="pc-text-input" type="email" value={data.email} onChange={(e) => onChange({ email: e.target.value })} onBlur={() => { if (data.email.trim() && !emailEnteredRef.current) { emailEnteredRef.current = true; track("email_entered", { entered: true }); } }} placeholder="you@email.com (optional)" autoComplete="email" />
           <div className="pc-cost-sub" style={{ marginTop: 6 }}>Optional — we can send both on WhatsApp instead.</div>
         </div>
 
@@ -775,10 +788,10 @@ function PCCheckout({ data, onChange, onNext, pkg, ceramicOn, dropoff, pickup, n
 // ═══════════════════════════════════════════════════════════════════════════
 // Deposit (EFT + POP upload → real CRM)
 // ═══════════════════════════════════════════════════════════════════════════
-function PCCopyBtn({ text }) {
+function PCCopyBtn({ text, field }) {
   const [done, setDone] = useState(false);
   return (
-    <button className="pc-copy" onClick={() => { try { navigator.clipboard.writeText(text); } catch (e) {} setDone(true); setTimeout(() => setDone(false), 1200); }} aria-label="Copy">
+    <button className="pc-copy" onClick={() => { track("eft_copy", { field }); try { navigator.clipboard.writeText(text); } catch (e) {} setDone(true); setTimeout(() => setDone(false), 1200); }} aria-label="Copy">
       {done
         ? <svg width="14" height="14" viewBox="0 0 14 14"><path d="M2 7l3.5 3.5L12 4" fill="none" stroke="#3FBE78" strokeWidth="1.8" /></svg>
         : <svg width="13" height="13" viewBox="0 0 14 14"><rect x="3" y="3" width="8" height="9" rx="1.3" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M3 3V1.8A.8.8 0 013.8 1H10" fill="none" stroke="currentColor" strokeWidth="1.3" /></svg>}
@@ -802,6 +815,7 @@ function PCDeposit({ pkg, ceramicOn, reference, dropoff, pickup, onUpload, onScr
 
   const handleWhatsapp = async () => {
     if (waBusy) return;
+    track("whatsapp_clicked");
     setWaBusy(true);
     try { await onWhatsappFirst(); } catch (e) { /* best-effort */ }
     setWaBusy(false);
@@ -812,6 +826,7 @@ function PCDeposit({ pkg, ceramicOn, reference, dropoff, pickup, onUpload, onScr
     const f = e.target.files[0];
     e.target.value = "";
     if (!f) return;
+    track("pop_upload_started");
     setPop({ name: f.name });
     setPhase("uploading");
     setChecks([]);
@@ -825,6 +840,7 @@ function PCDeposit({ pkg, ceramicOn, reference, dropoff, pickup, onUpload, onScr
       setVerdict((v && v.verdict) || "review");
       setPhase("revealing");
       setCheckN(0);
+      track("pop_uploaded");
       pcPixel.purchase({ pkgName: pkg.name, deposit, reference });
     } catch (err) {
       setError(err?.message || "Upload failed — please try again.");
@@ -890,7 +906,7 @@ function PCDeposit({ pkg, ceramicOn, reference, dropoff, pickup, onUpload, onScr
           </div>
 
           <div className="lf-q-foot" style={{ padding: "0 20px 24px" }}>
-            <button className="lf-bigbtn lf-bigbtn--primary pc-cta" onClick={() => setPath("hold")}>
+            <button className="lf-bigbtn lf-bigbtn--primary pc-cta" onClick={() => { track("hold_clicked"); setPath("hold"); }}>
               <span className="pc-cta-l"><span className="pc-cta-label">Hold my slot</span></span>
               <span className="pc-cta-r">
                 <span className="pc-cta-price">{money(deposit)}</span>
@@ -953,9 +969,9 @@ function PCDeposit({ pkg, ceramicOn, reference, dropoff, pickup, onUpload, onScr
           <div className="pc-eft-row"><span className="pc-eft-k">Bank</span><span className="pc-eft-v">{PC_BANK.bank}</span></div>
           <div className="pc-eft-row"><span className="pc-eft-k">Account holder</span><span className="pc-eft-v">{PC_BANK.holder}</span></div>
           <div className="pc-eft-row"><span className="pc-eft-k">Account type</span><span className="pc-eft-v">{PC_BANK.type}</span></div>
-          <div className="pc-eft-row"><span className="pc-eft-k">Account no.</span><span className="pc-eft-v">{PC_BANK.account}</span><PCCopyBtn text={PC_BANK.account} /></div>
-          <div className="pc-eft-row"><span className="pc-eft-k">Branch code</span><span className="pc-eft-v">{PC_BANK.branch}</span><PCCopyBtn text={PC_BANK.branch} /></div>
-          <div className="pc-eft-row ref"><span className="pc-eft-k">Reference</span><span className="pc-eft-v">{reference}</span><PCCopyBtn text={reference} /></div>
+          <div className="pc-eft-row"><span className="pc-eft-k">Account no.</span><span className="pc-eft-v">{PC_BANK.account}</span><PCCopyBtn text={PC_BANK.account} field="account" /></div>
+          <div className="pc-eft-row"><span className="pc-eft-k">Branch code</span><span className="pc-eft-v">{PC_BANK.branch}</span><PCCopyBtn text={PC_BANK.branch} field="branch" /></div>
+          <div className="pc-eft-row ref"><span className="pc-eft-k">Reference</span><span className="pc-eft-v">{reference}</span><PCCopyBtn text={reference} field="reference" /></div>
         </div>
 
         <div className="pc-cost-sub">Send the proof here or on WhatsApp — either works.</div>
@@ -1263,6 +1279,10 @@ export default function PaintCorrectionFlow({ utmContent }) {
   useEffect(() => { if (!toastMsg) return; const t = setTimeout(() => setToastMsg(null), 2600); return () => clearTimeout(t); }, [toastMsg]);
   const toast = (m) => setToastMsg(m);
 
+  // anonymous pre-contact funnel tracking (own KV, never Meta) — fires once
+  // per page load; see lib/pcTrackClient.js / lib/pcTracking.js.
+  useEffect(() => { firePageView(); }, []);
+
   // capture tracking + live availability on mount
   useEffect(() => {
     trackingRef.current = readTracking();
@@ -1351,6 +1371,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
       patchProgress("package_selected", { packageId: p.id, packageName: p.name, price: p.price });
     }
     if (step === "deposit") {
+      track("payment_viewed");
       pcPixel.stepEvent("payment_viewed", { content_name: selPkg.name, content_category: "Paint Correction", value: price });
       pcPixel.stepEvent("DepositPending", { content_name: selPkg.name, content_category: "Paint Correction", value: deposit });
       patchProgress("payment_viewed", {});
@@ -1370,6 +1391,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
   // instead of a ghost. ──
   async function createQuizLead() {
     const t = trackingRef.current || {};
+    const { sessionId, device, isWebview } = getSessionContext();
     const payload = {
       name: details.name.trim(),
       dial: details.dial || "+27",
@@ -1379,7 +1401,10 @@ export default function PaintCorrectionFlow({ utmContent }) {
       utm: t.utm || null,
       clickIds: t.clickIds || null,
       pageUrl: t.pageUrl || null,
-      referrer: t.referrer || null
+      referrer: t.referrer || null,
+      sessionId: sessionId || null,
+      device: device || null,
+      isWebview: !!isWebview
     };
     const res = await fetch("/api/lead/paint-correction/quiz-lead", {
       method: "POST",
@@ -1515,6 +1540,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
   // 0:00 nothing is lost — it softens into the same 24h pencil (E1+E2).
   const remain = heldUntil ? Math.max(0, heldUntil - now) : 0;
   const expired = !!heldUntil && remain <= 0;
+  useEffect(() => { if (expired) track("timer_expired"); }, [expired]);
   const mm = Math.floor(remain / 60000), ss = Math.floor((remain % 60000) / 1000);
   const low = remain > 0 && remain <= 5 * 60000;
   const dateLabel = dropoff ? pcFmtDate(new Date(dropoff + "T00:00:00")) : "your date";
@@ -1535,7 +1561,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
 
   let content;
   if (step === "hero") {
-    content = <PCHero utmContent={utmContent} onNext={() => { pcPixel.stepEvent("quiz_start", { content_category: "Paint Correction" }); go("q0"); }} />;
+    content = <PCHero utmContent={utmContent} onNext={() => { track("quiz_start"); pcPixel.stepEvent("quiz_start", { content_category: "Paint Correction" }); go("q0"); }} />;
   } else if (QSTEPS.includes(step)) {
     const qi = QSTEPS.indexOf(step);
     const q = PC_QUESTIONS[qi];
@@ -1543,8 +1569,8 @@ export default function PaintCorrectionFlow({ utmContent }) {
     content = (
       <PCQuestion
         q={q} n={qi} total={TOTAL} value={answers[key]}
-        onBack={() => (qi === 0 ? go("hero", -1) : go(QSTEPS[qi - 1], -1))}
-        onChange={(v) => setAnswers((a) => ({ ...a, [key]: v }))}
+        onBack={() => { track("quiz_back", { fromStep: `q${qi + 1}` }); (qi === 0 ? go("hero", -1) : go(QSTEPS[qi - 1], -1)); }}
+        onChange={(v) => { track(`q${qi + 1}_answered`, { answer: v }); setAnswers((a) => ({ ...a, [key]: v })); }}
         onNext={() => {
           if (qi < 3) go(QSTEPS[qi + 1]);
           else { pcPixel.stepEvent("quiz_complete", { content_category: "Paint Correction" }); go("contact"); }
@@ -1567,6 +1593,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
             // non-fatal — we retry when enriching the lead at checkout / POP upload
           }
           setBusy(false);
+          track("contact_submitted", { leadId: lead.current.id || null });
           const p = PC_PACKAGES.find((x) => x.id === (r && r.recId)) || PC_PACKAGES[1];
           pcPixel.lead({ pkgName: p.name, value: p.price, eventId: eventIdRef.current });
           go("reading");
@@ -1581,8 +1608,9 @@ export default function PaintCorrectionFlow({ utmContent }) {
         rec={rec} selectedId={selectedId} ceramic={ceramic} n={5} total={TOTAL}
         onBack={() => go("contact", -1)}
         onSelect={onSelect}
-        onToggleCeramic={() => setCeramic((c) => !c)}
+        onToggleCeramic={() => { track("ceramic_toggled"); setCeramic((c) => !c); }}
         onNext={() => {
+          track("reveal_continue");
           // Secondary/deep event — kept for reporting once the ad set is
           // optimizing off the shallower Lead event fired at contact-capture.
           pcPixel.initiateCheckout({ pkgName: selPkg.name, value: price, deposit });
@@ -1597,6 +1625,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
         onBack={() => go("result", -1)}
         onChange={(patch) => setDetails((d) => ({ ...d, ...patch }))}
         onNext={() => {
+          track("car_submitted");
           const car = [details.make, details.model, details.year].filter(Boolean).join(" ").trim();
           patchProgress("car_details", { make: details.make, model: details.model, year: details.year, car });
           go("calendar");
@@ -1612,6 +1641,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
         onBack={() => go("car", -1)}
         onChange={setDropoff}
         onNext={() => {
+          track("dates_confirmed");
           pcPixel.stepEvent("date_selected", { content_category: "Paint Correction", date: dropoff });
           patchProgress("date_selected", { dropoff, pickup: pickup ? pcIsoDate(pickup) : undefined, durationDays });
           go("checkout");
@@ -1627,6 +1657,7 @@ export default function PaintCorrectionFlow({ utmContent }) {
         onChange={(patch) => setDetails((d) => ({ ...d, ...patch }))}
         onNext={async () => {
           if (busy) return;
+          track("to_payment");
           setBusy(true);
           try {
             await createLead();

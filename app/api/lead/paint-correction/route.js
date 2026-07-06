@@ -158,6 +158,12 @@ export async function POST(request) {
     clickIds: d.clickIds || null,
     pageUrl: d.pageUrl || null,
     referrer: d.referrer || null,
+    // Carried forward from the quiz-lead record — this enrichment call
+    // doesn't re-send them, but they must survive since this rebuilds the
+    // whole lead object (see lib/pcTracking.js for what they join to).
+    sessionId: existing?.sessionId || null,
+    device: existing?.device || null,
+    isWebview: !!existing?.isWebview,
     // Izimoto's fixed 10% cut — set automatically, PC-only (see pcVendorQuote
     // doc comment). Doesn't touch the manual vendor-pricing flow other
     // services use (set_vendor_pricing MCP tool), and can still be overridden

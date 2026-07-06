@@ -40,7 +40,14 @@ const Schema = z.object({
     .nullable()
     .optional(),
   pageUrl: z.string().url().nullable().optional(),
-  referrer: z.string().max(1024).nullable().optional()
+  referrer: z.string().max(1024).nullable().optional(),
+  // Joins this lead to its anonymous pre-contact trail (lib/pcTracking.js) —
+  // the sessionId minted client-side on first page-load, and a snapshot of
+  // the device/webview dims so pc_dropoff_funnel can group the full funnel
+  // (pre- and post-contact) by the same dimensions.
+  sessionId: z.string().trim().max(100).nullable().optional(),
+  device: z.enum(["mobile", "tablet", "desktop"]).nullable().optional(),
+  isWebview: z.boolean().optional()
 });
 
 export async function POST(request) {
@@ -90,6 +97,9 @@ export async function POST(request) {
     clickIds: d.clickIds || null,
     pageUrl: d.pageUrl || null,
     referrer: d.referrer || null,
+    sessionId: d.sessionId || null,
+    device: d.device || null,
+    isWebview: !!d.isWebview,
     paintCorrection: {
       stage: "quiz_complete",
       packageId: null,

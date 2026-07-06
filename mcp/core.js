@@ -27,6 +27,7 @@ import { listPosts, getPost } from "@/lib/contentStore";
 import { SERVICES, STAGES, SOURCES } from "@/lib/crmKitAdapter";
 import { allocateInvoiceDigits } from "@/lib/invoiceSeq";
 import { pcFunnelSummary, pcLeadsDetail, pcCorrelations } from "@/lib/pcAnalytics";
+import { pcDropoffFunnel, pcSessionsRecent, getSessionTrail } from "@/lib/pcTracking";
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -373,7 +374,7 @@ export function registerTools(server) {
 
   server.tool(
     "pc_funnel_summary",
-    "Paint-correction funnel drop-off: how many leads reached each step (quiz complete, package viewed, car details, date picked, payment screen), plus booked / WhatsApp-handoff / still-bailed counts. Optionally grouped by a UTM dimension to compare against ad set / ad performance.",
+    "Paint-correction funnel drop-off: how many leads reached each step (quiz complete, package viewed, car details, date picked, payment screen), plus booked / WhatsApp-handoff / still-bailed counts. Optionally grouped by a UTM dimension to compare against ad set / ad performance. Only sees leads, i.e. visitors who already submitted contact details — for everyone who dropped before that, use pc_dropoff_funnel.",
     {
       groupBy: z.enum(["source", "medium", "campaign", "content", "term"]).optional().describe("Group by this UTM dimension, e.g. 'content' to compare per-ad drop-off. Omit for a single overall summary.")
     },
@@ -384,12 +385,49 @@ export function registerTools(server) {
   );
 
   server.tool(
+    "pc_dropoff_funnel",
+    "The FULL paint-correction funnel, including everyone pc_funnel_summary can't see: anonymous sessions from page_view through contact_submitted (tracked in our own KV, never Meta — see app/api/pc/track), stitched to the existing post-contact lead stages (package_selected -> payment_viewed -> booked) into one continuous waterfall. Each step reports reached count, % of page_views, and drop-off % from the previous step.",
+    {
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("Start date (YYYY-MM-DD), inclusive"),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe("End date (YYYY-MM-DD), inclusive"),
+      groupBy: z.enum(["content", "device", "webview", "day"]).optional().describe("content = utm_content (per-ad), device = mobile/tablet/desktop, webview = Instagram/Facebook in-app browser vs regular browser, day = one row per calendar day. Omit for a single overall waterfall.")
+    },
+    async ({ from, to, groupBy }) => {
+      const result = await pcDropoffFunnel({ from, to, groupBy: groupBy || null });
+      return jsonResult(result);
+    }
+  );
+
+  server.tool(
+    "pc_sessions_recent",
+    "Last N anonymous paint-correction funnel sessions (pre-contact tracking) with their full event trail — utm/device/webview and every event fired, in order. Use to debug a specific leak, e.g. droppedAt: 'contact_viewed' shows only sessions whose last event before disappearing was reaching the contact form.",
+    {
+      limit: z.number().int().min(1).max(200).optional().describe("Max sessions to return (default 20)"),
+      droppedAt: z.string().optional().describe("Only return sessions whose last recorded event matches this exactly, e.g. 'q2_answered'")
+    },
+    async ({ limit, droppedAt }) => {
+      const sessions = await pcSessionsRecent({ limit: limit || 20, droppedAt: droppedAt || null });
+      return jsonResult({ count: sessions.length, sessions });
+    }
+  );
+
+  server.tool(
     "pc_leads_detail",
-    "One row per paint-correction funnel lead: UTM/click-id attribution, all 4 quiz answers, package chosen, furthest funnel step reached, outcome (booked / whatsapp_handoff / in_progress), and payment timestamps. Use for exporting or ad-hoc pivoting beyond what pc_correlations pre-computes.",
+    "One row per paint-correction funnel lead: UTM/click-id attribution, all 4 quiz answers, package chosen, furthest funnel step reached, outcome (booked / whatsapp_handoff / in_progress), payment timestamps, the anonymous sessionId this lead joins to, device/webview, and preContactSeconds (time from first page_view to submitting contact details, when the session trail has both). Use for exporting or ad-hoc pivoting beyond what pc_correlations pre-computes.",
     {},
     async () => {
       const rows = await pcLeadsDetail();
-      return jsonResult({ count: rows.length, leads: rows });
+      const withTiming = await Promise.all(
+        rows.map(async (row) => {
+          if (!row.sessionId) return { ...row, preContactSeconds: null };
+          const trail = await getSessionTrail(row.sessionId);
+          const pageView = trail.find((e) => e.event === "page_view");
+          const submitted = trail.find((e) => e.event === "contact_submitted");
+          const preContactSeconds = pageView && submitted ? Math.round((submitted.ts - pageView.ts) / 1000) : null;
+          return { ...row, preContactSeconds };
+        })
+      );
+      return jsonResult({ count: withTiming.length, leads: withTiming });
     }
   );
 
