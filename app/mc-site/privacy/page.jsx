@@ -124,7 +124,7 @@ export default function PrivacyPage() {
             <h2>Who we are</h2>
             <p>
               This website is operated by <strong>Matthews / Clark</strong> (&ldquo;M/C&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;),
-              a Cape Town-based automotive protection and customisation business founded by Keanan Matthews and Sam Clark.
+              a Cape Town-based automotive protection and customisation business founded by Kieran Redpath, Sam Clark and Keanan Matthews.
               Physical work is carried out by our workshop partner, <strong>Izimoto</strong>, at 3 Muir Street, Woodstock, Cape Town.
             </p>
             <p>

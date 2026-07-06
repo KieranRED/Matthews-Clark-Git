@@ -1,15 +1,15 @@
 export const metadata = {
   title: 'About',
-  description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+  description: 'Kieran Redpath, Sam Clark and Keanan Matthews. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
   alternates: { canonical: 'https://www.matthewsandclark.co.za/mc-site/about' },
   openGraph: {
     title: 'About — Matthews / Clark Cape Town',
-    description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+    description: 'Kieran Redpath, Sam Clark and Keanan Matthews. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
     url: 'https://www.matthewsandclark.co.za/mc-site/about',
   },
   twitter: {
     title: 'About — Matthews / Clark Cape Town',
-    description: 'Keanan Matthews and Sam Clark. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
+    description: 'Kieran Redpath, Sam Clark and Keanan Matthews. Cape Town automotive protection and customisation, in partnership with Izimoto. By appointment only.',
   },
 };
 
@@ -41,7 +41,8 @@ const pageCSS = `
   .about-body .photo .quote .blue{color:var(--accent)}
   .founders{padding:32px 0 120px;background:var(--black);border-top:1px solid rgba(255,255,255,.06);}
   .founders .container{padding-top:96px}
-  .founder-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:48px}
+  .founder-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;margin-top:48px}
+  @media (max-width: 1000px){.founder-grid{grid-template-columns:1fr 1fr}}
   @media (max-width: 760px){.founder-grid{grid-template-columns:1fr;gap:24px}}
   .founder-card{display:flex;flex-direction:column;gap:24px;padding:32px;background:var(--grey-dark);border:1px solid var(--border);border-radius:12px;}
   .founder-card .photo{aspect-ratio:4/5;background:#111;overflow:hidden;position:relative;border-radius:8px;}
@@ -113,7 +114,7 @@ export default function AboutPage() {
             <span className="label">
               <span className="num">03</span><span>The team</span>
               <span className="div"></span>
-              <span className="sub">Two faces. One brand.</span>
+              <span className="sub">Three founders. Two of them on every job.</span>
             </span>
           </div>
           <div className="founder-grid">
@@ -138,6 +139,18 @@ export default function AboutPage() {
                 <div className="meta">
                   <div><div>On every</div><div className="v">Correction · Wrap</div></div>
                   <div><div>Studio years</div><div className="v">07</div></div>
+                </div>
+              </div>
+            </div>
+            <div className="founder-card">
+              <div className="photo"><span className="stamp">PHOTO  /  KIERAN</span></div>
+              <div className="body">
+                <div className="role">Co-founder · Product &amp; systems</div>
+                <h3>Kieran Redpath</h3>
+                <p>Builds the booking, the quotes, the whole way this runs online. If you dealt with M&amp;C before you met Sam or Keanan in person, this is why.</p>
+                <div className="meta">
+                  <div><div>On every</div><div className="v">Booking · Site</div></div>
+                  <div><div>Founded</div><div className="v">2019</div></div>
                 </div>
               </div>
             </div>
