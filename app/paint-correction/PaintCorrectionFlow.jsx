@@ -7,7 +7,6 @@
 // upload + Telegram approval, confirmation email. Design kept faithful.
 
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 
 import {
   PC_PACKAGES,
@@ -1213,12 +1212,11 @@ function clearPcSession() {
   try { window.sessionStorage.removeItem(PC_SESSION_KEY); } catch {}
 }
 
-export default function PaintCorrectionFlow() {
-  // G1: which ad the visitor clicked through from — read via useSearchParams
-  // (not window.location) so the server render and client hydration agree,
-  // same reasoning as the B2 sessionStorage note below.
-  const searchParams = useSearchParams();
-  const utmContent = searchParams.get("utm_content");
+export default function PaintCorrectionFlow({ utmContent }) {
+  // G1: which ad the visitor clicked through from — passed down from the
+  // server component (page.jsx), which reads it from the actual request.
+  // That's what lets the correct headline render server-side, at first
+  // paint, instead of only appearing after client JS hydrates.
 
   // B2 state restoration deliberately does NOT read sessionStorage into the
   // initial useState value — this is a client component, but Next.js still
