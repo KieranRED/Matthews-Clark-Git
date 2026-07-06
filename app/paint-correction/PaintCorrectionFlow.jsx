@@ -170,10 +170,13 @@ function PCButton({ children, onClick, disabled, variant = "primary" }) {
 // G1 — the ad names the itch, the landing H1 answers the desire underneath
 // it (not an echo of the ad). Only the headline changes per utm_content;
 // subhead, star bullet, CTA and everything below are one template, untouched.
+// Keys must match the live ad URLs' utm_content exactly (pc_conversion_phase1
+// campaign) — these are NOT the "pc-*" slugs used during planning, which
+// never matched any real ad and silently fell through to the default below.
 const PC_HERO_HEADLINES = {
-  "pc-tof-kak": <>YOUR EFFORT WAS NEVER THE PROBLEM. NOW IT <span className="acc">PAYS OFF</span>.</>,
-  "pc-mof-damaged": <>WAX HIDES. CORRECTION <span className="acc">REMOVES</span>.</>,
-  "pc-bof-gloss": <>IT’S NOT WHAT YOU DRIVE. IT’S HOW YOU <span className="acc">KEEP</span> IT.</>
+  "tof_kak": <>YOUR EFFORT WAS NEVER THE PROBLEM. NOW IT <span className="acc">PAYS OFF</span>.</>,
+  "mof_dirty_damaged": <>WAX HIDES. CORRECTION <span className="acc">REMOVES</span>.</>,
+  "bof_gloss_filter": <>IT’S NOT WHAT YOU DRIVE. IT’S HOW YOU <span className="acc">KEEP</span> IT.</>
 };
 const PC_HERO_HEADLINE_DEFAULT = <>THE SWIRLS<br />GO. THE<br /><span className="acc">GLOSS</span> STAYS.</>;
 
