@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { adminCookieName, verifyAdminSession } from "@/lib/adminAuth";
-import { deleteLead, getLead, updateLead } from "@/lib/leadStore";
+import { deleteLead, getLead, updateLead, PcTransitionError } from "@/lib/leadStore";
 import { kvZRevRange } from "@/lib/kv";
 import { deleteJob, listJobs } from "@/lib/jobStore";
 import { saveTask } from "@/lib/taskStore";
@@ -92,7 +92,13 @@ export async function PATCH(request, { params }) {
     delete patch.note;
   }
 
-  const next = await updateLead(params.leadId, patch);
+  let next;
+  try {
+    next = await updateLead(params.leadId, patch);
+  } catch (err) {
+    if (err instanceof PcTransitionError) return Response.json({ error: err.message }, { status: 409 });
+    throw err;
+  }
   if (!next) return Response.json({ error: "Failed to update lead" }, { status: 500 });
 
   // Auto-create a follow-up task when followUpAt is set.

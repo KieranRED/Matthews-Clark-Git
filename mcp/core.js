@@ -12,6 +12,7 @@ import {
   getLead,
   saveLead,
   updateLead,
+  PcTransitionError,
   upsertClientForLead,
   listClients,
   getClient,
@@ -25,6 +26,7 @@ import { listTeamMembers } from "@/lib/teamStore";
 import { listPosts, getPost } from "@/lib/contentStore";
 import { SERVICES, STAGES, SOURCES } from "@/lib/crmKitAdapter";
 import { allocateInvoiceDigits } from "@/lib/invoiceSeq";
+import { pcFunnelSummary, pcLeadsDetail, pcCorrelations } from "@/lib/pcAnalytics";
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -363,6 +365,44 @@ export function registerTools(server) {
       });
     }
   );
+  // -- read: paint-correction funnel analytics -------------------------------
+  // Every real step the PC ad funnel writes (see app/api/lead/[leadId]/
+  // pc-progress) turned into queryable views, so ad performance (Meta/TikTok
+  // Events Manager) can be checked against what actually happens once
+  // someone lands, without needing direct KV access.
+
+  server.tool(
+    "pc_funnel_summary",
+    "Paint-correction funnel drop-off: how many leads reached each step (quiz complete, package viewed, car details, date picked, payment screen), plus booked / WhatsApp-handoff / still-bailed counts. Optionally grouped by a UTM dimension to compare against ad set / ad performance.",
+    {
+      groupBy: z.enum(["source", "medium", "campaign", "content", "term"]).optional().describe("Group by this UTM dimension, e.g. 'content' to compare per-ad drop-off. Omit for a single overall summary.")
+    },
+    async ({ groupBy }) => {
+      const summary = await pcFunnelSummary({ groupBy: groupBy || null });
+      return jsonResult({ groupedBy: groupBy || null, groups: summary });
+    }
+  );
+
+  server.tool(
+    "pc_leads_detail",
+    "One row per paint-correction funnel lead: UTM/click-id attribution, all 4 quiz answers, package chosen, furthest funnel step reached, outcome (booked / whatsapp_handoff / in_progress), and payment timestamps. Use for exporting or ad-hoc pivoting beyond what pc_correlations pre-computes.",
+    {},
+    async () => {
+      const rows = await pcLeadsDetail();
+      return jsonResult({ count: rows.length, leads: rows });
+    }
+  );
+
+  server.tool(
+    "pc_correlations",
+    "Conversion-rate breakdown for the paint-correction funnel by each quiz answer, package tier, and UTM dimension — surfaces patterns like 'leads who picked X convert at Y% vs Z% overall'. Each row includes the sample size so small-sample noise can be judged.",
+    {},
+    async () => {
+      const data = await pcCorrelations();
+      return jsonResult(data);
+    }
+  );
+
   // -- write: leads ----------------------------------------------------------
 
   const SERVICE_IDS = SERVICES.map((s) => s.id);
@@ -947,8 +987,13 @@ export function registerTools(server) {
     async ({ leadId, status }) => {
       const lead = await getLead(leadId);
       if (!lead) return jsonResult({ error: "Lead not found", leadId });
-      const updated = await updateLead(leadId, { status });
-      return jsonResult({ ok: true, leadId, status: updated.status });
+      try {
+        const updated = await updateLead(leadId, { status });
+        return jsonResult({ ok: true, leadId, status: updated.status });
+      } catch (err) {
+        if (err instanceof PcTransitionError) return jsonResult({ error: err.message, leadId });
+        throw err;
+      }
     }
   );
 

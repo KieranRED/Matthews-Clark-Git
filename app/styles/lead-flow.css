@@ -160,7 +160,7 @@
   color: #fff;
 }
 .lf-bigbtn--primary:hover { background: #4A78FF; }
-.lf-bigbtn--primary:disabled { background: rgba(255,255,255,.08); color: rgba(255,255,255,.3); cursor: default; }
+.lf-bigbtn--primary:disabled { background: rgba(31,79,255,.16); color: rgba(255,255,255,.55); border: 1px solid rgba(31,79,255,.3); cursor: default; }
 .lf-bigbtn--ghost {
   background: transparent;
   color: #fff;

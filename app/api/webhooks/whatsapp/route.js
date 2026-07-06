@@ -19,6 +19,8 @@ import { after } from "next/server";
 import crypto from "node:crypto";
 import { processInboundMessage } from "@/lib/whatsappStore";
 import { dispatchToTeam } from "@/lib/pushStore";
+import { getLead, updateLead } from "@/lib/leadStore";
+import { updateTask } from "@/lib/taskStore";
 
 // ---------------------------------------------------------------------------
 // GET — hub.challenge verification
@@ -135,12 +137,44 @@ async function handlePayload(payload) {
           const preview = (msg.type === "text" ? msg.text?.body : `[${msg.type}]`) || "";
           await dispatchToTeam({ threadId: result.threadId, contactName, preview });
         }
+
+        // Paint-correction chase (T1/T2): an inbound reply means they DID
+        // WhatsApp us after all — cancel the "handoff gone quiet" trigger and
+        // close the auto-created follow-up tasks so the team isn't chasing
+        // someone who already replied.
+        if (result?.crmLeadId) {
+          await markPcLeadReplied(result.crmLeadId).catch((err) => console.error("[webhook][whatsapp][pc-reply-hook-failed]", err));
+        }
       }
 
       // Delivery receipts — log only in Phase 09 (outbound send is Phase 11)
       for (const status of value?.statuses ?? []) {
         console.log("[webhook][status]", status.id, status.status);
       }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Paint-correction chase hook — see lib/pcChase.js for the message side
+// ---------------------------------------------------------------------------
+async function markPcLeadReplied(leadId) {
+  const lead = await getLead(leadId);
+  if (!lead || lead.funnel !== "paint-correction") return;
+
+  const pc = lead.paintCorrection || {};
+  if (pc.whatsappInboundAt) return; // already recorded — nothing new to do
+
+  await updateLead(leadId, {
+    paintCorrection: { ...pc, whatsappInboundAt: new Date().toISOString() },
+    updatedAt: new Date().toISOString()
+  });
+
+  for (const taskId of [pc.followUpTaskId, pc.popReminderTaskId].filter(Boolean)) {
+    try {
+      await updateTask(taskId, { status: "done" });
+    } catch (err) {
+      console.error("[webhook][whatsapp][pc-task-close-failed]", { taskId, err: String(err) });
     }
   }
 }

@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/post", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/token-refresh", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/blob-cleanup", "schedule": "0 3 * * *" }
+    { "path": "/api/cron/blob-cleanup", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/pc-reminders", "schedule": "*/15 * * * *" }
   ]
 }
