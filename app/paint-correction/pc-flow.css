@@ -73,7 +73,13 @@
 }
 .pc-hero-eyebrow .sl { color:rgba(255,255,255,.3); }
 .pc-hero-title {
-  font-family:'Anton','Oswald',Impact,sans-serif; font-size:74px; line-height:.84;
+  /* Fluid size, not a fixed 74px — the ad-matched headlines (G1) run far
+     longer than the short default and were wrapping to 5-6 lines on real ad
+     viewports (~365-440px), which at line-height:.84 rendered as illegible
+     overlapping text. clamp() keeps the punchy display size on wide/short
+     headlines while shrinking long ones to fit; .98 leaves enough gap
+     between baselines that wrapped lines never collide, at any length. */
+  font-family:'Anton','Oswald',Impact,sans-serif; font-size:clamp(38px, 11vw, 74px); line-height:.98;
   letter-spacing:-.02em; text-transform:uppercase; margin:0;
 }
 .pc-hero-title .acc { color:var(--pc-blue); }
