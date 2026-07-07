@@ -175,10 +175,20 @@ function PCButton({ children, onClick, disabled, variant = "primary" }) {
 // Keys must match the live ad URLs' utm_content exactly (pc_conversion_phase1
 // campaign) — these are NOT the "pc-*" slugs used during planning, which
 // never matched any real ad and silently fell through to the default below.
+// Deliberate short <br/>-broken lines (2026-07-07 rewrite) rather than one
+// long sentence left to wrap — keeps each line short enough to run large,
+// and gives every variant the same tall, stacked rhythm as the default
+// below instead of collapsing to two flat lines on mobile.
+// tof_kak: cold lead — resolves the "I already wash it" frustration by
+// naming the paint, not the owner's effort, as the actual problem.
+// mof_dirty_damaged: warm lead — wax-hides-vs-correction-removes is the
+// real, well-established distinction in the market; leans on permanence.
+// bof_gloss_filter: hot/purchase-ready lead — confident and short, answers
+// the "is that shine real or edited" doubt the ad's filter hook implies.
 const PC_HERO_HEADLINES = {
-  "tof_kak": <>YOUR EFFORT WAS NEVER THE PROBLEM. NOW IT <span className="acc">PAYS OFF</span>.</>,
-  "mof_dirty_damaged": <>WAX HIDES. CORRECTION <span className="acc">REMOVES</span>.</>,
-  "bof_gloss_filter": <>IT’S NOT WHAT YOU DRIVE. IT’S HOW YOU <span className="acc">KEEP</span> IT.</>
+  "tof_kak": <>YOUR WASH<br />WAS FINE.<br /><span className="acc">YOUR PAINT<br />NEEDED MORE.</span></>,
+  "mof_dirty_damaged": <>WAX<br />HIDES IT.<br /><span className="acc">WE REMOVE<br />IT FOR GOOD.</span></>,
+  "bof_gloss_filter": <>NO FILTER.<br /><span className="acc">JUST REAL<br />GLOSS.</span></>
 };
 const PC_HERO_HEADLINE_DEFAULT = <>THE SWIRLS<br />GO. THE<br /><span className="acc">GLOSS</span> STAYS.</>;
 

@@ -73,13 +73,18 @@
 }
 .pc-hero-eyebrow .sl { color:rgba(255,255,255,.3); }
 .pc-hero-title {
-  /* Fluid size, not a fixed 74px — the ad-matched headlines (G1) run far
-     longer than the short default and were wrapping to 5-6 lines on real ad
-     viewports (~365-440px), which at line-height:.84 rendered as illegible
-     overlapping text. clamp() keeps the punchy display size on wide/short
-     headlines while shrinking long ones to fit; .98 leaves enough gap
-     between baselines that wrapped lines never collide, at any length. */
-  font-family:'Anton','Oswald',Impact,sans-serif; font-size:clamp(38px, 11vw, 74px); line-height:.98;
+  /* Fluid size — the G1 headlines (2026-07-07 rewrite) are now deliberate
+     short <br/>-broken lines rather than one long sentence left to wrap, so
+     line count is fixed by design and can't overflow the way unpredictable
+     natural wrapping did. That means size can scale aggressively without
+     risking the overlap the old fixed-74px/line-height:.84 caused. The
+     middle clamp term takes whichever of width or height is more
+     constraining (min()), so a short, wide phone doesn't overflow
+     sideways and a narrow, tall phone gets to stack taller instead of
+     sitting small — "stack higher if the phone's height supports it".
+     line-height:.94 is tight enough to feel like one bold block, loose
+     enough that ascenders/descenders on adjacent lines never touch. */
+  font-family:'Anton','Oswald',Impact,sans-serif; font-size:clamp(40px, min(15vw, 9dvh), 84px); line-height:.94;
   letter-spacing:-.02em; text-transform:uppercase; margin:0;
 }
 .pc-hero-title .acc { color:var(--pc-blue); }
